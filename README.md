@@ -1,2 +1,2 @@
 # Zombie
-Zombie chain revive!
+Zombie chan revive!
