@@ -23,12 +23,12 @@ using WEComputer = std::weak_ptr<EComputerNode>;
 using tock_t = int64_t;
 
 struct Record {
-  tock_t finished_tock;
+  tock_t end_tock;
   WEZombie value;
 };
 
 struct Scope {
-  tock_t &tick;
+  tock_t &tock;
   std::vector<WEZombie> created;
 };
 
@@ -76,7 +76,7 @@ struct Zombie {
 };
 
 template<typename T>
-struct Gaurd {
+struct Guard {
   const T& get();
 };
 
