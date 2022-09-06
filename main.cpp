@@ -5,7 +5,9 @@
 #include <optional>
 
 struct EZombieNode {
-  
+  virtual void* unsafe_ptr() = 0;
+  virtual void lock() = 0;
+  virtual void unlock() = 0;
 };
 
 using EZombie = std::shared_ptr<EZombieNode>;
