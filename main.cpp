@@ -14,7 +14,8 @@ using EZombie = std::shared_ptr<EZombieNode>;
 using WEZombie = std::weak_ptr<EZombieNode>;
 
 struct EComputerNode {
-  
+  virtual void* uncompute() = 0;
+  virtual double cost() = 0;
 };
 
 using EComputer = std::shared_ptr<EComputerNode>;
@@ -79,7 +80,18 @@ struct Zombie {
 
 template<typename T>
 struct Guard {
-  const T& get();
+  EZombie& ezombie;
+  Guard(EZombie& ez) : ezombie(ez) {
+    ezombie->lock();
+  }
+  ~Guard() {
+    ezombie->unlock();
+  }
+  Guard(const Guard<T>&) = delete;
+  Guard(Guard<T>&&) = delete;
+  const T& get() {
+    return ezombie->unsafe_ptr();
+  }
 };
 
 int main() {
