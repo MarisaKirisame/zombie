@@ -52,7 +52,7 @@ struct World {
 // does not recurse
 template<typename T>
 struct ComputerNode : EComputerNode {
-  std::function<void()> f;
+  std::function<void(void* in, void* out)> f;
   std::vector<EZombie> input;
   std::vector<WEZombie> output;
   size_t memory;
@@ -71,6 +71,16 @@ struct ZombieNode : EZombieNode {
   std::optional<T> t;
   std::optional<Computer<T>> com;
   // invariant: t or com must has_value()
+  ZombieNode(const T& t) : t(t) { }
+  void* unsafe_ptr() {
+    return &t.value();
+  }
+  void lock() {
+    
+  }
+  void unlock() {
+    
+  }
 };
 
 template<typename T>
@@ -82,14 +92,15 @@ template<typename T>
 struct Guard;
 
 template<typename T>
-Zombie<T> mkZombie(const T&) {
-  
+Zombie<T> mkZombie(const T& t) {
+  return { std::make_shared<ZombieNode<T>>(t) };
 }
 
 template<typename F, typename ...T>
 auto bindZombie(const F& f, const Zombie<T>& ...x) {
   std::tuple<Guard<T>...> g(x.node...);
-  return 1;
+  auto y = std::apply([](const Guard<T>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
+  return std::apply(f, y);
 }
 
 template<typename T>
@@ -103,8 +114,8 @@ struct Guard {
   }
   Guard(const Guard<T>&) = delete;
   Guard(Guard<T>&&) = delete;
-  const T& get() {
-    return ezombie->unsafe_ptr();
+  const T& get() const {
+    return *static_cast<T*>(ezombie->unsafe_ptr());
   }
 };
 
