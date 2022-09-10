@@ -79,9 +79,23 @@ struct Zombie {
 };
 
 template<typename T>
+struct Guard;
+
+template<typename T>
+Zombie<T> mkZombie(const T&) {
+  
+}
+
+template<typename F, typename ...T>
+auto bindZombie(const F& f, const Zombie<T>& ...x) {
+  std::tuple<Guard<T>...> g(x.node...);
+  return 1;
+}
+
+template<typename T>
 struct Guard {
-  EZombie& ezombie;
-  Guard(EZombie& ez) : ezombie(ez) {
+  const EZombie& ezombie;
+  Guard(const EZombie& ez) : ezombie(ez) {
     ezombie->lock();
   }
   ~Guard() {
@@ -95,5 +109,7 @@ struct Guard {
 };
 
 int main() {
+  auto x = mkZombie(3), y = mkZombie(4);
+  auto z = bindZombie([](int x, int y){return mkZombie(x + y);}, x, y);
   return 0;
 }
