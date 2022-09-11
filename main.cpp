@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <vector>
 #include <optional>
+#include <iostream>
 
 struct EZombieNode {
   virtual ~EZombieNode() { }
@@ -93,6 +94,9 @@ struct ZombieNode : EZombieNode {
   void* unsafe_ptr() {
     return &t.value();
   }
+  const T& get() {
+   return  t.value();
+  }
   void lock() {
     
   }
@@ -123,22 +127,24 @@ auto bindZombie(const F& f, const Zombie<T>& ...x) {
 
 template<typename T>
 struct Guard {
-  const EZombie& ezombie;
-  Guard(const EZombie& ez) : ezombie(ez) {
-    ezombie->lock();
+  EZombieNode& ezn;
+  Guard(const EZombie& ez) : ezn(*ez.get()) {
+    ezn.lock();
   }
   ~Guard() {
-    ezombie->unlock();
+    ezn.unlock();
   }
   Guard(const Guard<T>&) = delete;
   Guard(Guard<T>&&) = delete;
   const T& get() const {
-    return *static_cast<T*>(ezombie->unsafe_ptr());
+    return *static_cast<const T*>(ezn.unsafe_ptr());
   }
 };
 
 int main() {
   auto x = mkZombie(3), y = mkZombie(4);
+  std::cout << x.node->get() << y.node->get() << std::endl;
   auto z = bindZombie([](int x, int y){return mkZombie(x + y);}, x, y);
+  std::cout << z.node->get() << std::endl;
   return 0;
 }
