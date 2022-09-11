@@ -69,8 +69,8 @@ struct Computer {
 template<typename T>
 struct ZombieNode : EZombieNode {
   std::optional<T> t;
-  std::optional<Computer<T>> com;
-  // invariant: t or com must has_value()
+  // multiple ZombieNode may share the same created_time
+  tock_t created_time;
   ZombieNode(const T& t) : t(t) { }
   void* unsafe_ptr() {
     return &t.value();
