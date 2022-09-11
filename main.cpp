@@ -5,6 +5,7 @@
 #include <optional>
 
 struct EZombieNode {
+  virtual ~EZombieNode() { }
   virtual void* unsafe_ptr() = 0;
   virtual void lock() = 0;
   virtual void unlock() = 0;
@@ -14,6 +15,7 @@ using EZombie = std::shared_ptr<EZombieNode>;
 using WEZombie = std::weak_ptr<EZombieNode>;
 
 struct EComputerNode {
+  virtual ~EComputerNode() { }
   virtual void* uncompute() = 0;
   virtual double cost() = 0;
 };
@@ -22,7 +24,20 @@ using EComputer = std::shared_ptr<EComputerNode>;
 using WEComputer = std::weak_ptr<EComputerNode>;
 
 // start at 0.
-// a tock pass whenever a Computer is created.
+// a tock pass whenever a Computer start execution, or a Zombie is created.
+// we denote the start and end(open-close) of Computer execution as a tock_range.
+// likewise, Zombie also has a tock_range with exactly 1 tock in it.
+// One property of all the tock_range is, there is no overlapping.
+// A tock_range might either be included by another tock_range,
+// include that tock_range, or have no intersection.
+// This allow a bunch of tock_range in a tree.
+// From a tock, we can regain a Computer (to rerun function),
+// or a Zombie, to reuse values.
+// We use tock instead of e.g. pointer for indexing,
+// because doing so allow a far more compact representation,
+// and we use a single index instead of separate index, because Computer and Zombie relate -
+// the outer tock_range node can does everything an inner tock_range node does,
+// so one can replay that instead if the more fine grained option is absent.
 using tock_t = int64_t;
 
 struct Record {
@@ -46,6 +61,9 @@ struct World {
   std::vector<WEComputer> evict_pool;
   // when replaying a function, look at recorded to repatch recursive remat, thus existing fragment can be reused
   std::unordered_map<tock_t, Record> recorded;
+
+  // recorded at above is not too correct... I think it should be more like a tree.
+
   Context ctx;
 };
 
