@@ -9,8 +9,11 @@
 #include <map>
 #include <cassert>
 
-struct EZombieNode {
-  virtual ~EZombieNode() { }
+struct Object {
+  virtual ~Object() { }
+};
+
+struct EZombieNode : Object {
   virtual void* unsafe_ptr() = 0;
   virtual void lock() = 0;
   virtual void unlock() = 0;
@@ -19,8 +22,7 @@ struct EZombieNode {
 using EZombie = std::shared_ptr<EZombieNode>;
 using WEZombie = std::weak_ptr<EZombieNode>;
 
-struct EComputerNode {
-  virtual ~EComputerNode() { }
+struct EComputerNode : Object {
   virtual void* uncompute() = 0;
   virtual double cost() = 0;
 };
@@ -48,8 +50,8 @@ using tock = int64_t;
 // open-close.
 using tock_range = std::pair<tock, tock>;
 
+template<typename V>
 struct tock_tree {
-  using V = void*;
   struct Node {
     // nullptr iff toplevel
     Node* parent;
@@ -130,11 +132,6 @@ struct tock_tree {
   }
 };
 
-struct Record {
-  tock end_tock;
-  WEZombie value;
-};
-
 struct Scope {
   tock &current_tock;
   std::vector<WEZombie> created;
@@ -147,12 +144,16 @@ struct Context {
 
 struct World {
   static World& get_world();
-  // maybe this should be an kinetic datastructure, we will see
-  std::vector<WEComputer> evict_pool;
-  // when replaying a function, look at recorded to repatch recursive remat, thus existing fragment can be reused
-  std::unordered_map<tock, Record> recorded;
 
-  // recorded at above is not too correct... I think it should be more like a tree.
+  std::vector<tock> evict_pool;
+
+  // Zombie are referenced by record while
+  // Computer are held by record.
+  // Zombie are removed when it is destructed while
+  // Computer are removed and destructed when it has no children.
+  // Note that one cannot create a Computer with no children,
+  // as you have to return a Zombie, which become its children.
+  tock_tree<Object*> record;
 
   Context ctx;
 };
