@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -13,22 +12,16 @@ struct Object {
   virtual ~Object() { }
 };
 
-struct EZombieNode : Object {
-  virtual void* unsafe_ptr() = 0;
-  virtual void lock() = 0;
-  virtual void unlock() = 0;
+struct EZombie : Object {
+  virtual const void* unsafe_ptr() const = 0;
+  virtual void lock() const = 0;
+  virtual void unlock() const = 0;
 };
 
-using EZombie = std::shared_ptr<EZombieNode>;
-using WEZombie = std::weak_ptr<EZombieNode>;
-
-struct EComputerNode : Object {
+struct EComputer : Object {
   virtual void* uncompute() = 0;
   virtual double cost() = 0;
 };
-
-using EComputer = std::shared_ptr<EComputerNode>;
-using WEComputer = std::weak_ptr<EComputerNode>;
 
 // start at 0.
 // a tock pass whenever a Computer start execution, or a Zombie is created.
@@ -134,7 +127,7 @@ struct tock_tree {
 
 struct Scope {
   tock &current_tock;
-  std::vector<WEZombie> created;
+  std::vector<EZombie*> created;
 };
 
 struct Context {
@@ -160,10 +153,10 @@ struct World {
 
 // does not recurse
 template<typename T>
-struct ComputerNode : EComputerNode {
+struct Computer : EComputer {
   std::function<void(void* in, void* out)> f;
-  std::vector<EZombie> input;
-  std::vector<WEZombie> output;
+  std::vector<tock> input;
+  std::vector<tock> output;
   size_t memory;
   int64_t compute_cost;
   time_t enter_time;
@@ -171,62 +164,47 @@ struct ComputerNode : EComputerNode {
 };
 
 template<typename T>
-struct Computer {
-  std::shared_ptr<ComputerNode<T>> node;
-};
-
-template<typename T>
-struct ZombieNode : EZombieNode {
+struct Zombie : EZombie {
   std::optional<T> t;
   // multiple ZombieNode may share the same created_time
   tock created_time;
-  ZombieNode(const T& t) : t(t) { }
-  void* unsafe_ptr() {
+  Zombie(const T& t) : t(t) { }
+  const void* unsafe_ptr() const {
     return &t.value();
   }
-  const T& get() {
+  const T& unsafe_get() const {
    return  t.value();
   }
-  void lock() {
+  void lock() const {
     
   }
-  void unlock() {
+  void unlock() const {
     
   }
-};
-
-template<typename T>
-struct Zombie {
-  std::shared_ptr<ZombieNode<T>> node;
 };
 
 template<typename T>
 struct Guard;
 
-template<typename T>
-Zombie<T> mkZombie(const T& t) {
-  return { std::make_shared<ZombieNode<T>>(t) };
-}
-
 template<typename F, typename ...T>
 auto bindZombie(const F& f, const Zombie<T>& ...x) {
-  std::tuple<Guard<T>...> g(x.node.get()...);
+  std::tuple<Guard<T>...> g(&x...);
   auto y = std::apply([](const Guard<T>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
   return std::apply(f, y);
 }
 
 template<typename T>
 struct Guard {
-  EZombieNode& ezn;
-  Guard(EZombieNode* eznp) : ezn(*eznp) {
-    ezn.lock();
+  const EZombie& ez;
+  Guard(const EZombie* ezp) : ez(*ezp) {
+    ez.lock();
   }
   ~Guard() {
-    ezn.unlock();
+    ez.unlock();
   }
   Guard(const Guard<T>&) = delete;
   Guard(Guard<T>&&) = delete;
   const T& get() const {
-    return *static_cast<const T*>(ezn.unsafe_ptr());
+    return *static_cast<const T*>(ez.unsafe_ptr());
   }
 };
