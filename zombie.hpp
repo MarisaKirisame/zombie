@@ -6,6 +6,8 @@
 #include <vector>
 #include <optional>
 #include <iostream>
+#include <map>
+#include <cassert>
 
 struct EZombieNode {
   virtual ~EZombieNode() { }
@@ -41,21 +43,106 @@ using WEComputer = std::weak_ptr<EComputerNode>;
 // and we use a single index instead of separate index, because Computer and Zombie relate -
 // the outer tock_range node can does everything an inner tock_range node does,
 // so one can replay that instead if the more fine grained option is absent.
-using tock_t = int64_t;
+using tock = int64_t;
+
+// open-close.
+using tock_range = std::pair<tock, tock>;
+
+struct tock_tree {
+  using V = void*;
+  struct Node {
+    // nullptr iff toplevel
+    Node* parent;
+    tock_range range;
+    V value;
+    Node(Node* parent, const tock_range& range, const V& value) :
+      parent(parent), range(range), value(value) { }
+    std::map<tock, Node> children;
+  };
+  std::map<tock, Node> children;
+  static bool static_in_range(const std::map<tock, Node>& children, const tock& t) {
+    auto it = children.upper_bound(t);
+    if (it == children.end()) {
+      return false;
+    } else {
+      assert(it->second.range.first <= t);
+      return t < it->second.range.second;
+    }
+  }
+  bool in_range(const tock& t) const {
+    return static_in_range(children, t);
+  }
+  static const Node& static_get_shallow(const std::map<tock, Node>& children, const tock& t) {
+    auto it = children.upper_bound(t);
+    assert(it != children.end());
+    assert(it->second.range.first <= t);
+    assert(t < it->second.range.second);
+    return it->second;
+  }
+  static Node& static_get_shallow(std::map<tock, Node>& children, const tock& t) {
+    auto it = children.upper_bound(t);
+    assert(it != children.end());
+    assert(it->second.range.first <= t);
+    assert(t < it->second.range.second);
+    return it->second;
+  }
+  Node& get_node(const tock& t) {
+    Node* ptr = &static_get_shallow(children, t);
+    while (static_in_range(ptr->children, t)) {
+      ptr = &static_get_shallow(ptr->children, t);
+    }
+    return *ptr;
+  }
+  const Node& get_node(const tock& t) const {
+    const Node* ptr = &static_get_shallow(children, t);
+    while (static_in_range(ptr->children, t)) {
+      ptr = &static_get_shallow(ptr->children, t);
+    }
+    return *ptr;
+  }
+  // get the most precise range that contain t
+  V get(const tock& t) {
+    return get_node(t).value;
+  }
+  void delete_node(Node& node) {
+    if (node.parent == nullptr) {
+      children.erase(node.range.first);
+    } else {
+      std::map<tock, Node>& insert_to = node.parent->children;
+      for (auto it = node.children.begin(); it != node.children.end();) {
+        auto next_it = it;
+        ++next_it;
+        auto nh = node.children.extract(it);
+        nh.mapped().parent = node.parent->parent;
+        insert_to.insert(std::move(nh));
+        it = next_it;
+      }
+      node.parent->children.erase(node.range.first);
+    }
+  }
+  void put(const tock_range& r, const V& v) {
+    if (in_range(r.first)) {
+      auto n = get_node(r.first);
+      n.children.insert({r.first, Node(&n, r, v)});
+    } else {
+      children.insert({r.first, Node(nullptr, r, v)});
+    }
+  }
+};
 
 struct Record {
-  tock_t end_tock;
+  tock end_tock;
   WEZombie value;
 };
 
 struct Scope {
-  tock_t &tock;
+  tock &current_tock;
   std::vector<WEZombie> created;
 };
 
 struct Context {
   std::vector<Scope> scopes;
-  tock_t day, night;
+  tock day, night;
 };
 
 struct World {
@@ -63,7 +150,7 @@ struct World {
   // maybe this should be an kinetic datastructure, we will see
   std::vector<WEComputer> evict_pool;
   // when replaying a function, look at recorded to repatch recursive remat, thus existing fragment can be reused
-  std::unordered_map<tock_t, Record> recorded;
+  std::unordered_map<tock, Record> recorded;
 
   // recorded at above is not too correct... I think it should be more like a tree.
 
@@ -79,7 +166,7 @@ struct ComputerNode : EComputerNode {
   size_t memory;
   int64_t compute_cost;
   time_t enter_time;
-  tock_t started_tock;
+  tock started_tock;
 };
 
 template<typename T>
@@ -91,7 +178,7 @@ template<typename T>
 struct ZombieNode : EZombieNode {
   std::optional<T> t;
   // multiple ZombieNode may share the same created_time
-  tock_t created_time;
+  tock created_time;
   ZombieNode(const T& t) : t(t) { }
   void* unsafe_ptr() {
     return &t.value();
