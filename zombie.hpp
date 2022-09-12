@@ -145,7 +145,7 @@ struct Context {
 struct World {
   static World& get_world();
 
-  std::vector<tock> evict_pool;
+  std::vector<EZombie*> evict_pool;
 
   // Zombie are referenced by record while
   // Computer are held by record.
