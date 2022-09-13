@@ -68,7 +68,9 @@ struct Zombie : EZombie {
   std::optional<T> t;
   // multiple ZombieNode may share the same created_time
   tock created_time;
+  Zombie() : t(T()) { }
   Zombie(const T& t) : t(t) { }
+  Zombie(T&& t) : t(std::move(t)) { }
   const void* unsafe_ptr() const {
     return &t.value();
   }

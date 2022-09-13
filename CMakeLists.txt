@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 
 project(Zombie)
 
+add_executable(debug debug.cpp)
+
+target_compile_features(debug PRIVATE cxx_std_17)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
