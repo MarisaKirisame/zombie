@@ -36,9 +36,20 @@ TEST(ZombieTest, Resource) {
       Zombie<Resource> y = bindZombie([](const Resource& x) { return Resource(); }, x);
       EXPECT_EQ(destructor_count, last_destructor_count);
       last_destructor_count = destructor_count;
+      EXPECT_EQ(y.evictable(), true);
+      y.evict();
+      EXPECT_EQ(destructor_count, last_destructor_count+1) << "evict does not release resource";
+      last_destructor_count = destructor_count;
     }
-    EXPECT_EQ(destructor_count, last_destructor_count+1);
+    EXPECT_EQ(destructor_count, last_destructor_count) << "evicted value does not get destructed again";
     last_destructor_count = destructor_count;
   }
   EXPECT_EQ(destructor_count, last_destructor_count+1);
+}
+
+TEST(ZombieTest, Recompute) {
+  Zombie<int> x(3);
+  // maybe weird that we allow evicting on input, but input can live out of scope so we have to recompute them anyway.
+  x.evict();
+  EXPECT_EQ(x.get_value(), 3);
 }

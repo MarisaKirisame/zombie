@@ -18,6 +18,13 @@ struct EZombie : Object {
   virtual const void* unsafe_ptr() const = 0;
   virtual void lock() const = 0;
   virtual void unlock() const = 0;
+  // locked values are not evictable
+  virtual bool evictable() const = 0;
+  // a value may be evicted multiple time.
+  // this serve as a better user-facing api,
+  // because a value might be silently evict.
+  virtual bool evicted() const = 0;
+  virtual void evict() const = 0;
 };
 
 struct EComputer : Object {
@@ -63,14 +70,24 @@ struct Computer : EComputer {
   tock started_tock;
 };
 
+// T should manage it's own memory:
+// when T is construct, only then all memory is released.
+// this mean T should no contain Zombie or shared_ptr.
+// however, such cases is not incorrect, it merely mess with uncompute/recompute profitability a bit.
 template<typename T>
 struct Zombie : EZombie {
-  std::optional<T> t;
-  // multiple ZombieNode may share the same created_time
+  mutable std::optional<T> t;
+  // -1 for moved Zombie. otherwise unique.
   tock created_time;
   Zombie() : t(T()) { }
   Zombie(const T& t) : t(t) { }
   Zombie(T&& t) : t(std::move(t)) { }
+  Zombie(Zombie&& z) : t(std::move(t)), created_time(std::move(created_time)) {
+    z.created_time = -1;
+  }
+  ~Zombie() {
+    if (created_time != -1) { }
+  }
   const void* unsafe_ptr() const {
     return &t.value();
   }
@@ -82,6 +99,18 @@ struct Zombie : EZombie {
   }
   void unlock() const {
     
+  }
+  bool evictable() const {
+    return true;
+  }
+  bool evicted() const {
+    return t.has_value();
+  }
+  void evict() const {
+    t.reset();
+  }
+  T get_value() const {
+    return unsafe_get();
   }
 };
 
