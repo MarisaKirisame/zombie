@@ -43,7 +43,10 @@ struct Context {
 };
 
 struct World {
-  static World& get_world();
+  static World& get_world() {
+    static World w;
+    return w;
+  }
 
   std::vector<EZombie*> evict_pool;
 
@@ -79,9 +82,16 @@ struct Zombie : EZombie {
   mutable std::optional<T> t;
   // -1 for moved Zombie. otherwise unique.
   tock created_time;
-  Zombie() : t(T()) { }
-  Zombie(const T& t) : t(t) { }
-  Zombie(T&& t) : t(std::move(t)) { }
+  template<typename ...Args>
+  Zombie(const Args& ... args) : t(T(args...)) { }
+  Zombie(T&& t) : t(std::move(t)) {
+    World& w = World::get_world();
+    if (w.ctx.scopes.empty()) {
+      
+    } else {
+      
+    }
+  }
   Zombie(Zombie&& z) : t(std::move(t)), created_time(std::move(created_time)) {
     z.created_time = -1;
   }

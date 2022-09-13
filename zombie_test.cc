@@ -53,3 +53,7 @@ TEST(ZombieTest, Recompute) {
   x.evict();
   EXPECT_EQ(x.get_value(), 3);
 }
+
+TEST(TockTreeTest, ReversedOrder) {
+  
+}
