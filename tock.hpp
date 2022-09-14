@@ -20,6 +20,26 @@ using tock = int64_t;
 // open-close.
 using tock_range = std::pair<tock, tock>;
 
+template<typename K, typename V>
+auto largest_value_le(const std::map<K, V>& m, const K& k) {
+  auto it = m.lower_bound(k);
+  if (it == m.begin()) {
+    return m.end();
+  } else {
+    return --it;
+  }
+}
+
+template<typename K, typename V>
+auto largest_value_le(std::map<K, V>& m, const K& k) {
+  auto it = m.lower_bound(k);
+  if (it == m.begin()) {
+    return it;
+  } else {
+    return --it;
+  }
+}
+
 template<typename V>
 struct tock_tree {
   struct Node {
@@ -33,10 +53,11 @@ struct tock_tree {
   };
   std::map<tock, Node> children;
   static bool static_in_range(const std::map<tock, Node>& children, const tock& t) {
-    auto it = children.upper_bound(t);
+    auto it = largest_value_le(children, t);
     if (it == children.end()) {
       return false;
     } else {
+      std::cout << it->first << ", " << it->second.range.first << ", " << t << std::endl;
       assert(it->second.range.first <= t);
       return t < it->second.range.second;
     }
@@ -45,14 +66,14 @@ struct tock_tree {
     return static_in_range(children, t);
   }
   static const Node& static_get_shallow(const std::map<tock, Node>& children, const tock& t) {
-    auto it = children.upper_bound(t);
+    auto it = largest_value_le(children, t);
     assert(it != children.end());
     assert(it->second.range.first <= t);
     assert(t < it->second.range.second);
     return it->second;
   }
   static Node& static_get_shallow(std::map<tock, Node>& children, const tock& t) {
-    auto it = children.upper_bound(t);
+    auto it = largest_value_le(children, t);
     assert(it != children.end());
     assert(it->second.range.first <= t);
     assert(t < it->second.range.second);
