@@ -64,7 +64,9 @@ struct tock_tree {
       parent(parent), range(range), value(value) { }
     std::map<tock, Node> children;
   };
+
   std::map<tock, Node> children;
+
   static bool static_in_range(const std::map<tock, Node>& children, const tock& t) {
     auto it = largest_value_le(children, t);
     if (it == children.end()) {
@@ -74,9 +76,11 @@ struct tock_tree {
       return t < it->second.range.second;
     }
   }
+
   bool in_range(const tock& t) const {
     return static_in_range(children, t);
   }
+
   static const Node& static_get_shallow(const std::map<tock, Node>& children, const tock& t) {
     auto it = largest_value_le(children, t);
     assert(it != children.end());
@@ -84,6 +88,7 @@ struct tock_tree {
     assert(t < it->second.range.second);
     return it->second;
   }
+
   static Node& static_get_shallow(std::map<tock, Node>& children, const tock& t) {
     auto it = largest_value_le(children, t);
     assert(it != children.end());
@@ -91,6 +96,7 @@ struct tock_tree {
     assert(t < it->second.range.second);
     return it->second;
   }
+
   Node& get_node(const tock& t) {
     Node* ptr = &static_get_shallow(children, t);
     while (static_in_range(ptr->children, t)) {
@@ -98,6 +104,7 @@ struct tock_tree {
     }
     return *ptr;
   }
+
   const Node& get_node(const tock& t) const {
     const Node* ptr = &static_get_shallow(children, t);
     while (static_in_range(ptr->children, t)) {
@@ -105,10 +112,12 @@ struct tock_tree {
     }
     return *ptr;
   }
+
   // get the most precise range that contain t
   V get(const tock& t) {
     return get_node(t).value;
   }
+
   void delete_node(Node& node) {
     if (node.parent == nullptr) {
       children.erase(node.range.first);
@@ -124,9 +133,11 @@ struct tock_tree {
       node.parent->children.erase(node.range.first);
     }
   }
+
   void check_invariant() const {
     check_invariant(children, std::optional<tock_range>());
   }
+
   static void check_invariant(const std::map<tock, Node>& children, const std::optional<tock_range>& r) {
     std::optional<tock_range> prev_range;
     for (auto p : children) {
@@ -142,6 +153,7 @@ struct tock_tree {
       prev_range = curr_range;
     }
   }
+
   void put(const tock_range& r, const V& v) {
     std::map<tock, Node>* inserted = nullptr;
     typename std::map<tock, Node>::iterator it;
