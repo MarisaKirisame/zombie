@@ -58,4 +58,5 @@ TEST(TockTreeTest, ReversedOrder) {
   tock_tree<int> tt;
   tt.put({2,6}, 0);
   tt.put({1,10}, 1);
+  EXPECT_EQ(tt.get(5), 1);
 }

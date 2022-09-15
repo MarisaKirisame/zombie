@@ -23,7 +23,7 @@ using tock_range = std::pair<tock, tock>;
 template<typename K, typename V>
 auto largest_value_le(const std::map<K, V>& m, const K& k) {
   auto it = m.lower_bound(k);
-  if (it == m.begin()) {
+  if (it == m.begin() || it == m.end()) {
     return m.end();
   } else {
     return --it;
