@@ -40,6 +40,19 @@ auto largest_value_le(std::map<K, V>& m, const K& k) {
   }
 }
 
+bool range_dominate(const tock_range& l, const tock_range& r) {
+  return l.first <= r.first && l.second >= r.second;
+}
+
+// for now we dont allow empty range, but the code should hopefully work with them.
+bool range_ok(const tock_range& r) {
+  return r.first < r.second;
+}
+
+bool range_nointersect(const tock_range& l, const tock_range& r) {
+  return l.second <= r.first;
+}
+
 template<typename V>
 struct tock_tree {
   struct Node {
@@ -57,7 +70,6 @@ struct tock_tree {
     if (it == children.end()) {
       return false;
     } else {
-      std::cout << it->first << ", " << it->second.range.first << ", " << t << std::endl;
       assert(it->second.range.first <= t);
       return t < it->second.range.second;
     }
@@ -103,22 +115,53 @@ struct tock_tree {
     } else {
       std::map<tock, Node>& insert_to = node.parent->children;
       for (auto it = node.children.begin(); it != node.children.end();) {
-        auto next_it = it;
-        ++next_it;
-        auto nh = node.children.extract(it);
-        nh.mapped().parent = node.parent->parent;
+        auto old_it = it;
+        ++it;
+        auto nh = node.children.extract(old_it);
+        nh.mapped().parent = node.parent;
         insert_to.insert(std::move(nh));
-        it = next_it;
       }
       node.parent->children.erase(node.range.first);
     }
   }
+  void check_invariant() const {
+    check_invariant(children, std::optional<tock_range>());
+  }
+  static void check_invariant(const std::map<tock, Node>& children, const std::optional<tock_range>& r) {
+    std::optional<tock_range> prev_range;
+    for (auto p : children) {
+      const auto& curr_range = p.second.range;
+      assert(range_ok(curr_range));
+      if (r.has_value()) {
+        assert(range_dominate(r.value(), curr_range));
+      }
+      if (prev_range.has_value()) {
+        assert(range_nointersect(prev_range.value(), curr_range));
+      }
+      check_invariant(p.second.children, curr_range);
+      prev_range = curr_range;
+    }
+  }
   void put(const tock_range& r, const V& v) {
+    std::map<tock, Node>* inserted = nullptr;
+    typename std::map<tock, Node>::iterator it;
     if (in_range(r.first)) {
       auto n = get_node(r.first);
-      n.children.insert({r.first, Node(&n, r, v)});
+      assert(range_dominate(n.range, r));
+      inserted = &n.children;
+      it = inserted->insert({r.first, Node(&n, r, v)}).first;
     } else {
-      children.insert({r.first, Node(nullptr, r, v)});
+      inserted = &children;
+      it = inserted->insert({r.first, Node(nullptr, r, v)}).first;
+    }
+    Node& inserted_node = it->second;
+    ++it;
+    while (it != inserted->end() && range_dominate(r, it->second.range)) {
+      auto old_it = it;
+      ++it;
+      auto nh = inserted->extract(old_it);
+      nh.mapped().parent = &inserted_node;
+      inserted_node.children.insert(std::move(nh));
     }
   }
 };
