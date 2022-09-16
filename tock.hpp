@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 // start at 0.
 // a tock pass whenever a Computer start execution, or a Zombie is created.
 // we denote the start and end(open-close) of Computer execution as a tock_range.
@@ -22,8 +24,8 @@ using tock_range = std::pair<tock, tock>;
 
 template<typename K, typename V>
 auto largest_value_le(const std::map<K, V>& m, const K& k) {
-  auto it = m.lower_bound(k);
-  if (it == m.begin() || it == m.end()) {
+  auto it = m.upper_bound(k);
+  if (it == m.begin()) {
     return m.end();
   } else {
     return --it;
@@ -32,9 +34,9 @@ auto largest_value_le(const std::map<K, V>& m, const K& k) {
 
 template<typename K, typename V>
 auto largest_value_le(std::map<K, V>& m, const K& k) {
-  auto it = m.lower_bound(k);
+  auto it = m.upper_bound(k);
   if (it == m.begin()) {
-    return it;
+    return m.end();
   } else {
     return --it;
   }
@@ -63,117 +65,119 @@ struct tock_tree {
     Node(Node* parent, const tock_range& range, const V& value) :
       parent(parent), range(range), value(value) { }
     std::map<tock, Node> children;
+
+    bool children_in_range(const tock& t) const {
+      auto it = largest_value_le(children, t);
+      if (it == children.end()) {
+        return false;
+      } else {
+        assert(it->second.range.first <= t);
+        return t < it->second.range.second;
+      }
+    }
+
+    const Node& get_shallow(const tock& t) const {
+      auto it = largest_value_le(children, t);
+      assert(it != children.end());
+      assert(it->second.range.first <= t);
+      assert(t < it->second.range.second);
+      return it->second;
+    }
+
+    Node& get_shallow(const tock& t) {
+      auto it = largest_value_le(children, t);
+      assert(it != children.end());
+      assert(it->second.range.first <= t);
+      assert(t < it->second.range.second);
+      return it->second;
+    }
+
+    const Node& get_node(const tock& t) const {
+      return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
+    }
+
+    Node& get_node(const tock& t) {
+      return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
+    }
+
+    // get the most precise range that contain t
+    V get(const tock& t) const {
+      return get_node(t).value;
+    }
+
+    void delete_node() {
+      // the root node is not for deletion.
+      assert (parent != nullptr);
+      std::map<tock, Node>& insert_to = parent->children;
+      for (auto it = children.begin(); it != children.end();) {
+        auto nh = children.extract(it++);
+        nh.mapped().parent = parent;
+        insert_to.insert(std::move(nh));
+      }
+      parent->children.erase(range.first);
+    }
+
+    void check_invariant() const {
+      std::optional<tock_range> prev_range;
+      for (auto p : children) {
+        const auto& curr_range = p.second.range;
+        assert(range_ok(curr_range));
+        assert(range_dominate(range, curr_range));
+        if (prev_range.has_value()) {
+          assert(range_nointersect(prev_range.value(), curr_range));
+        }
+        p.second.check_invariant();
+        prev_range = curr_range;
+      }
+
+    }
   };
 
-  std::map<tock, Node> children;
-
-  static bool static_in_range(const std::map<tock, Node>& children, const tock& t) {
-    auto it = largest_value_le(children, t);
-    if (it == children.end()) {
-      return false;
-    } else {
-      assert(it->second.range.first <= t);
-      return t < it->second.range.second;
-    }
-  }
-
-  bool in_range(const tock& t) const {
-    return static_in_range(children, t);
-  }
-
-  static const Node& static_get_shallow(const std::map<tock, Node>& children, const tock& t) {
-    auto it = largest_value_le(children, t);
-    assert(it != children.end());
-    assert(it->second.range.first <= t);
-    assert(t < it->second.range.second);
-    return it->second;
-  }
-
-  static Node& static_get_shallow(std::map<tock, Node>& children, const tock& t) {
-    auto it = largest_value_le(children, t);
-    assert(it != children.end());
-    assert(it->second.range.first <= t);
-    assert(t < it->second.range.second);
-    return it->second;
-  }
+  Node n = Node(nullptr, tock_range(-1, std::numeric_limits<tock>::max()), V());
 
   Node& get_node(const tock& t) {
-    Node* ptr = &static_get_shallow(children, t);
-    while (static_in_range(ptr->children, t)) {
-      ptr = &static_get_shallow(ptr->children, t);
-    }
-    return *ptr;
+    return n.get_node(t);
   }
 
   const Node& get_node(const tock& t) const {
-    const Node* ptr = &static_get_shallow(children, t);
-    while (static_in_range(ptr->children, t)) {
-      ptr = &static_get_shallow(ptr->children, t);
-    }
-    return *ptr;
+    return n.get_node(t);
   }
 
   // get the most precise range that contain t
-  V get(const tock& t) {
-    return get_node(t).value;
-  }
-
-  void delete_node(Node& node) {
-    if (node.parent == nullptr) {
-      children.erase(node.range.first);
-    } else {
-      std::map<tock, Node>& insert_to = node.parent->children;
-      for (auto it = node.children.begin(); it != node.children.end();) {
-        auto old_it = it;
-        ++it;
-        auto nh = node.children.extract(old_it);
-        nh.mapped().parent = node.parent;
-        insert_to.insert(std::move(nh));
-      }
-      node.parent->children.erase(node.range.first);
-    }
+  V get(const tock& t) const {
+    return n.get(t);
   }
 
   void check_invariant() const {
-    check_invariant(children, std::optional<tock_range>());
-  }
-
-  static void check_invariant(const std::map<tock, Node>& children, const std::optional<tock_range>& r) {
-    std::optional<tock_range> prev_range;
-    for (auto p : children) {
-      const auto& curr_range = p.second.range;
-      assert(range_ok(curr_range));
-      if (r.has_value()) {
-        assert(range_dominate(r.value(), curr_range));
-      }
-      if (prev_range.has_value()) {
-        assert(range_nointersect(prev_range.value(), curr_range));
-      }
-      check_invariant(p.second.children, curr_range);
-      prev_range = curr_range;
-    }
+    n.check_invariant();
   }
 
   void put(const tock_range& r, const V& v) {
-    std::map<tock, Node>* inserted = nullptr;
-    typename std::map<tock, Node>::iterator it;
-    if (in_range(r.first)) {
-      auto n = get_node(r.first);
-      assert(range_dominate(n.range, r));
-      inserted = &n.children;
-      it = inserted->insert({r.first, Node(&n, r, v)}).first;
-    } else {
-      inserted = &children;
-      it = inserted->insert({r.first, Node(nullptr, r, v)}).first;
-    }
+    Node& n = get_node(r.first);
+    assert(range_dominate(n.range, r));
+    auto* inserted = &n.children;
+    auto it = inserted->insert({r.first, Node(&n, r, v)}).first;
     Node& inserted_node = it->second;
     ++it;
     while (it != inserted->end() && range_dominate(r, it->second.range)) {
-      auto old_it = it;
-      ++it;
-      auto nh = inserted->extract(old_it);
+      auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
       inserted_node.children.insert(std::move(nh));
     }
   }
 };
+
+template<typename V>
+std::ostream& print(std::ostream& os, const typename tock_tree<V>::Node& n) {
+  os << "Node " << n.value << " [" << n.range.first << ", " << n.range.second << ")" << " {" << std::endl;
+  for (const auto& p : n.children) {
+    print<V>(os, p.second);
+  }
+  return os << "}" << std::endl;
+}
+
+template<typename V>
+std::ostream& operator<<(std::ostream& os, const tock_tree<V>& v) {
+  print<V>(os, v.n);
+  return os;
+}

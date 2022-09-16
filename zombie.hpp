@@ -82,9 +82,10 @@ struct Zombie : EZombie {
   mutable std::optional<T> t;
   // -1 for moved Zombie. otherwise unique.
   tock created_time;
+
   template<typename ...Args>
-  Zombie(const Args& ... args) : t(T(args...)) { }
-  Zombie(T&& t) : t(std::move(t)) {
+  void construct(Args&& ... args) {
+    t = T(std::move(args)...);
     World& w = World::get_world();
     if (w.ctx.scopes.empty()) {
       
@@ -92,7 +93,18 @@ struct Zombie : EZombie {
       
     }
   }
-  Zombie(Zombie&& z) : t(std::move(t)), created_time(std::move(created_time)) {
+
+  template<typename ...Args>
+  Zombie(Args&&... args) {
+    construct(std::move(args)...);
+  }
+  Zombie(const T& t) {
+    construct(t);
+  }
+  Zombie(T&& t) {
+    construct(std::move(t));
+  }
+  Zombie(Zombie<T>&& z) : t(std::move(t)), created_time(std::move(created_time)) {
     z.created_time = -1;
   }
   ~Zombie() {
