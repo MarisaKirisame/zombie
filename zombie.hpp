@@ -29,14 +29,7 @@ struct EZombie : Object {
 };
 
 struct Scope {
-  tock& current_tock;
   std::vector<tock> created;
-  Scope(tock& current_tock) : current_tock(current_tock) { }
-};
-
-struct Context {
-  std::vector<Scope> scopes;
-  tock day, night;
 };
 
 struct World {
@@ -55,22 +48,17 @@ struct World {
   // as you have to return a Zombie, which become its children.
   tock_tree<Object*> record;
 
-  Context ctx;
+  std::vector<Scope> scopes;
 
-  tock tick_tock() {
-    return ctx.scopes.back().current_tock++;
-  }
-
-  tock get_tock() {
-    return ctx.scopes.back().current_tock;
-  }
+  tock current_tock = 1;
 };
 
 // does not recurse
 struct Computer {
-  std::function<void(void* in, void* out)> f;
+  std::function<void(std::vector<void*> in, EZombie* out)> f;
   std::vector<tock> input;
-  std::vector<tock> output;
+  std::vector<tock> created;
+  tock output;
   size_t memory;
   int64_t compute_cost;
 };
@@ -87,30 +75,32 @@ private:
     t = std::move(z.t);
     z.t.reset();
     created_time = std::move(z.created_time);
-    z.created_time = -1;
+    z.created_time = 0;
     return *this;
   }
   Zombie<T>& operator=(const Zombie<T>&) = delete;
+  template<typename F, typename... Arg>
+  friend auto bindZombie(F&& f, const Zombie<Arg>&... x);
 public:
   mutable std::optional<T> t;
-  // -1 for moved Zombie. otherwise unique.
+  // 0 for moved Zombie, positive for normal, unique zombie, negative forward to corresponding positive.
   tock created_time;
 
   template<typename ...Args>
   void construct(Args&&... args) {
     World& w = World::get_world();
-    if (w.ctx.scopes.empty()) {
+    if (w.scopes.empty()) {
       struct Constructor {
         std::tuple<std::decay_t<Args>...> args;
         Constructor(Args&&... args) : args(std::forward<Args>(args)...) { }
-        Zombie<T> operator()() {
+        Zombie<T> operator()() const {
           return std::apply([](const Args&... args){ return Zombie<T>(args...); }, args);
         }
       } con(std::forward<Args>(args)...);
       (*this) = bindZombie(std::move(con));
     } else {
       t = T(std::forward<Args>(args)...);
-      created_time = w.tick_tock();
+      created_time = w.current_tock++;
     }
   }
 
@@ -125,7 +115,7 @@ public:
     construct(std::move(t));
   }
   Zombie(Zombie<T>&& z) : t(std::move(z.t)), created_time(std::move(z.created_time)) {
-    z.created_time = -1;
+    z.created_time = 0;
     z.t.reset();
   }
   Zombie(const Zombie<T>& z) = delete;
@@ -174,25 +164,42 @@ struct Guard {
   }
 };
 
-template<typename F, typename ...T>
-auto bindZombie(F&& f, const Zombie<T>& ...x) {
+template<typename F, size_t... Is>
+auto gen_tuple_impl(F func, std::index_sequence<Is...> ) {
+  return std::make_tuple(func(Is)...);
+}
+
+template<size_t N, typename F>
+auto gen_tuple(F func) {
+  return gen_tuple_impl(func, std::make_index_sequence<N>{} );
+}
+
+template<typename F, typename... Arg>
+auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   World& w = World::get_world();
   struct ScopeGuard {
     World& w;
     std::vector<Scope>& scopes;
-    ScopeGuard(World& w) : w(w), scopes(w.ctx.scopes) {
-      scopes.push_back(Scope(scopes.empty() ? w.ctx.day : scopes.back().current_tock));
+    ScopeGuard(World& w) : w(w), scopes(w.scopes) {
+      scopes.push_back(Scope());
     }
     ~ScopeGuard() {
       scopes.pop_back();
     }
   } sg(w);
-  std::tuple<Guard<T>...> g(&x...);
-  auto y = std::apply([](const Guard<T>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
-  tock start_time = w.tick_tock();
+  std::tuple<Guard<Arg>...> g(&x...);
+  auto y = std::apply([](const Guard<Arg>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
+  tock start_time = w.current_tock++;
   auto ret = std::apply(f, y);
-  tock end_time = w.get_tock();
-  new F(std::forward<F>(f));
-  new Computer { };
+  tock end_time = w.current_tock;
+  std::vector<tock> in = {x.created_time...};
+  std::vector<tock> out = std::move(w.scopes.back().created);
+  std::function<void(const std::vector<void*>&, EZombie*)> func =
+    [f = std::forward<F>(f)](const std::vector<void*> in, EZombie* out) {
+      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+      (*dynamic_cast<decltype(ret)*>(out)) = std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
+  };
+  new Computer { std::move(func), in, out };
   return std::move(ret);
 }
