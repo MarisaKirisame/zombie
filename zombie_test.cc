@@ -34,7 +34,6 @@ TEST(ZombieTest, Resource) {
     ~Resource() {
       if (!moved) {
         ++destructor_count;
-        std::cout << "~Resource!" << std::endl;
       }
     }
   };
