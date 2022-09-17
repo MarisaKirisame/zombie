@@ -28,14 +28,9 @@ struct EZombie : Object {
   virtual void evict() const = 0;
 };
 
-struct EComputer : Object {
-  virtual void* uncompute() = 0;
-  virtual double cost() = 0;
-};
-
 struct Scope {
   tock& current_tock;
-  std::vector<EZombie*> created;
+  std::vector<tock> created;
   Scope(tock& current_tock) : current_tock(current_tock) { }
 };
 
@@ -61,18 +56,23 @@ struct World {
   tock_tree<Object*> record;
 
   Context ctx;
+
+  tock tick_tock() {
+    return ctx.scopes.back().current_tock++;
+  }
+
+  tock get_tock() {
+    return ctx.scopes.back().current_tock;
+  }
 };
 
 // does not recurse
-template<typename T>
-struct Computer : EComputer {
+struct Computer {
   std::function<void(void* in, void* out)> f;
   std::vector<tock> input;
   std::vector<tock> output;
   size_t memory;
   int64_t compute_cost;
-  time_t enter_time;
-  tock started_tock;
 };
 
 // T should manage it's own memory:
@@ -110,7 +110,7 @@ public:
       (*this) = bindZombie(std::move(con));
     } else {
       t = T(std::forward<Args>(args)...);
-      created_time = w.ctx.scopes.back().current_tock++;
+      created_time = w.tick_tock();
     }
   }
 
@@ -159,25 +159,6 @@ public:
 };
 
 template<typename T>
-struct Guard;
-
-template<typename F, typename ...T>
-auto bindZombieInner(bool recompute, F&& f, const Zombie<T>& ...x) {
-  World& w = World::get_world();
-  w.ctx.scopes.push_back(Scope(recompute ? w.ctx.night : w.ctx.day));
-  std::tuple<Guard<T>...> g(&x...);
-  auto y = std::apply([](const Guard<T>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
-  auto ret = std::apply(f, y);
-  w.ctx.scopes.pop_back();
-  new F(std::forward<F>(f));
-  return std::move(ret);
-}
-template<typename F, typename ...T>
-auto bindZombie(F&& f, const Zombie<T>& ...x) {
-  return bindZombieInner(false, std::forward<F>(f), x...);
-}
-
-template<typename T>
 struct Guard {
   const EZombie& ez;
   Guard(const EZombie* ezp) : ez(*ezp) {
@@ -192,3 +173,26 @@ struct Guard {
     return *static_cast<const T*>(ez.unsafe_ptr());
   }
 };
+
+template<typename F, typename ...T>
+auto bindZombie(F&& f, const Zombie<T>& ...x) {
+  World& w = World::get_world();
+  struct ScopeGuard {
+    World& w;
+    std::vector<Scope>& scopes;
+    ScopeGuard(World& w) : w(w), scopes(w.ctx.scopes) {
+      scopes.push_back(Scope(scopes.empty() ? w.ctx.day : scopes.back().current_tock));
+    }
+    ~ScopeGuard() {
+      scopes.pop_back();
+    }
+  } sg(w);
+  std::tuple<Guard<T>...> g(&x...);
+  auto y = std::apply([](const Guard<T>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
+  tock start_time = w.tick_tock();
+  auto ret = std::apply(f, y);
+  tock end_time = w.get_tock();
+  new F(std::forward<F>(f));
+  new Computer { };
+  return std::move(ret);
+}
