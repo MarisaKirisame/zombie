@@ -22,14 +22,19 @@ TEST(ZombieTest, Resource) {
     Resource(Resource&& r) {
       r.moved = true;
     }
+    Resource(const Resource& r) {
+      assert(!r.moved);
+    }
+    Resource& operator=(const Resource& r) {
+      throw;
+    }
     Resource& operator=(Resource&& r) {
-      moved = false;
-      r.moved = true;
-      return *this;
+      throw;
     }
     ~Resource() {
       if (!moved) {
         ++destructor_count;
+        std::cout << "~Resource!" << std::endl;
       }
     }
   };
@@ -41,7 +46,7 @@ TEST(ZombieTest, Resource) {
       Zombie<Resource> y = bindZombie([](const Resource& x) { return Resource(); }, x);
       EXPECT_EQ(destructor_count, last_destructor_count);
       last_destructor_count = destructor_count;
-      EXPECT_EQ(y.evictable(), true);
+      EXPECT_TRUE(y.evictable());
       y.evict();
       EXPECT_EQ(destructor_count, last_destructor_count+1) << "evict does not release resource";
       last_destructor_count = destructor_count;

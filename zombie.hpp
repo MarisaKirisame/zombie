@@ -7,6 +7,7 @@
 #include <iostream>
 #include <map>
 #include <cassert>
+#include <type_traits>
 
 #include "tock.hpp"
 
@@ -33,8 +34,9 @@ struct EComputer : Object {
 };
 
 struct Scope {
-  tock &current_tock;
+  tock& current_tock;
   std::vector<EZombie*> created;
+  Scope(tock& current_tock) : current_tock(current_tock) { }
 };
 
 struct Context {
@@ -79,24 +81,42 @@ struct Computer : EComputer {
 // however, such cases is not incorrect, it merely mess with uncompute/recompute profitability a bit.
 template<typename T>
 struct Zombie : EZombie {
+private:
+  //Zombie() : created_time(-1) { }
+  Zombie<T>& operator=(Zombie<T>&& z) {
+    t = std::move(z.t);
+    z.t.reset();
+    created_time = std::move(z.created_time);
+    z.created_time = -1;
+    return *this;
+  }
+  Zombie<T>& operator=(const Zombie<T>&) = delete;
+public:
   mutable std::optional<T> t;
   // -1 for moved Zombie. otherwise unique.
   tock created_time;
 
   template<typename ...Args>
-  void construct(Args&& ... args) {
-    t = T(std::move(args)...);
+  void construct(Args&&... args) {
     World& w = World::get_world();
     if (w.ctx.scopes.empty()) {
-      
+      struct Constructor {
+        std::tuple<std::decay_t<Args>...> args;
+        Constructor(Args&&... args) : args(std::forward<Args>(args)...) { }
+        Zombie<T> operator()() {
+          return std::apply([](const Args&... args){ return Zombie<T>(args...); }, args);
+        }
+      } con(std::forward<Args>(args)...);
+      (*this) = bindZombie(std::move(con));
     } else {
-      
+      t = T(std::forward<Args>(args)...);
+      created_time = w.ctx.scopes.back().current_tock++;
     }
   }
 
-  template<typename ...Args>
+  template<typename... Args>
   Zombie(Args&&... args) {
-    construct(std::move(args)...);
+    construct(std::forward<Args>(args)...);
   }
   Zombie(const T& t) {
     construct(t);
@@ -104,9 +124,11 @@ struct Zombie : EZombie {
   Zombie(T&& t) {
     construct(std::move(t));
   }
-  Zombie(Zombie<T>&& z) : t(std::move(t)), created_time(std::move(created_time)) {
+  Zombie(Zombie<T>&& z) : t(std::move(z.t)), created_time(std::move(z.created_time)) {
     z.created_time = -1;
+    z.t.reset();
   }
+  Zombie(const Zombie<T>& z) = delete;
   ~Zombie() {
     if (created_time != -1) { }
   }
@@ -140,10 +162,19 @@ template<typename T>
 struct Guard;
 
 template<typename F, typename ...T>
-auto bindZombie(const F& f, const Zombie<T>& ...x) {
+auto bindZombieInner(bool recompute, F&& f, const Zombie<T>& ...x) {
+  World& w = World::get_world();
+  w.ctx.scopes.push_back(Scope(recompute ? w.ctx.night : w.ctx.day));
   std::tuple<Guard<T>...> g(&x...);
   auto y = std::apply([](const Guard<T>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
-  return std::apply(f, y);
+  auto ret = std::apply(f, y);
+  w.ctx.scopes.pop_back();
+  new F(std::forward<F>(f));
+  return std::move(ret);
+}
+template<typename F, typename ...T>
+auto bindZombie(F&& f, const Zombie<T>& ...x) {
+  return bindZombieInner(false, std::forward<F>(f), x...);
 }
 
 template<typename T>

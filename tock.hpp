@@ -152,7 +152,7 @@ struct tock_tree {
     n.check_invariant();
   }
 
-  void put(const tock_range& r, const V& v) {
+  Node& put(const tock_range& r, const V& v) {
     Node& n = get_node(r.first);
     assert(range_dominate(n.range, r));
     auto* inserted = &n.children;
@@ -164,6 +164,7 @@ struct tock_tree {
       nh.mapped().parent = &inserted_node;
       inserted_node.children.insert(std::move(nh));
     }
+    return inserted_node;
   }
 };
 
