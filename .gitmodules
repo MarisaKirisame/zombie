@@ -1,7 +1,0 @@
-[submodule "abseil-cpp"]
-	path = abseil-cpp
-	url = git@github.com:abseil/abseil-cpp.git
-[submodule "re2"]
-	path = re2
-	url = git@github.com:google/re2.git
-	branch = abseil
