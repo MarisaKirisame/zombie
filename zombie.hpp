@@ -16,7 +16,7 @@ struct Object {
 };
 
 struct EZombie : Object {
-  virtual const void* unsafe_ptr() const = 0;
+  virtual const void* void_ptr() const = 0;
   virtual void lock() const = 0;
   virtual void unlock() const = 0;
   // locked values are not evictable
@@ -29,7 +29,6 @@ struct EZombie : Object {
 };
 
 struct Scope {
-  std::vector<tock> created;
 };
 
 struct World {
@@ -55,20 +54,46 @@ struct World {
 
 // does not recurse
 struct Computer : Object {
-  std::function<void(const std::vector<void*>& in, EZombie* out)> f;
+  std::function<void(const std::vector<void*>& in)> f;
   std::vector<tock> input;
-  std::vector<tock> created;
   tock output;
   size_t memory;
   int64_t compute_cost;
-  Computer(std::function<void(const std::vector<void*>& in, EZombie* out)>&& f,
+  Computer(std::function<void(const std::vector<void*>& in)>&& f,
            const std::vector<tock>& input,
-           const std::vector<tock>& created,
            const tock& output) :
     f(std::move(f)),
     input(input),
-    created(created),
     output(output) { }
+  void replay(const tock& start_at) {
+    struct Tardis {
+      tock old_tock;
+      Tardis(const tock& new_tock) : old_tock(World::get_world().current_tock) {
+        World::get_world().current_tock = new_tock;
+      }
+      ~Tardis() {
+        World::get_world().current_tock = old_tock;
+      }
+    } t(start_at);
+    std::vector<void*> in;
+    f(in);
+  }
+};
+
+template<typename T>
+struct Guard {
+  const EZombie& ez;
+  Guard(const EZombie* ezp) : ez(*ezp) {
+    ez.lock();
+  }
+  ~Guard() {
+    ez.unlock();
+  }
+  Guard(const Guard<T>&) = delete;
+  Guard(Guard<T>&&) = delete;
+  const T& get() const {
+    return *static_cast<const T*>(ez.void_ptr());
+  }
 };
 
 // T should manage it's own memory:
@@ -107,8 +132,18 @@ public:
       } con(std::forward<Args>(args)...);
       (*this) = bindZombie(std::move(con));
     } else {
-      t = T(std::forward<Args>(args)...);
       created_time = w.current_tock++;
+      if (w.record.has_precise(created_time)) {
+        created_time *= -1;
+        auto& n = w.record.get_node_precise(created_time);
+        Zombie<T>& z = dynamic_cast<Zombie<T>&>(*n.value);
+        if (!z.t.has_value()) {
+          z.t = T(std::forward<Args>(args)...);
+        }
+      } else {
+        t = T(std::forward<Args>(args)...);
+        w.record.put({created_time, created_time+1}, this);
+      }
     }
   }
 
@@ -116,59 +151,72 @@ public:
   Zombie(Args&&... args) {
     construct(std::forward<Args>(args)...);
   }
+
   Zombie(const T& t) {
     construct(t);
   }
+
   Zombie(T&& t) {
     construct(std::move(t));
   }
+
   Zombie(Zombie<T>&& z) : t(std::move(z.t)), created_time(std::move(z.created_time)) {
     z.created_time = 0;
     z.t.reset();
   }
+
   Zombie(const Zombie<T>& z) = delete;
+
   ~Zombie() {
-    if (created_time != 0) { }
+    if (created_time > 0) { }
   }
-  const void* unsafe_ptr() const {
-    return &t.value();
-  }
+
   const T& unsafe_get() const {
-   return  t.value();
+    return  t.value();
   }
+
   void lock() const {
     
   }
+
   void unlock() const {
     
   }
+
   bool evictable() const {
     return true;
   }
+
   bool evicted() const {
-    return t.has_value();
+    return !t.has_value();
   }
+
   void evict() const {
     t.reset();
   }
-  T get_value() const {
-    return unsafe_get();
-  }
-};
 
-template<typename T>
-struct Guard {
-  const EZombie& ez;
-  Guard(const EZombie* ezp) : ez(*ezp) {
-    ez.lock();
-  }
-  ~Guard() {
-    ez.unlock();
-  }
-  Guard(const Guard<T>&) = delete;
-  Guard(Guard<T>&&) = delete;
   const T& get() const {
-    return *static_cast<const T*>(ez.unsafe_ptr());
+    assert(created_time > 0);
+    if (t.has_value()) {
+      return t.value();
+    } else {
+      Guard<T> g(this);
+      auto& n = World::get_world().record.get_node_precise(created_time);
+      assert(n.parent != nullptr);
+      assert(n.parent->parent != nullptr);
+      Computer* com = dynamic_cast<Computer*>(n.parent->value);
+      assert(com != nullptr);
+      com->replay(n.parent->range.first);
+      return t.value();
+    }
+  }
+
+  const void* void_ptr() const {
+    return &get();
+  }
+
+  T get_value() const {
+    return get();
   }
 };
 
@@ -208,13 +256,12 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
   tock end_time = w.current_tock;
   std::vector<tock> in = {x.created_time...};
-  std::vector<tock> out = std::move(w.scopes.back().created);
-  std::function<void(const std::vector<void*>&, EZombie*)> func =
-    [f = std::forward<F>(f)](const std::vector<void*> in, EZombie* out) {
+  std::function<void(const std::vector<void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<void*> in) {
       auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-      (*dynamic_cast<decltype(ret)*>(out)) = std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
+      std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  w.record.put({start_time, end_time}, new Computer(std::move(func), in, out, ret.created_time));
+  w.record.put({start_time, end_time}, new Computer(std::move(func), in, ret.created_time));
   return std::move(ret);
 }

@@ -6,6 +6,12 @@ add_executable(debug debug.cpp)
 
 target_compile_features(debug PRIVATE cxx_std_17)
 
+add_subdirectory(abseil-cpp)
+include_directories(abseil-cpp)
+
+add_subdirectory(re2)
+include_directories(re2)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -30,3 +36,6 @@ target_link_libraries(
 
 include(GoogleTest)
 gtest_discover_tests(zombie_test)
+
+target_compile_definitions(gtest PUBLIC GTEST_HAS_ABSL=1)
+target_compile_definitions(gtest_main PUBLIC GTEST_HAS_ABSL=1)

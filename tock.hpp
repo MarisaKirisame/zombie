@@ -133,18 +133,28 @@ struct tock_tree {
     }
   };
 
-  Node n = Node(nullptr, tock_range(-1, std::numeric_limits<tock>::max()), V());
+  Node n = Node(nullptr, tock_range(std::numeric_limits<tock>::min(), std::numeric_limits<tock>::max()), V());
 
   Node& get_node(const tock& t) {
     return n.get_node(t);
   }
 
-  bool has_precise_value(const tock& t) {
+  const Node& get_node(const tock& t) const {
+    return n.get_node(t);
+  }
+
+  bool has_precise(const tock& t) const {
     return get_node(t).range.first == t;
   }
 
-  const Node& get_node(const tock& t) const {
-    return n.get_node(t);
+  Node& get_node_precise(const tock& t) {
+    assert(has_precise(t));
+    return get_node(t);
+  }
+
+  const Node& get_node_precise(const tock& t) const {
+    assert(has_precise(t));
+    return get_node(t);
   }
 
   // get the most precise range that contain t
