@@ -136,8 +136,8 @@ public:
     } else {
       created_time = w.current_tock++;
       if (w.record.has_precise(created_time)) {
-        created_time *= -1;
         auto& n = w.record.get_node_precise(created_time);
+        created_time *= -1;
         Zombie<T>& z = dynamic_cast<Zombie<T>&>(*n.value);
         if (!z.t.has_value()) {
           z.t = T(std::forward<Args>(args)...);
