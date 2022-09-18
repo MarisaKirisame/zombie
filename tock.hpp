@@ -148,12 +148,12 @@ struct tock_tree {
   }
 
   Node& get_node_precise(const tock& t) {
-    assert(has_precise(t));
+    ASSERT(has_precise(t));
     return get_node(t);
   }
 
   const Node& get_node_precise(const tock& t) const {
-    assert(has_precise(t));
+    ASSERT(has_precise(t));
     return get_node(t);
   }
 

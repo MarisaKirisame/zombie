@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 
 project(Zombie)
 
+include_directories(../libassert/include)
+link_directories(../libassert/bin)
+link_libraries(assert)
+
 add_executable(debug debug.cpp)
 target_compile_features(debug PRIVATE cxx_std_17)
 

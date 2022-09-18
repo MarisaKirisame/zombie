@@ -1,6 +1,7 @@
 #include "zombie.hpp"
 
 #include <gtest/gtest.h>
+#include "assert.hpp"
 
 TEST(ZombieTest, Create) {
   Zombie<int> x(42);
@@ -43,7 +44,7 @@ TEST(ZombieTest, Resource) {
     {
       last_destructor_count = destructor_count;
       Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie(Resource()); }, x);
-      EXPECT_EQ(destructor_count, last_destructor_count);
+      ASSERT(destructor_count == last_destructor_count);
       last_destructor_count = destructor_count;
       EXPECT_TRUE(y.evictable());
       y.evict();

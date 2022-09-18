@@ -9,6 +9,8 @@
 #include <cassert>
 #include <type_traits>
 
+#include "assert.hpp"
+
 #include "tock.hpp"
 
 struct Object {
