@@ -8,5 +8,5 @@ int main() {
     //}
   };
   Zombie<Resource> x;
-  Zombie<Resource> y = bindZombie([](const Resource& x) { return Resource(); }, x);
+  Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie(Resource()); }, x);
 }

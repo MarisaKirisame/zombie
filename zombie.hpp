@@ -54,13 +54,21 @@ struct World {
 };
 
 // does not recurse
-struct Computer {
-  std::function<void(std::vector<void*> in, EZombie* out)> f;
+struct Computer : Object {
+  std::function<void(const std::vector<void*>& in, EZombie* out)> f;
   std::vector<tock> input;
   std::vector<tock> created;
   tock output;
   size_t memory;
   int64_t compute_cost;
+  Computer(std::function<void(const std::vector<void*>& in, EZombie* out)>&& f,
+           const std::vector<tock>& input,
+           const std::vector<tock>& created,
+           const tock& output) :
+    f(std::move(f)),
+    input(input),
+    created(created),
+    output(output) { }
 };
 
 // T should manage it's own memory:
@@ -120,7 +128,7 @@ public:
   }
   Zombie(const Zombie<T>& z) = delete;
   ~Zombie() {
-    if (created_time != -1) { }
+    if (created_time != 0) { }
   }
   const void* unsafe_ptr() const {
     return &t.value();
@@ -174,6 +182,12 @@ auto gen_tuple(F func) {
   return gen_tuple_impl(func, std::make_index_sequence<N>{} );
 }
 
+template<typename T>
+struct IsZombie : std::false_type { };
+
+template<typename T>
+struct IsZombie<Zombie<T>> : std::true_type { };
+
 template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   World& w = World::get_world();
@@ -191,6 +205,7 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   auto y = std::apply([](const Guard<Arg>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
   tock start_time = w.current_tock++;
   auto ret = std::apply(f, y);
+  static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
   tock end_time = w.current_tock;
   std::vector<tock> in = {x.created_time...};
   std::vector<tock> out = std::move(w.scopes.back().created);
@@ -199,7 +214,7 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       (*dynamic_cast<decltype(ret)*>(out)) = std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
-  };
-  new Computer { std::move(func), in, out };
+    };
+  w.record.put({start_time, end_time}, new Computer(std::move(func), in, out, ret.created_time));
   return std::move(ret);
 }

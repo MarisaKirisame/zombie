@@ -139,6 +139,10 @@ struct tock_tree {
     return n.get_node(t);
   }
 
+  bool has_precise_value(const tock& t) {
+    return get_node(t).range.first == t;
+  }
+
   const Node& get_node(const tock& t) const {
     return n.get_node(t);
   }
@@ -154,6 +158,8 @@ struct tock_tree {
 
   Node& put(const tock_range& r, const V& v) {
     Node& n = get_node(r.first);
+    // disallow inserting the same node twice
+    assert(n.range.first != r.first);
     assert(range_dominate(n.range, r));
     auto* inserted = &n.children;
     auto it = inserted->insert({r.first, Node(&n, r, v)}).first;

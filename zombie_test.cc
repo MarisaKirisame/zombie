@@ -42,7 +42,7 @@ TEST(ZombieTest, Resource) {
     EXPECT_EQ(destructor_count, 0);
     {
       last_destructor_count = destructor_count;
-      Zombie<Resource> y = bindZombie([](const Resource& x) { return Resource(); }, x);
+      Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie(Resource()); }, x);
       EXPECT_EQ(destructor_count, last_destructor_count);
       last_destructor_count = destructor_count;
       EXPECT_TRUE(y.evictable());
