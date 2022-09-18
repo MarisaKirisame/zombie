@@ -54,6 +54,17 @@ struct World {
   tock current_tock = 1;
 };
 
+struct ScopeGuard {
+  World& w;
+  std::vector<Scope>& scopes;
+  ScopeGuard(World& w) : w(w), scopes(w.scopes) {
+    scopes.push_back(Scope());
+  }
+  ~ScopeGuard() {
+    scopes.pop_back();
+  }
+};
+
 // does not recurse
 struct Computer : Object {
   std::function<void(const std::vector<void*>& in)> f;
@@ -77,6 +88,8 @@ struct Computer : Object {
         World::get_world().current_tock = old_tock;
       }
     } t(start_at);
+    ScopeGuard sg(World::get_world());
+    World::get_world().current_tock++;
     std::vector<void*> in;
     f(in);
   }
@@ -111,6 +124,7 @@ private:
     z.t.reset();
     created_time = std::move(z.created_time);
     z.created_time = 0;
+    World::get_world().record.get_node_precise(created_time).value = this;
     return *this;
   }
   Zombie<T>& operator=(const Zombie<T>&) = delete;
@@ -137,11 +151,11 @@ public:
       created_time = w.current_tock++;
       if (w.record.has_precise(created_time)) {
         auto& n = w.record.get_node_precise(created_time);
-        created_time *= -1;
         Zombie<T>& z = dynamic_cast<Zombie<T>&>(*n.value);
         if (!z.t.has_value()) {
           z.t = T(std::forward<Args>(args)...);
         }
+        created_time *= -1;
       } else {
         t = T(std::forward<Args>(args)...);
         w.record.put({created_time, created_time+1}, this);
@@ -162,9 +176,8 @@ public:
     construct(std::move(t));
   }
 
-  Zombie(Zombie<T>&& z) : t(std::move(z.t)), created_time(std::move(z.created_time)) {
-    z.created_time = 0;
-    z.t.reset();
+  Zombie(Zombie<T>&& z) {
+    (*this) = std::move(z);
   }
 
   Zombie(const Zombie<T>& z) = delete;
@@ -241,16 +254,7 @@ struct IsZombie<Zombie<T>> : std::true_type { };
 template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   World& w = World::get_world();
-  struct ScopeGuard {
-    World& w;
-    std::vector<Scope>& scopes;
-    ScopeGuard(World& w) : w(w), scopes(w.scopes) {
-      scopes.push_back(Scope());
-    }
-    ~ScopeGuard() {
-      scopes.pop_back();
-    }
-  } sg(w);
+  ScopeGuard sg(w);
   std::tuple<Guard<Arg>...> g(&x...);
   auto y = std::apply([](const Guard<Arg>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
   tock start_time = w.current_tock++;

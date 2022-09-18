@@ -169,8 +169,8 @@ struct tock_tree {
   Node& put(const tock_range& r, const V& v) {
     Node& n = get_node(r.first);
     // disallow inserting the same node twice
-    assert(n.range.first != r.first);
-    assert(range_dominate(n.range, r));
+    ASSERT(n.range.first != r.first);
+    ASSERT(range_dominate(n.range, r));
     auto* inserted = &n.children;
     auto it = inserted->insert({r.first, Node(&n, r, v)}).first;
     Node& inserted_node = it->second;

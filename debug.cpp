@@ -1,12 +1,8 @@
 #include "zombie.hpp"
 
 int main() {
-  static int destructor_count = 0;
-  struct Resource {
-    //~Resource() {
-    //  ++destructor_count;
-    //}
-  };
-  Zombie<Resource> x;
-  Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie(Resource()); }, x);
+  Zombie<int> x(3);
+  // maybe weird that we allow evicting on input, but input can live out of scope so we have to recompute them anyway.
+  x.evict();
+  ASSERT(x.get_value(), 3);
 }
