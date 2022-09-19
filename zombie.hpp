@@ -65,7 +65,13 @@ struct ScopeGuard {
   }
 };
 
-// does not recurse
+// A Computer record a computation executed by bindZombie, to replay it.
+// Note that a Computer may invoke more bindZombie, which may create Computer.
+// When that happend, the outer Computer will not replay the inner one,
+// And the metadata is measured accordingly.
+// Note: Computer might be created or destroyed,
+// Thus the work executed by the parent Computer will also change.
+// The metadata must be updated accordingly.
 struct Computer : Object {
   std::function<void(const std::vector<void*>& in)> f;
   std::vector<tock> input;
@@ -79,18 +85,27 @@ struct Computer : Object {
     input(input),
     output(output) { }
   void replay(const tock& start_at) {
+    World& w = World::get_world();
     struct Tardis {
+      World& w;
       tock old_tock;
-      Tardis(const tock& new_tock) : old_tock(World::get_world().current_tock) {
-        World::get_world().current_tock = new_tock;
+      Tardis(World& w, const tock& new_tock) : w(w), old_tock(w.current_tock) {
+        w.current_tock = new_tock;
       }
       ~Tardis() {
-        World::get_world().current_tock = old_tock;
+        w.current_tock = old_tock;
       }
-    } t(start_at);
+    } t(w, start_at);
     ScopeGuard sg(World::get_world());
-    World::get_world().current_tock++;
+    w.current_tock++;
+    std::vector<Zombie*> zombie;
+    std::vector<std::unique_ptr<Zombie>> temporary_zombie;
+    for (const tock& t : input) {
+      ASSERT(w.record.has_precise(t));
+
+    }
     std::vector<void*> in;
+
     f(in);
   }
 };
