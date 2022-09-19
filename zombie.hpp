@@ -8,9 +8,9 @@
 #include <map>
 #include <cassert>
 #include <type_traits>
+#include <memory>
 
 #include "assert.hpp"
-
 #include "tock.hpp"
 
 struct Object {
@@ -28,6 +28,29 @@ struct EZombie : Object {
   // because a value might be silently evict.
   virtual bool evicted() const = 0;
   virtual void evict() const = 0;
+};
+
+struct EGuard {
+  const EZombie& ez;
+  EGuard(const EZombie* ezp) : ez(*ezp) {
+    ez.lock();
+  }
+  ~EGuard() {
+    ez.unlock();
+  }
+  EGuard(const EGuard&) = delete;
+  EGuard(EGuard&&) = delete;
+  const void* get_ptr() const {
+    return ez.void_ptr();
+  }
+};
+
+template<typename T>
+struct Guard : EGuard {
+  Guard(const EZombie* ezp) : EGuard(ezp) { }
+  const T& get() const {
+    return *static_cast<const T*>(get_ptr());
+  }
 };
 
 struct Scope {
@@ -73,12 +96,12 @@ struct ScopeGuard {
 // Thus the work executed by the parent Computer will also change.
 // The metadata must be updated accordingly.
 struct Computer : Object {
-  std::function<void(const std::vector<void*>& in)> f;
+  std::function<void(const std::vector<const void*>& in)> f;
   std::vector<tock> input;
   tock output;
   size_t memory;
   int64_t compute_cost;
-  Computer(std::function<void(const std::vector<void*>& in)>&& f,
+  Computer(std::function<void(const std::vector<const void*>& in)>&& f,
            const std::vector<tock>& input,
            const tock& output) :
     f(std::move(f)),
@@ -98,31 +121,25 @@ struct Computer : Object {
     } t(w, start_at);
     ScopeGuard sg(World::get_world());
     w.current_tock++;
-    std::vector<Zombie*> zombie;
-    std::vector<std::unique_ptr<Zombie>> temporary_zombie;
+    // note that the pointer will be stale if the zombie are destructed, or moved, inside bindZombie.
+    // so - dont do that!
+    // only move zombie that you freshly created,
+    // and only destruct zombie 
+    std::vector<EZombie*> zombie;
+    std::vector<std::unique_ptr<EZombie>> temporary_zombie;
     for (const tock& t : input) {
       ASSERT(w.record.has_precise(t));
-
+      zombie.push_back(dynamic_cast<EZombie*>(w.record.get_node_precise(t).value));
     }
-    std::vector<void*> in;
-
+    std::vector<std::unique_ptr<EGuard>> guards;
+    for (EZombie* ez : zombie) {
+      guards.push_back(std::make_unique<EGuard>(ez));
+    }
+    std::vector<const void*> in;
+    for (const auto& z : guards) {
+      in.push_back(z->get_ptr());
+    }
     f(in);
-  }
-};
-
-template<typename T>
-struct Guard {
-  const EZombie& ez;
-  Guard(const EZombie* ezp) : ez(*ezp) {
-    ez.lock();
-  }
-  ~Guard() {
-    ez.unlock();
-  }
-  Guard(const Guard<T>&) = delete;
-  Guard(Guard<T>&&) = delete;
-  const T& get() const {
-    return *static_cast<const T*>(ez.void_ptr());
   }
 };
 
@@ -277,8 +294,8 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
   tock end_time = w.current_tock;
   std::vector<tock> in = {x.created_time...};
-  std::function<void(const std::vector<void*>&)> func =
-    [f = std::forward<F>(f)](const std::vector<void*> in) {
+  std::function<void(const std::vector<const void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<const void*> in) {
       auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
