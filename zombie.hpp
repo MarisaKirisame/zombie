@@ -13,60 +13,7 @@
 
 #include "assert.hpp"
 #include "tock.hpp"
-
-struct Any {
-  struct AnyNode {
-    virtual ~AnyNode() { }
-    virtual const void* void_ptr() const = 0;
-    virtual void* void_ptr() = 0;
-  };
-  std::unique_ptr<AnyNode> ptr;
-  bool has_value() const {
-    return static_cast<bool>(ptr);
-  }
-  const void* void_ptr() const {
-    return ptr->void_ptr();
-  }
-  void* void_ptr() {
-    return ptr->void_ptr();
-  }
-};
-
-struct Object {
-  virtual ~Object() { }
-};
-
-// template<typename T>
-struct EMonster : Object {
-  // const T* T_ptr() const = 0;
-  virtual const void* void_ptr() const = 0;
-  virtual void lock() const = 0;
-  virtual void unlock() const = 0;
-  // locked values are not evictable
-  virtual bool evictable() const = 0;
-  virtual bool has_value() const = 0;
-  // a value may be evicted multiple time.
-  // this serve as a better user-facing api,
-  // because a value might be silently evict.
-  virtual void evict() const = 0;
-  // void fill(T&&) const = 0;
-  virtual void fill_any(Any&&) const = 0;
-};
-
-struct EGuard {
-  const EMonster& ez;
-  EGuard(const EMonster* ezp) : ez(*ezp) {
-    ez.lock();
-  }
-  ~EGuard() {
-    ez.unlock();
-  }
-  EGuard(const EGuard&) = delete;
-  EGuard(EGuard&&) = delete;
-  const void* get_ptr() const {
-    return ez.void_ptr();
-  }
-};
+#include "phantom.hpp"
 
 template<typename T>
 struct Guard : EGuard {
@@ -76,53 +23,7 @@ struct Guard : EGuard {
   }
 };
 
-struct Scope {
-};
-
-struct World {
-  static World& get_world() {
-    static World w;
-    return w;
-  }
-
-  std::vector<EMonster*> evict_pool;
-
-  // Zombie are referenced by record while
-  // Computer are held by record.
-  // Zombie are removed when it is destructed while
-  // Computer are removed and destructed when it has no children.
-  // Note that one cannot create a Computer with no children,
-  // as you have to return a Zombie, which become its children.
-  tock_tree<Object*> record;
-
-  std::vector<Scope> scopes;
-
-  tock current_tock = 1;
-};
-
-struct Phantom : EMonster {
-  mutable Any a;
-  tock created_time;
-  bool evictable() const { return false; }
-  void lock() const { }
-  void unlock() const { }
-  bool has_value() const { return a.has_value(); }
-  void evict() const { ASSERT(false); }
-  const void* void_ptr() const {
-    return a.void_ptr();
-  }
-  void fill_any(Any&& filled) const {
-    if (!a.has_value()) {
-      a = std::move(filled);
-    }
-  }
-  Phantom(const tock& created_time) : created_time(created_time) {
-    World::get_world().record.put({created_time, created_time+1}, this);
-  }
-  ~Phantom() {
-    World::get_world().record.get_precise_node(created_time).delete_node();
-  }
-};
+struct Computer;
 
 struct ScopeGuard {
   World& w;
@@ -195,6 +96,15 @@ struct Computer : Object {
   }
 };
 
+inline const void* Phantom::void_ptr() const {
+  if (!has_value()) {
+    auto& n = *World::get_world().record.get_precise_node(created_time).parent;
+    dynamic_cast<Computer*>(n.value)->replay(n.range.first);
+  }
+  ASSERT(has_value());
+  return a.void_ptr();
+}
+
 // T should manage it's own memory:
 // when T is construct, only then all memory is released.
 // this mean T should no contain Zombie or shared_ptr.
@@ -235,9 +145,9 @@ public:
       created_time = w.current_tock++;
       if (w.record.has_precise(created_time)) {
         auto& n = w.record.get_precise_node(created_time);
-        Zombie<T>& z = dynamic_cast<Zombie<T>&>(*n.value);
-        if (!z.t.has_value()) {
-          z.t = T(std::forward<Args>(args)...);
+        EMonster* m = dynamic_cast<EMonster*>(n.value);
+        if (!m->has_value()) {
+          m->fill_any(Any(T(std::forward<Args>(args)...)));
         }
         created_time *= -1;
       } else {
@@ -289,7 +199,7 @@ public:
   }
 
   bool has_value() const {
-    return !t.has_value();
+    return t.has_value();
   }
 
   void evict() const {
@@ -308,6 +218,7 @@ public:
       Computer* com = dynamic_cast<Computer*>(n.parent->value);
       assert(com != nullptr);
       com->replay(n.parent->range.first);
+      ASSERT(t.has_value());
       return t.value();
     }
   }
@@ -321,7 +232,7 @@ public:
   }
 
   void fill_any(Any&& a) const {
-    if (has_value()) {
+    if (!has_value()) {
       t = std::move(*static_cast<const T*>(a.void_ptr()));
     }
   }
