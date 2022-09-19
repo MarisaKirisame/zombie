@@ -9,30 +9,53 @@
 #include <cassert>
 #include <type_traits>
 #include <memory>
+#include <any>
 
 #include "assert.hpp"
 #include "tock.hpp"
+
+struct Any {
+  struct AnyNode {
+    virtual ~AnyNode() { }
+    virtual const void* void_ptr() const = 0;
+    virtual void* void_ptr() = 0;
+  };
+  std::unique_ptr<AnyNode> ptr;
+  bool has_value() const {
+    return static_cast<bool>(ptr);
+  }
+  const void* void_ptr() const {
+    return ptr->void_ptr();
+  }
+  void* void_ptr() {
+    return ptr->void_ptr();
+  }
+};
 
 struct Object {
   virtual ~Object() { }
 };
 
-struct EZombie : Object {
+// template<typename T>
+struct EMonster : Object {
+  // const T* T_ptr() const = 0;
   virtual const void* void_ptr() const = 0;
   virtual void lock() const = 0;
   virtual void unlock() const = 0;
   // locked values are not evictable
   virtual bool evictable() const = 0;
+  virtual bool has_value() const = 0;
   // a value may be evicted multiple time.
   // this serve as a better user-facing api,
   // because a value might be silently evict.
-  virtual bool evicted() const = 0;
   virtual void evict() const = 0;
+  // void fill(T&&) const = 0;
+  virtual void fill_any(Any&&) const = 0;
 };
 
 struct EGuard {
-  const EZombie& ez;
-  EGuard(const EZombie* ezp) : ez(*ezp) {
+  const EMonster& ez;
+  EGuard(const EMonster* ezp) : ez(*ezp) {
     ez.lock();
   }
   ~EGuard() {
@@ -47,7 +70,7 @@ struct EGuard {
 
 template<typename T>
 struct Guard : EGuard {
-  Guard(const EZombie* ezp) : EGuard(ezp) { }
+  Guard(const EMonster* ezp) : EGuard(ezp) { }
   const T& get() const {
     return *static_cast<const T*>(get_ptr());
   }
@@ -62,7 +85,7 @@ struct World {
     return w;
   }
 
-  std::vector<EZombie*> evict_pool;
+  std::vector<EMonster*> evict_pool;
 
   // Zombie are referenced by record while
   // Computer are held by record.
@@ -75,6 +98,30 @@ struct World {
   std::vector<Scope> scopes;
 
   tock current_tock = 1;
+};
+
+struct Phantom : EMonster {
+  mutable Any a;
+  tock created_time;
+  bool evictable() const { return false; }
+  void lock() const { }
+  void unlock() const { }
+  bool has_value() const { return a.has_value(); }
+  void evict() const { ASSERT(false); }
+  const void* void_ptr() const {
+    return a.void_ptr();
+  }
+  void fill_any(Any&& filled) const {
+    if (!a.has_value()) {
+      a = std::move(filled);
+    }
+  }
+  Phantom(const tock& created_time) : created_time(created_time) {
+    World::get_world().record.put({created_time, created_time+1}, this);
+  }
+  ~Phantom() {
+    World::get_world().record.get_precise_node(created_time).delete_node();
+  }
 };
 
 struct ScopeGuard {
@@ -124,16 +171,21 @@ struct Computer : Object {
     // note that the pointer will be stale if the zombie are destructed, or moved, inside bindZombie.
     // so - dont do that!
     // only move zombie that you freshly created,
-    // and only destruct zombie 
-    std::vector<EZombie*> zombie;
-    std::vector<std::unique_ptr<EZombie>> temporary_zombie;
+    // and only destruct zombie at destructor.
+    std::vector<EMonster*> monster;
+    std::vector<std::unique_ptr<Phantom>> phantom;
     for (const tock& t : input) {
-      ASSERT(w.record.has_precise(t));
-      zombie.push_back(dynamic_cast<EZombie*>(w.record.get_node_precise(t).value));
+      if (w.record.has_precise(t)) {
+        monster.push_back(dynamic_cast<EMonster*>(w.record.get_precise_node(t).value));
+      } else {
+        auto p = std::make_unique<Phantom>(t);
+        monster.push_back(p.get());
+        phantom.push_back(std::move(p));
+      }
     }
     std::vector<std::unique_ptr<EGuard>> guards;
-    for (EZombie* ez : zombie) {
-      guards.push_back(std::make_unique<EGuard>(ez));
+    for (EMonster* em : monster) {
+      guards.push_back(std::make_unique<EGuard>(em));
     }
     std::vector<const void*> in;
     for (const auto& z : guards) {
@@ -148,7 +200,7 @@ struct Computer : Object {
 // this mean T should no contain Zombie or shared_ptr.
 // however, such cases is not incorrect, it merely mess with uncompute/recompute profitability a bit.
 template<typename T>
-struct Zombie : EZombie {
+struct Zombie : EMonster {
 private:
   //Zombie() : created_time(-1) { }
   Zombie<T>& operator=(Zombie<T>&& z) {
@@ -156,7 +208,7 @@ private:
     z.t.reset();
     created_time = std::move(z.created_time);
     z.created_time = 0;
-    World::get_world().record.get_node_precise(created_time).value = this;
+    World::get_world().record.get_precise_node(created_time).value = this;
     return *this;
   }
   Zombie<T>& operator=(const Zombie<T>&) = delete;
@@ -182,7 +234,7 @@ public:
     } else {
       created_time = w.current_tock++;
       if (w.record.has_precise(created_time)) {
-        auto& n = w.record.get_node_precise(created_time);
+        auto& n = w.record.get_precise_node(created_time);
         Zombie<T>& z = dynamic_cast<Zombie<T>&>(*n.value);
         if (!z.t.has_value()) {
           z.t = T(std::forward<Args>(args)...);
@@ -215,7 +267,9 @@ public:
   Zombie(const Zombie<T>& z) = delete;
 
   ~Zombie() {
-    if (created_time > 0) { }
+    if (created_time > 0) {
+      World::get_world().record.get_precise_node(created_time).delete_node();
+    }
   }
 
   const T& unsafe_get() const {
@@ -234,7 +288,7 @@ public:
     return true;
   }
 
-  bool evicted() const {
+  bool has_value() const {
     return !t.has_value();
   }
 
@@ -248,7 +302,7 @@ public:
       return t.value();
     } else {
       Guard<T> g(this);
-      auto& n = World::get_world().record.get_node_precise(created_time);
+      auto& n = World::get_world().record.get_precise_node(created_time);
       assert(n.parent != nullptr);
       assert(n.parent->parent != nullptr);
       Computer* com = dynamic_cast<Computer*>(n.parent->value);
@@ -264,6 +318,12 @@ public:
 
   T get_value() const {
     return get();
+  }
+
+  void fill_any(Any&& a) const {
+    if (has_value()) {
+      t = std::move(*static_cast<const T*>(a.void_ptr()));
+    }
   }
 };
 

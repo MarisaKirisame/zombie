@@ -147,12 +147,12 @@ struct tock_tree {
     return get_node(t).range.first == t;
   }
 
-  Node& get_node_precise(const tock& t) {
+  Node& get_precise_node(const tock& t) {
     ASSERT(has_precise(t));
     return get_node(t);
   }
 
-  const Node& get_node_precise(const tock& t) const {
+  const Node& get_precise_node(const tock& t) const {
     ASSERT(has_precise(t));
     return get_node(t);
   }

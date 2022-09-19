@@ -76,6 +76,17 @@ TEST(ZombieTest, ChainRecompute) {
   EXPECT_EQ(z.get_value(), 4);
 }
 
+TEST(ZombieTest, ChainRecomputeDestructed) {
+  Zombie<int> x(1);
+  Zombie<int> z = [&](){
+    Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
+    return bindZombie([](int y) { return Zombie(y * 2); }, y);
+  }();
+  EXPECT_TRUE(z.evictable());
+  z.evict();
+  EXPECT_EQ(z.get_value(), 4);
+}
+
 TEST(TockTreeTest, ReversedOrder) {
   tock_tree<int> tt;
   tt.put({2,6}, 1);
