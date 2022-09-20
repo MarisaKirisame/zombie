@@ -19,6 +19,10 @@ struct EMonster : Object {
   // this serve as a better user-facing api,
   // because a value might be silently evict.
   virtual void evict() const = 0;
+  void force_evict() const {
+    ASSERT(evictable());
+    evict();
+  }
   // void fill(T&&) const = 0;
   virtual void fill_any(Any&&) const = 0;
 };
