@@ -2,14 +2,17 @@ cmake_minimum_required(VERSION 3.10)
 
 project(Zombie)
 
-include_directories(include)
+file(GLOB ALL_SRCS "src/*.cpp")
+add_library(ZombieLib ${ALL_SRCS})
+target_include_directories(ZombieLib PUBLIC include)
+target_compile_features(ZombieLib PUBLIC cxx_std_17)
 
 include_directories(../libassert/include)
 link_directories(../libassert/bin)
 link_libraries(assert)
 
 add_executable(debug debug.cpp)
-target_compile_features(debug PRIVATE cxx_std_17)
+target_link_libraries(debug ZombieLib)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -25,8 +28,7 @@ add_executable(
   zombie_test
   zombie_test.cc
 )
-
-target_compile_features(zombie_test PRIVATE cxx_std_17)
+target_link_libraries(zombie_test ZombieLib)
 
 target_link_libraries(
   zombie_test

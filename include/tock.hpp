@@ -1,6 +1,8 @@
 #pragma once
 
 #include <iostream>
+#include <map>
+#include <cassert>
 
 // start at 0.
 // a tock pass whenever a Computer start execution, or a Zombie is created.
@@ -42,16 +44,16 @@ auto largest_value_le(std::map<K, V>& m, const K& k) {
   }
 }
 
-bool range_dominate(const tock_range& l, const tock_range& r) {
+inline bool range_dominate(const tock_range& l, const tock_range& r) {
   return l.first <= r.first && l.second >= r.second;
 }
 
 // for now we dont allow empty range, but the code should hopefully work with them.
-bool range_ok(const tock_range& r) {
+inline bool range_ok(const tock_range& r) {
   return r.first < r.second;
 }
 
-bool range_nointersect(const tock_range& l, const tock_range& r) {
+inline bool range_nointersect(const tock_range& l, const tock_range& r) {
   return l.second <= r.first;
 }
 

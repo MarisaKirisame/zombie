@@ -23,8 +23,6 @@ struct Guard : EGuard {
   }
 };
 
-struct Computer;
-
 struct ScopeGuard {
   World& w;
   std::vector<Scope>& scopes;
@@ -95,15 +93,6 @@ struct Computer : Object {
     f(in);
   }
 };
-
-inline const void* Phantom::void_ptr() const {
-  if (!has_value()) {
-    auto& n = *World::get_world().record.get_precise_node(created_time).parent;
-    dynamic_cast<Computer*>(n.value)->replay(n.range.first);
-  }
-  ASSERT(has_value());
-  return a.void_ptr();
-}
 
 // T should manage it's own memory:
 // when T is construct, only then all memory is released.

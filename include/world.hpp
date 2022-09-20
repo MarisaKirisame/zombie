@@ -1,5 +1,7 @@
 #pragma once
 
+#include "tock.hpp"
+
 struct EMonster;
 struct Object;
 

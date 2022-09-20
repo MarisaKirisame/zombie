@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include "assert.hpp"
 
 struct Any {
   struct AnyNode {
