@@ -5,13 +5,13 @@
 
 TEST(ZombieTest, Create) {
   Zombie<int> x(42);
-  EXPECT_EQ(x.unsafe_get(), 42);
+  EXPECT_EQ(x.get_value(), 42);
 }
 
 TEST(ZombieTest, Bind) {
   Zombie<int> x(6), y(7);
   Zombie<int> z = bindZombie([](int x, int y) { return Zombie(x * y); }, x, y);
-  EXPECT_EQ(z.unsafe_get(), 42);
+  EXPECT_EQ(z.get_value(), 42);
 }
 
 TEST(ZombieTest, Resource) {
@@ -82,6 +82,25 @@ TEST(ZombieTest, ChainRecomputeDestructed) {
   EXPECT_EQ(z.get_value(), 4);
 }
 
+TEST(ZombieTest, DiamondRecompute) {
+  Zombie<int> a(1);
+  size_t executed_time = 0;
+  Zombie<int> b = bindZombie([&](int x) {
+    ++executed_time;
+    return Zombie(x * 2);
+  }, a);
+  Zombie<int> c = bindZombie([](int x) { return Zombie(x * 2); }, b);
+  Zombie<int> d = bindZombie([](int x) { return Zombie(x * 2); }, b);
+  Zombie<int> e = bindZombie([](int x, int y) { return Zombie(x + y); }, c, d);
+  EXPECT_EQ(executed_time, 1);
+  b.force_evict();
+  c.force_evict();
+  d.force_evict();
+  e.force_evict();
+  EXPECT_EQ(e.get_value(), 8);
+  EXPECT_EQ(executed_time, 2);
+}
+
 TEST(ZombieTest, RecursiveEvictedRecompute) {
   // During Recompute, we might run out of memory to hold the newly computed value.
   // When that happend, Zombie might evict some value that it recursively recomputed,
@@ -100,6 +119,8 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
   // totalling 2 execution of b in recompute of e.
   Zombie<int> a(1);
   size_t executed_time = 0;
+  // The use of capture by reference for b and c is not safe,
+  // but we know what we are doing.
   Zombie<int> b = bindZombie([&](int x) {
     ++executed_time;
     return Zombie(x * 2);
