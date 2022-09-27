@@ -26,7 +26,7 @@ enable_testing()
 
 add_executable(
   zombie_test
-  zombie_test.cc
+  test/zombie_test.cc
 )
 target_link_libraries(zombie_test ZombieLib)
 
