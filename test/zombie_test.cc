@@ -111,11 +111,11 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
 
   // The following test had been very carefully constructed.
   // b is the value where we multi-recompute.
-  // we simulate running out of memory by making c evict b.
-  // d also depend on b, and e depend on b, c.
+  // we simulate running out of memory by making d in d <- c <- b evict b.
+  // e also depend on b, and f depend on d, e.
   // when we evict everything, to recompute e,
-  // we recompute c which recompute and immediately evict b,
-  // then we recompute d which recompute b,
+  // we recompute d <- c <- b which evict b,
+  // then we recompute e <- b,
   // totalling 2 execution of b in recompute of e.
   Zombie<int> a(1);
   size_t executed_time = 0;
@@ -126,18 +126,32 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
     return Zombie(x * 2);
   }, a);
   Zombie<int> c = bindZombie([&](int x) {
-    b.force_evict();
     return Zombie(x * 2);
   }, b);
-  Zombie<int> d = bindZombie([](int x) { return Zombie(x * 2); }, b);
-  Zombie<int> e = bindZombie([](int x, int y) { return Zombie(x + y); }, c, d);
+  Zombie<int> d = bindZombie([&](int x) {
+    b.force_evict();
+    return Zombie(x * 2);
+  }, c);
+  Zombie<int> e = bindZombie([](int x) { return Zombie(x * 2); }, b);
+  Zombie<int> f = bindZombie([](int x, int y) { return Zombie(x + y); }, d, e);
   executed_time = 0;
   b.force_evict();
   c.force_evict();
   d.force_evict();
   e.force_evict();
-  EXPECT_EQ(e.get_value(), 8);
+  f.force_evict();
+  EXPECT_EQ(f.get_value(), 12);
   EXPECT_EQ(executed_time, 2);
+}
+
+TEST(ZombieTest, Lock) {
+  Zombie<int> a(0);
+  ASSERT(a.evictable());
+  bindZombie([&](int a_){
+    ASSERT(!a.evictable());
+    return Zombie(1);
+  }, a);
+  ASSERT(a.evictable());
 }
 
 TEST(TockTreeTest, ReversedOrder) {

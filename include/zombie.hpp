@@ -175,16 +175,18 @@ public:
     return  t.value();
   }
 
+  mutable int64_t lock_cnt = 0;
+
   void lock() const {
-    
+    ++lock_cnt;
   }
 
   void unlock() const {
-    
+    --lock_cnt;
   }
 
   bool evictable() const {
-    return true;
+    return lock_cnt == 0;
   }
 
   bool has_value() const {
