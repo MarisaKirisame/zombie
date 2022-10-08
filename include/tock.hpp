@@ -4,6 +4,8 @@
 #include <map>
 #include <cassert>
 
+#include "assert.hpp"
+
 // start at 0.
 // a tock pass whenever a Computer start execution, or a Zombie is created.
 // we denote the start and end(open-close) of Computer execution as a tock_range.

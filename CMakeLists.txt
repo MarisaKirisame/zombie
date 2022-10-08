@@ -24,9 +24,10 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
+file(GLOB zombie_test_src "test/*.cc")
 add_executable(
   zombie_test
-  test/zombie_test.cc
+  ${zombie_test_src}
 )
 target_link_libraries(zombie_test ZombieLib)
 
