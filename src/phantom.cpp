@@ -3,6 +3,7 @@
 #include "phantom.hpp"
 #include "zombie.hpp"
 
+/*
 inline const void* Phantom::void_ptr() const {
   if (!has_value()) {
     auto& n = *World::get_world().record.get_precise_node(created_time).parent;
@@ -11,3 +12,4 @@ inline const void* Phantom::void_ptr() const {
   ASSERT(has_value());
   return a.void_ptr();
 }
+*/

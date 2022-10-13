@@ -8,6 +8,7 @@
 template<typename T>
 struct Bag {
   std::vector<T> vec;
+  Bag() { }
   Bag(std::initializer_list<T> l) : vec(l) { }
   void insert(const T& t) {
     vec.push_back(t);

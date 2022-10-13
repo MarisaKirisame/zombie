@@ -1,8 +1,9 @@
 #pragma once
 
 #include "tock.hpp"
+#include "bag.hpp"
 
-struct EMonster;
+struct EZombieNode;
 struct Object;
 
 struct Scope {
