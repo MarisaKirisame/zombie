@@ -265,3 +265,33 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   w.record.put({start_time, end_time}, new Computer(std::move(func), in, ret.created_time));
   return std::move(ret);
 }
+
+// todo: it could be a shared_ptr to skip registering in node.
+// when that happend, we gain both space and time,
+// at the lose of eviction granularity.
+
+// the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
+template<typename X>
+struct NewZombie {
+  tock t;
+  std::weak_ptr<ZombieNode<X>> ptr;
+};
+
+struct EZombieNode {
+  virtual ~EZombieNode() { }
+  void* get_ptr() const = 0;
+};
+
+struct EZombieRecord : Object {
+};
+
+template<typename X>
+struct ZombieRecord : EZombieRecord {
+  std::weak_ptr<ZombieNode<X>>
+};
+
+template<typename X>
+struct ZombieNode : EZombieNode {
+  X x;
+  Node* node;
+}

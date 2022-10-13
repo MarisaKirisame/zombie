@@ -14,7 +14,7 @@ struct World {
     return w;
   }
 
-  std::vector<EMonster*> evict_pool;
+  Bag<std::shared_ptr<EZombieNode>> x;
 
   // Zombie are referenced by record while
   // Computer are held by record.
