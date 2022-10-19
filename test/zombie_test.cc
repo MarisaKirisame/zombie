@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 #include "assert.hpp"
-/*
+
 TEST(ZombieTest, Create) {
   Zombie<int> x(42);
   EXPECT_EQ(x.get_value(), 42);
@@ -46,7 +46,7 @@ TEST(ZombieTest, Resource) {
       Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie(Resource()); }, x);
       ASSERT(destructor_count == last_destructor_count);
       last_destructor_count = destructor_count;
-      y.force_evict();
+      //y.force_evict();
       EXPECT_EQ(destructor_count, last_destructor_count+1) << "evict does not release resource";
       last_destructor_count = destructor_count;
     }
@@ -56,6 +56,8 @@ TEST(ZombieTest, Resource) {
   EXPECT_EQ(destructor_count, last_destructor_count+1);
 }
 
+
+/*
 TEST(ZombieTest, Recompute) {
   Zombie<int> x(3);
   // maybe weird that we allow evicting on input, but input can live out of scope so we have to recompute them anyway.

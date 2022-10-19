@@ -1,28 +1,10 @@
 #pragma once
 
-/*
-#include <functional>
-#include <unordered_map>
-#include <vector>
-#include <optional>
-#include <iostream>
-#include <map>
-#include <cassert>
-#include <type_traits>
 #include <memory>
-#include <any>
+#include <functional>
 
-#include "assert.hpp"
 #include "tock.hpp"
-#include "phantom.hpp"
-
-template<typename T>
-struct Guard : EGuard {
-  Guard(const EMonster* ezp) : EGuard(ezp) { }
-  const T& get() const {
-    return *static_cast<const T*>(get_ptr());
-  }
-};
+#include "world.hpp"
 
 struct ScopeGuard {
   World& w;
@@ -34,6 +16,21 @@ struct ScopeGuard {
     scopes.pop_back();
   }
 };
+
+/*
+#include <functional>
+#include <unordered_map>
+#include <vector>
+#include <optional>
+#include <iostream>
+#include <map>
+#include <cassert>
+#include <type_traits>
+#include <any>
+
+#include "assert.hpp"
+#include "phantom.hpp"
+
 
 // A Computer record a computation executed by bindZombie, to replay it.
 // Note that a Computer may invoke more bindZombie, which may create Computer.
@@ -178,18 +175,6 @@ public:
 
   mutable int64_t lock_cnt = 0;
 
-  void lock() const {
-    ++lock_cnt;
-  }
-
-  void unlock() const {
-    --lock_cnt;
-  }
-
-  bool evictable() const {
-    return lock_cnt == 0;
-  }
-
   bool has_value() const {
     return t.has_value();
   }
@@ -230,6 +215,17 @@ public:
   }
 };
 
+struct EZombieRecord : Object {
+};
+
+template<typename X>
+struct ZombieRecord : EZombieRecord {
+  std::weak_ptr<ZombieNode<X>>
+};
+
+*/
+
+
 template<typename F, size_t... Is>
 auto gen_tuple_impl(F func, std::index_sequence<Is...> ) {
   return std::make_tuple(func(Is)...);
@@ -239,6 +235,73 @@ template<size_t N, typename F>
 auto gen_tuple(F func) {
   return gen_tuple_impl(func, std::make_index_sequence<N>{} );
 }
+
+struct EZombieNode {
+  virtual ~EZombieNode() { }
+  virtual const void* get_ptr() const = 0;
+};
+
+template<typename X>
+struct ZombieNode : EZombieNode {
+  X x;
+  const void* get_ptr() const {
+    return &x;
+  }
+  const X& get_ref() const {
+    return x;
+  }
+  template<typename... Args>
+  ZombieNode(Args&&... args) : x(std::forward<Args>(args)...) { }
+};
+
+// todo: it could be a shared_ptr to skip registering in node.
+// when that happend, we gain both space and time,
+// at the lose of eviction granularity.
+
+// the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
+template<typename T>
+struct Zombie {
+  static_assert(!std::is_reference_v<T>, "should not be a reference");
+  tock created_time;
+  //std::weak_ptr<ZombieNode<X>> ptr;
+  std::shared_ptr<ZombieNode<T>> ptr;
+
+  template<typename... Args>
+  void construct(Args&&... args) {
+    World& w = World::get_world();
+    created_time = w.current_tock++;
+    if (w.record.has_precise(created_time)) {
+      throw;
+      /*auto& n = w.record.get_precise_node(created_time);
+        EMonster* m = dynamic_cast<EMonster*>(n.value);
+        if (!m->has_value()) {
+        m->fill_any(Any(T(std::forward<Args>(args)...)));
+        }
+        created_time *= -1;*/
+    } else {
+      ptr = std::make_shared<ZombieNode<T>>(std::forward<Args>(args)...);
+      //w.record.put({created_time, created_time+1}, this);
+    }
+  }
+
+  template<typename... Args>
+  Zombie(Args&&... args) {
+    construct(std::forward<Args>(args)...);
+  }
+
+  Zombie(const T& t) {
+    construct(t);
+  }
+
+  Zombie(T&& t) {
+    construct(std::move(t));
+  }
+
+  T get_value() const {
+    return ptr->x;
+  }
+};
+
 
 template<typename T>
 struct IsZombie : std::false_type { };
@@ -250,8 +313,8 @@ template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   World& w = World::get_world();
   ScopeGuard sg(w);
-  std::tuple<Guard<Arg>...> g(&x...);
-  auto y = std::apply([](const Guard<Arg>&... g_){ return std::make_tuple<>(std::cref(g_.get())...); }, g);
+  std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.ptr...);
+  auto y = std::apply([](const std::shared_ptr<ZombieNode<Arg>>&... g_){ return std::make_tuple<>(std::cref(g_->get_ref())...); }, g);
   tock start_time = w.current_tock++;
   auto ret = std::apply(f, y);
   static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
@@ -263,37 +326,6 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  w.record.put({start_time, end_time}, new Computer(std::move(func), in, ret.created_time));
+  //w.record.put({start_time, end_time}, new Computer(std::move(func), in, ret.created_time));
   return std::move(ret);
 }
-
-// todo: it could be a shared_ptr to skip registering in node.
-// when that happend, we gain both space and time,
-// at the lose of eviction granularity.
-
-// the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
-template<typename X>
-struct NewZombie {
-  tock t;
-  std::weak_ptr<ZombieNode<X>> ptr;
-};
-
-struct EZombieNode {
-  virtual ~EZombieNode() { }
-  void* get_ptr() const = 0;
-};
-
-struct EZombieRecord : Object {
-};
-
-template<typename X>
-struct ZombieRecord : EZombieRecord {
-  std::weak_ptr<ZombieNode<X>>
-};
-
-template<typename X>
-struct ZombieNode : EZombieNode {
-  X x;
-  Node* node;
-}
-*/
