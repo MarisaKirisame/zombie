@@ -212,6 +212,27 @@ struct GraveYard : Object {
   explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : head(ptr) { }
 };
 
+
+template<>
+struct NotifyParentChanged<std::unique_ptr<Object>> {
+  void operator()(std::unique_ptr<Object>& node, typename tock_tree<std::unique_ptr<Object>>::Node* parent) {
+    Object* obj = node.get();
+    if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
+      if (gy->head) {
+	if (parent != nullptr) {
+	  auto& bag = World::get_world().evict_pool;
+	  bag.insert(gy->head);
+	  gy->evictable = gy->head;
+	  gy->head.reset();
+	}
+      }
+    } else {
+      // type not found
+      ASSERT(false);
+    }
+  }
+};
+
 template<typename F, size_t... Is>
 auto gen_tuple_impl(F func, std::index_sequence<Is...> ) {
   return std::make_tuple(func(Is)...);

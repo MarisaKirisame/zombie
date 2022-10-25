@@ -64,7 +64,7 @@ struct tock_tree;
 
 template<typename T>
 struct NotifyParentChanged {
-  void operator()(T&, typename tock_tree<T>::Node&) { }
+  void operator()(T&, typename tock_tree<T>::Node*) { }
 };
 
 template<typename V>
@@ -126,7 +126,7 @@ struct tock_tree {
       for (auto it = children.begin(); it != children.end();) {
         auto nh = children.extract(it++);
         nh.mapped().parent = parent;
-        NotifyParentChanged<V>()(nh.mapped().value, *parent);
+        NotifyParentChanged<V>()(nh.mapped().value, parent);
         insert_to.insert(std::move(nh));
       }
       parent->children.erase(range.first);
@@ -198,7 +198,7 @@ struct tock_tree {
       auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
       inserted_node.children.insert(std::move(nh));
-      NotifyParentChanged<V>()(nh.mapped().value, inserted_node);
+      NotifyParentChanged<V>()(nh.mapped().value, &inserted_node);
     }
     return inserted_node;
   }
