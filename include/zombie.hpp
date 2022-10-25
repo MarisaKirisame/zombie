@@ -31,14 +31,6 @@ struct ScopeGuard {
 #include "assert.hpp"
 #include "phantom.hpp"
 
-
-// A Computer record a computation executed by bindZombie, to replay it.
-// Note that a Computer may invoke more bindZombie, which may create Computer.
-// When that happend, the outer Computer will not replay the inner one,
-// And the metadata is measured accordingly.
-// Note: Computer might be created or destroyed,
-// Thus the work executed by the parent Computer will also change.
-// The metadata must be updated accordingly.
 struct Computer : Object {
   std::function<void(const std::vector<const void*>& in)> f;
   std::vector<tock> input;
@@ -112,50 +104,8 @@ private:
   template<typename F, typename... Arg>
   friend auto bindZombie(F&& f, const Zombie<Arg>&... x);
 public:
-  mutable std::optional<T> t;
   // 0 for moved Zombie, positive for normal, unique zombie, negative forward to corresponding positive.
   tock created_time;
-
-  template<typename ...Args>
-  void construct(Args&&... args) {
-    World& w = World::get_world();
-    if (w.scopes.empty()) {
-      struct Constructor {
-        std::tuple<std::decay_t<Args>...> args;
-        Constructor(Args&&... args) : args(std::forward<Args>(args)...) { }
-        Zombie<T> operator()() const {
-          return std::apply([](const Args&... args){ return Zombie<T>(args...); }, args);
-        }
-      } con(std::forward<Args>(args)...);
-      (*this) = bindZombie(std::move(con));
-    } else {
-      created_time = w.current_tock++;
-      if (w.record.has_precise(created_time)) {
-        auto& n = w.record.get_precise_node(created_time);
-        EMonster* m = dynamic_cast<EMonster*>(n.value);
-        if (!m->has_value()) {
-          m->fill_any(Any(T(std::forward<Args>(args)...)));
-        }
-        created_time *= -1;
-      } else {
-        t = T(std::forward<Args>(args)...);
-        w.record.put({created_time, created_time+1}, this);
-      }
-    }
-  }
-
-  template<typename... Args>
-  Zombie(Args&&... args) {
-    construct(std::forward<Args>(args)...);
-  }
-
-  Zombie(const T& t) {
-    construct(t);
-  }
-
-  Zombie(T&& t) {
-    construct(std::move(t));
-  }
 
   Zombie(Zombie<T>&& z) {
     (*this) = std::move(z);
@@ -225,6 +175,20 @@ struct ZombieRecord : EZombieRecord {
 
 */
 
+// A Computer record a computation executed by bindZombie, to replay it.
+// Note that a Computer may invoke more bindZombie, which may create Computer.
+// When that happend, the outer Computer will not replay the inner one,
+// And the metadata is measured accordingly.
+// Note: Computer might be created or destroyed,
+// Thus the work executed by the parent Computer will also change.
+// The metadata must be updated accordingly.
+struct MicroWave : Object {
+  
+};
+
+struct GraveYard : Object {
+  
+};
 
 template<typename F, size_t... Is>
 auto gen_tuple_impl(F func, std::index_sequence<Is...> ) {
@@ -237,8 +201,16 @@ auto gen_tuple(F func) {
 }
 
 struct EZombieNode {
+  ptrdiff_t pool_index = -1;
   virtual ~EZombieNode() { }
   virtual const void* get_ptr() const = 0;
+};
+
+template<>
+struct BagObserver<std::shared_ptr<EZombieNode>> {
+  void operator()(std::shared_ptr<EZombieNode>& t, size_t idx) {
+    t->pool_index = idx;
+  }
 };
 
 template<typename X>
@@ -263,8 +235,48 @@ template<typename T>
 struct Zombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
   tock created_time;
-  //std::weak_ptr<ZombieNode<X>> ptr;
-  std::shared_ptr<ZombieNode<T>> ptr;
+  std::weak_ptr<ZombieNode<T>> ptr;
+
+  bool evictable() const {
+    auto ptr = this->ptr.lock();
+    if (ptr) {
+      return ptr->pool_index != -1;
+    } else {
+      return false;
+    }
+  }
+
+  bool unique() const {
+    return ptr.use_count() ==  1;
+  }
+
+  void evict() {
+    if (evictable()) {
+      auto ptr = this->ptr.lock();
+      ASSERT(ptr);
+      World::get_world().evict_pool.remove(ptr->pool_index);
+    }
+  }
+
+  void force_evict() {
+    ASSERT(evictable());
+    evict();
+  }
+
+  void force_unique_evict() {
+    ASSERT(evictable());
+    ASSERT(unique());
+    evict();
+  }
+
+  std::shared_ptr<ZombieNode<T>> shared_ptr() const {
+    auto ret = ptr.lock();
+    if (ret) {
+      return ret;
+    } else {
+      throw;
+    }
+  }
 
   template<typename... Args>
   void construct(Args&&... args) {
@@ -279,7 +291,9 @@ struct Zombie {
         }
         created_time *= -1;*/
     } else {
-      ptr = std::make_shared<ZombieNode<T>>(std::forward<Args>(args)...);
+      auto shared = std::make_shared<ZombieNode<T>>(std::forward<Args>(args)...);
+      ptr = shared;
+      w.evict_pool.insert(shared);
       //w.record.put({created_time, created_time+1}, this);
     }
   }
@@ -298,7 +312,7 @@ struct Zombie {
   }
 
   T get_value() const {
-    return ptr->x;
+    return shared_ptr()->x;
   }
 };
 
@@ -313,7 +327,7 @@ template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   World& w = World::get_world();
   ScopeGuard sg(w);
-  std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.ptr...);
+  std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.shared_ptr()...);
   auto y = std::apply([](const std::shared_ptr<ZombieNode<Arg>>&... g_){ return std::make_tuple<>(std::cref(g_->get_ref())...); }, g);
   tock start_time = w.current_tock++;
   auto ret = std::apply(f, y);

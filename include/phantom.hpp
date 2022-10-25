@@ -3,7 +3,7 @@
 #include "base.hpp"
 #include "any.hpp"
 #include "world.hpp"
-
+/*
 struct Phantom : EMonster {
   mutable Any a;
   tock created_time;
@@ -25,3 +25,4 @@ struct Phantom : EMonster {
     World::get_world().record.get_precise_node(created_time).delete_node();
   }
 };
+*/

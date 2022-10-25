@@ -2,9 +2,9 @@
 
 #include "tock.hpp"
 #include "bag.hpp"
+#include "base.hpp"
 
 struct EZombieNode;
-struct Object;
 
 struct Scope {
 };
@@ -15,7 +15,7 @@ struct World {
     return w;
   }
 
-  Bag<std::shared_ptr<EZombieNode>> x;
+  Bag<std::shared_ptr<EZombieNode>> evict_pool;
 
   // Zombie are referenced by record while
   // Computer are held by record.
@@ -23,7 +23,7 @@ struct World {
   // Computer are removed and destructed when it has no children.
   // Note that one cannot create a Computer with no children,
   // as you have to return a Zombie, which become its children.
-  tock_tree<Object*> record;
+  tock_tree<std::unique_ptr<Object>> record;
 
   std::vector<Scope> scopes;
 

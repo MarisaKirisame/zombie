@@ -60,6 +60,14 @@ inline bool range_nointersect(const tock_range& l, const tock_range& r) {
 }
 
 template<typename V>
+struct tock_tree;
+
+template<typename T>
+struct NotifyParentChanged {
+  void operator()(T&, typename tock_tree<T>::Node&) { }
+};
+
+template<typename V>
 struct tock_tree {
   struct Node {
     // nullptr iff toplevel
@@ -68,6 +76,8 @@ struct tock_tree {
     V value;
     Node(Node* parent, const tock_range& range, const V& value) :
       parent(parent), range(range), value(value) { }
+    Node(Node* parent, const tock_range& range, V&& value) :
+      parent(parent), range(range), value(std::move(value)) { }
     std::map<tock, Node> children;
 
     bool children_in_range(const tock& t) const {
@@ -116,6 +126,7 @@ struct tock_tree {
       for (auto it = children.begin(); it != children.end();) {
         auto nh = children.extract(it++);
         nh.mapped().parent = parent;
+        NotifyParentChanged<V>()(nh.mapped().value, *parent);
         insert_to.insert(std::move(nh));
       }
       parent->children.erase(range.first);
@@ -183,6 +194,7 @@ struct tock_tree {
       auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
       inserted_node.children.insert(std::move(nh));
+      NotifyParentChanged<V>()(nh.mapped().value, inserted_node);
     }
     return inserted_node;
   }
