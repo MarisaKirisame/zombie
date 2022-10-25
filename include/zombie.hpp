@@ -5,6 +5,7 @@
 
 #include "tock.hpp"
 #include "world.hpp"
+#include "assert.hpp"
 
 struct ScopeGuard {
   World& w;
@@ -17,6 +18,17 @@ struct ScopeGuard {
   }
 };
 
+struct Computer : Object {
+  std::function<void(const std::vector<const void*>& in)> f;
+  std::vector<tock> input;
+  tock output;
+  Computer(std::function<void(const std::vector<const void*>& in)>&& f,
+           const std::vector<tock>& input,
+           const tock& output) :
+    f(std::move(f)),
+    input(input),
+    output(output) { }
+};
 /*
 #include <functional>
 #include <unordered_map>
@@ -28,21 +40,11 @@ struct ScopeGuard {
 #include <type_traits>
 #include <any>
 
-#include "assert.hpp"
 #include "phantom.hpp"
 
 struct Computer : Object {
-  std::function<void(const std::vector<const void*>& in)> f;
-  std::vector<tock> input;
-  tock output;
   size_t memory;
   int64_t compute_cost;
-  Computer(std::function<void(const std::vector<const void*>& in)>&& f,
-           const std::vector<tock>& input,
-           const tock& output) :
-    f(std::move(f)),
-    input(input),
-    output(output) { }
   void replay(const tock& start_at) {
     World& w = World::get_world();
     struct Tardis {
@@ -186,8 +188,28 @@ struct MicroWave : Object {
   
 };
 
+// Manage a Zombie.
+// Exactly one pointer is not a nullptr.
+//
+// When evictable is present,
+// The managed is a normal Zombie, that might be evicted from memory.
+// note that the weak_ptr will not be expired().
+// this is because when Zombie die the accompanying GraveYard is removed.
+//
+// When head is present,
+// The managed is a Zombie with the means of reproduction is unknown.
+// It is thus not evictable, but that might change as Zombie/MicroWave creation follow stack discipline.
+//
+// When requested is present, the Zombie is evicted,
+// but we wish to recompute it and store the result in *requested.
+//
+// todo: it look like we can use only one pointer by unioning it.
+// in such a case pointer tagging can be use to distinguish the three case. 
 struct GraveYard : Object {
-  
+  std::weak_ptr<EZombieNode> evictable;
+  std::shared_ptr<EZombieNode> head;
+  std::shared_ptr<EZombieNode>* requested = nullptr; 
+  explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : head(ptr) { }
 };
 
 template<typename F, size_t... Is>
@@ -200,9 +222,8 @@ auto gen_tuple(F func) {
   return gen_tuple_impl(func, std::make_index_sequence<N>{} );
 }
 
-struct EZombieNode {
+struct EZombieNode : Object {
   ptrdiff_t pool_index = -1;
-  virtual ~EZombieNode() { }
   virtual const void* get_ptr() const = 0;
 };
 
@@ -293,8 +314,8 @@ struct Zombie {
     } else {
       auto shared = std::make_shared<ZombieNode<T>>(std::forward<Args>(args)...);
       ptr = shared;
-      w.evict_pool.insert(shared);
-      //w.record.put({created_time, created_time+1}, this);
+      //w.evict_pool.insert(shared);
+      w.record.put({created_time, created_time+1}, std::make_unique<GraveYard>(shared));
     }
   }
 
@@ -340,6 +361,6 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  //w.record.put({start_time, end_time}, new Computer(std::move(func), in, ret.created_time));
+  w.record.put({start_time, end_time}, std::make_unique<Computer>(std::move(func), in, ret.created_time));
   return std::move(ret);
 }

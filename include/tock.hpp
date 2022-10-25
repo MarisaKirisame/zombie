@@ -180,14 +180,18 @@ struct tock_tree {
   void check_invariant() const {
     n.check_invariant();
   }
-
+  
   Node& put(const tock_range& r, const V& v) {
+    return put(r, v);
+  }
+
+  Node& put(const tock_range& r, V&& v) {
     Node& n = get_node(r.first);
     // disallow inserting the same node twice
     ASSERT(n.range.first != r.first);
     ASSERT(range_dominate(n.range, r));
     auto* inserted = &n.children;
-    auto it = inserted->insert({r.first, Node(&n, r, v)}).first;
+    auto it = inserted->insert({r.first, Node(&n, r, std::move(v))}).first;
     Node& inserted_node = it->second;
     ++it;
     while (it != inserted->end() && range_dominate(r, it->second.range)) {
