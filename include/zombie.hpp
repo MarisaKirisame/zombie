@@ -29,50 +29,6 @@ struct ScopeGuard {
 
 #include "phantom.hpp"
 
-struct MicroWave : Object {
-  size_t memory;
-  int64_t compute_cost;
-  void replay(const tock& start_at) {
-    World& w = World::get_world();
-    struct Tardis {
-      World& w;
-      tock old_tock;
-      Tardis(World& w, const tock& new_tock) : w(w), old_tock(w.current_tock) {
-        w.current_tock = new_tock;
-      }
-      ~Tardis() {
-        w.current_tock = old_tock;
-      }
-    } t(w, start_at);
-    ScopeGuard sg(World::get_world());
-    w.current_tock++;
-    // note that the pointer will be stale if the zombie are destructed, or moved, inside bindZombie.
-    // so - dont do that!
-    // only move zombie that you freshly created,
-    // and only destruct zombie at destructor.
-    std::vector<EMonster*> monster;
-    std::vector<std::unique_ptr<Phantom>> phantom;
-    for (const tock& t : input) {
-      if (w.record.has_precise(t)) {
-        monster.push_back(dynamic_cast<EMonster*>(w.record.get_precise_node(t).value));
-      } else {
-        auto p = std::make_unique<Phantom>(t);
-        monster.push_back(p.get());
-        phantom.push_back(std::move(p));
-      }
-    }
-    std::vector<std::unique_ptr<EGuard>> guards;
-    for (EMonster* em : monster) {
-      guards.push_back(std::make_unique<EGuard>(em));
-    }
-    std::vector<const void*> in;
-    for (const auto& z : guards) {
-      in.push_back(z->get_ptr());
-    }
-    f(in);
-  }
-};
-
 // T should manage it's own memory:
 // when T is construct, only then all memory is released.
 // this mean T should no contain Zombie or shared_ptr.
@@ -114,37 +70,77 @@ public:
 struct MicroWave : Object {
   std::function<void(const std::vector<const void*>& in)> f;
   std::vector<tock> input;
-  tock output;
+  tock start_time;
+  tock end_time;
   MicroWave(std::function<void(const std::vector<const void*>& in)>&& f,
 	    const std::vector<tock>& input,
-	    const tock& output) :
+	    const tock& start_time,
+	    const tock& end_time) :
     f(std::move(f)),
     input(input),
-    output(output) { }
+    start_time(start_time),
+    end_time(end_time) { }
+  void replay() {
+    World& w = World::get_world();
+    struct Tardis {
+      World& w;
+      tock old_tock;
+      Tardis(World& w, const tock& new_tock) : w(w), old_tock(w.current_tock) {
+        w.current_tock = new_tock;
+      }
+      ~Tardis() {
+        w.current_tock = old_tock;
+      }
+    } t(w, start_time);
+    ScopeGuard sg(w);
+    w.current_tock++;
+    std::vector<std::shared_ptr<EZombieNode>> input_zombie;
+    for (const tock& t : input) {
+      if (w.record.has_precise(t)) {
+	/*monster.push_back(dynamic_cast<EMonster*>(w.record.get_precise_node(t).value));*/
+      } else {
+	ASSERT(false);
+      }
+    }
+  }
+  /*
+  void replay(const tock& start_at) {
+    std::vector<std::unique_ptr<EGuard>> guards;
+    for (EMonster* em : monster) {
+      guards.push_back(std::make_unique<EGuard>(em));
+    }
+    std::vector<const void*> in;
+    for (const auto& z : guards) {
+      in.push_back(z->get_ptr());
+    }
+    f(in);
+  }
+  */
 };
 
 // Manage a Zombie.
-// Exactly one pointer is not a nullptr.
+// At most one pointer is not a nullptr.
 //
 // When evictable is present,
 // The managed is a normal Zombie, that might be evicted from memory.
 // note that the weak_ptr will not be expired().
 // this is because when Zombie die the accompanying GraveYard is removed.
 //
-// When head is present,
-// The managed is a Zombie with the means of reproduction is unknown.
-// It is thus not evictable, but that might change as Zombie/MicroWave creation follow stack discipline.
+// When holding is present,
+// The managed is a Zombie which should not be evicted right now.
 //
-// When requested is present, the Zombie is evicted,
-// but we wish to recompute it and store the result in *requested.
+// When no pointer is present,
+// This mean the Zombie is dead, but we would like to revive it.
+// When the Zombie is eventually revived, holding should be filled,
+// and the revive-requester should get the value and make it evictable.
 //
 // todo: it look like we can use only one pointer by unioning it.
 // in such a case pointer tagging can be use to distinguish the three case. 
 struct GraveYard : Object {
   std::weak_ptr<EZombieNode> evictable;
-  std::shared_ptr<EZombieNode> head;
-  std::shared_ptr<EZombieNode>* requested = nullptr; 
-  explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : head(ptr) { }
+  std::shared_ptr<EZombieNode> holding;
+  explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : holding(ptr) { }
+  explicit GraveYard() { }
 };
 
 
@@ -153,12 +149,12 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
   void operator()(std::unique_ptr<Object>& node, typename tock_tree<std::unique_ptr<Object>>::Node* parent) {
     Object* obj = node.get();
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
-      if (gy->head) {
+      if (gy->holding) {
 	if (parent != nullptr) {
 	  auto& bag = World::get_world().evict_pool;
-	  bag.insert(gy->head);
-	  gy->evictable = gy->head;
-	  gy->head.reset();
+	  bag.insert(gy->holding);
+	  gy->evictable = gy->holding;
+	  gy->holding.reset();
 	}
       }
     } else {
@@ -250,7 +246,6 @@ struct Zombie {
   const T& get() const {
     assert(created_time > 0);
       Guard<T> g(this);
-      auto& n = World::get_world().record.get_precise_node(created_time);
       assert(n.parent != nullptr);
       assert(n.parent->parent != nullptr);
       MicroWave* com = dynamic_cast<MicroWave*>(n.parent->value);
@@ -265,6 +260,14 @@ struct Zombie {
     if (ret) {
       return ret;
     } else {
+      auto& n = World::get_world().record.get_node(created_time);
+      MicroWave* m = dynamic_cast<MicroWave*>(n.value.get());
+      if (m == nullptr) {
+	ASSERT(n.parent != nullptr);
+	m = dynamic_cast<MicroWave*>(n.parent->value.get());
+      }
+      ASSERT(m != nullptr);
+      m->replay();
       std::cout << "!!!" << std::endl;
       throw;
     }
@@ -325,6 +328,7 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   auto ret = std::apply(f, y);
   static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
   tock end_time = w.current_tock;
+  ASSERT(end_time == ret.created_time + 1);
   std::vector<tock> in = {x.created_time...};
   std::function<void(const std::vector<const void*>&)> func =
     [f = std::forward<F>(f)](const std::vector<const void*> in) {
@@ -332,6 +336,6 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  w.record.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, ret.created_time));
+  w.record.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
   return std::move(ret);
 }
