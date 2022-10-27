@@ -15,27 +15,16 @@ void MicroWave::replay() {
   ScopeGuard sg(w);
   w.current_tock++;
   std::vector<std::shared_ptr<EZombieNode>> input_zombie;
+  std::vector<const void*> in;
   for (const tock& t : input) {
     if (w.record.has_precise(t)) {
       auto& n = w.record.get_precise_node(t);
-      input_zombie.push_back(non_null(dynamic_cast<GraveYard*>(n.value.get()))->arise(n));
+      auto ezn = non_null(dynamic_cast<GraveYard*>(n.value.get()))->arise(n);
+      in.push_back(ezn->get_ptr());
+      input_zombie.push_back(ezn);
     } else {
       ASSERT(false);
     }
   }
-  std::cout << "replay" << std::endl;
-  throw;
-}
-/*
-  void replay(const tock& start_at) {
-  std::vector<std::unique_ptr<EGuard>> guards;
-  for (EMonster* em : monster) {
-  guards.push_back(std::make_unique<EGuard>(em));
-  }
-  std::vector<const void*> in;
-  for (const auto& z : guards) {
-  in.push_back(z->get_ptr());
-  }
   f(in);
-  }
-*/
+}

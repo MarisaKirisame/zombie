@@ -77,6 +77,9 @@ struct GraveYard : Object {
   std::shared_ptr<EZombieNode> holding;
   explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : holding(ptr) { }
   explicit GraveYard() { }
+  bool zombie_present() {
+    return (!weak_is_nullptr(evictable)) || holding != nullptr;
+  }
   // Arise my Zombie!
   std::shared_ptr<EZombieNode> arise(const tock_tree<std::unique_ptr<Object>>::Node& node) {
     if (!weak_is_nullptr(evictable)) {
@@ -240,8 +243,11 @@ struct Zombie {
     World& w = World::get_world();
     created_time = w.current_tock++;
     if (w.record.has_precise(created_time)) {
-      throw;
-      /*auto& n = w.record.get_precise_node(created_time);*/
+      auto& n = w.record.get_precise_node(created_time);
+      GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
+      if (!gy->zombie_present()) {
+	gy->holding = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
+      }
     } else {
       auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr = shared;
