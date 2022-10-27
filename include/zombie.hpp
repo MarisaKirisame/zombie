@@ -19,7 +19,6 @@ struct ScopeGuard {
   }
 };
 /*
-#include <functional>
 #include <unordered_map>
 #include <optional>
 #include <iostream>
@@ -100,22 +99,6 @@ public:
   ~Zombie() {
     if (created_time > 0) {
       World::get_world().record.get_precise_node(created_time).delete_node();
-    }
-  }
-  const T& get() const {
-    assert(created_time > 0);
-    if (t.has_value()) {
-      return t.value();
-    } else {
-      Guard<T> g(this);
-      auto& n = World::get_world().record.get_precise_node(created_time);
-      assert(n.parent != nullptr);
-      assert(n.parent->parent != nullptr);
-      MicroWave* com = dynamic_cast<MicroWave*>(n.parent->value);
-      assert(com != nullptr);
-      com->replay(n.parent->range.first);
-      ASSERT(t.has_value());
-      return t.value();
     }
   }
 };
@@ -263,11 +246,26 @@ struct Zombie {
     evict();
   }
 
+  /*
+  const T& get() const {
+    assert(created_time > 0);
+      Guard<T> g(this);
+      auto& n = World::get_world().record.get_precise_node(created_time);
+      assert(n.parent != nullptr);
+      assert(n.parent->parent != nullptr);
+      MicroWave* com = dynamic_cast<MicroWave*>(n.parent->value);
+      assert(com != nullptr);
+      com->replay(n.parent->range.first);
+      ASSERT(t.has_value());
+      return t.value();
+  }
+  */
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     auto ret = ptr.lock();
     if (ret) {
       return ret;
     } else {
+      std::cout << "!!!" << std::endl;
       throw;
     }
   }

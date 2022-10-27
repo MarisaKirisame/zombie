@@ -55,22 +55,22 @@ TEST(ZombieTest, Resource) {
   }
 }
 
-TEST(ZombieTest, SourceNoEvict) {
-  Zombie<int> x(3);
-  // maybe weird that we allow evicting on input, but input can live out of scope so we have to recompute them anyway.
-  EXPECT_FALSE(x.evictable());
-}
-
 // todo: test for eagereviction
 // todo: test for cleanup
 
-/*
-  TEST(ZombieTest, Recompute) {
+TEST(ZombieTest, SourceNoEvict) {
   Zombie<int> x(3);
-  // maybe weird that we allow evicting on input, but input can live out of scope so we have to recompute them anyway.
-  x.force_evict();
-  EXPECT_EQ(x.get_value(), 3);
-  }
+  EXPECT_FALSE(x.evictable());
+}
+
+TEST(ZombieTest, Recompute) {
+  Zombie<int> x(3);
+  auto y = bindZombie([](const int& x) { return Zombie(x * 2); }, x);
+  y.force_unique_evict();
+  EXPECT_EQ(y.get_value(), 6);
+}
+
+/*
 
 TEST(ZombieTest, ChainRecompute) {
   Zombie<int> x(1);
