@@ -17,18 +17,6 @@ struct ScopeGuard {
     scopes.pop_back();
   }
 };
-
-struct Computer : Object {
-  std::function<void(const std::vector<const void*>& in)> f;
-  std::vector<tock> input;
-  tock output;
-  Computer(std::function<void(const std::vector<const void*>& in)>&& f,
-           const std::vector<tock>& input,
-           const tock& output) :
-    f(std::move(f)),
-    input(input),
-    output(output) { }
-};
 /*
 #include <functional>
 #include <unordered_map>
@@ -42,7 +30,7 @@ struct Computer : Object {
 
 #include "phantom.hpp"
 
-struct Computer : Object {
+struct MicroWave : Object {
   size_t memory;
   int64_t compute_cost;
   void replay(const tock& start_at) {
@@ -144,7 +132,7 @@ public:
       auto& n = World::get_world().record.get_precise_node(created_time);
       assert(n.parent != nullptr);
       assert(n.parent->parent != nullptr);
-      Computer* com = dynamic_cast<Computer*>(n.parent->value);
+      MicroWave* com = dynamic_cast<MicroWave*>(n.parent->value);
       assert(com != nullptr);
       com->replay(n.parent->range.first);
       ASSERT(t.has_value());
@@ -177,15 +165,23 @@ struct ZombieRecord : EZombieRecord {
 
 */
 
-// A Computer record a computation executed by bindZombie, to replay it.
-// Note that a Computer may invoke more bindZombie, which may create Computer.
-// When that happend, the outer Computer will not replay the inner one,
+// A MicroWave record a computation executed by bindZombie, to replay it.
+// Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
+// When that happend, the outer MicroWave will not replay the inner one,
 // And the metadata is measured accordingly.
-// Note: Computer might be created or destroyed,
-// Thus the work executed by the parent Computer will also change.
+// Note: MicroWave might be created or destroyed,
+// Thus the work executed by the parent MicroWave will also change.
 // The metadata must be updated accordingly.
 struct MicroWave : Object {
-  
+  std::function<void(const std::vector<const void*>& in)> f;
+  std::vector<tock> input;
+  tock output;
+  MicroWave(std::function<void(const std::vector<const void*>& in)>&& f,
+	    const std::vector<tock>& input,
+	    const tock& output) :
+    f(std::move(f)),
+    input(input),
+    output(output) { }
 };
 
 // Manage a Zombie.
@@ -382,6 +378,6 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  w.record.put({start_time, end_time}, std::make_unique<Computer>(std::move(func), in, ret.created_time));
+  w.record.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, ret.created_time));
   return std::move(ret);
 }
