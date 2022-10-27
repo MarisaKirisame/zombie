@@ -15,9 +15,9 @@ struct World {
     return w;
   }
 
-  bool in_apocalypse = false;
+  bool in_ragnarok = false;
   ~World() {
-    in_apocalypse = true;
+    in_ragnarok = true;
   }
 
   Bag<std::shared_ptr<EZombieNode>> evict_pool;

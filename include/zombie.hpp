@@ -132,7 +132,7 @@ struct EZombieNode : Object {
   EZombieNode(tock created_time) : created_time(created_time) { }
   ~EZombieNode() {
     auto& w = World::get_world();
-    if (!w.in_apocalypse) {
+    if (!w.in_ragnarok) {
       w.record.get_precise_node(created_time).delete_node();
     }
   }

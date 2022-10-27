@@ -1,8 +1,6 @@
-#pragma once
-
 #include "zombie.hpp"
 
-inline void MicroWave::replay() {
+void MicroWave::replay() {
   World& w = World::get_world();
   struct Tardis {
     World& w;
