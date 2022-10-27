@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <functional>
+#include <vector>
 
 #include "tock.hpp"
 #include "world.hpp"
@@ -20,7 +21,6 @@ struct ScopeGuard {
 /*
 #include <functional>
 #include <unordered_map>
-#include <vector>
 #include <optional>
 #include <iostream>
 #include <map>
@@ -97,32 +97,11 @@ public:
   // 0 for moved Zombie, positive for normal, unique zombie, negative forward to corresponding positive.
   tock created_time;
 
-  Zombie(Zombie<T>&& z) {
-    (*this) = std::move(z);
-  }
-
-  Zombie(const Zombie<T>& z) = delete;
-
   ~Zombie() {
     if (created_time > 0) {
       World::get_world().record.get_precise_node(created_time).delete_node();
     }
   }
-
-  const T& unsafe_get() const {
-    return  t.value();
-  }
-
-  mutable int64_t lock_cnt = 0;
-
-  bool has_value() const {
-    return t.has_value();
-  }
-
-  void evict() const {
-    t.reset();
-  }
-
   const T& get() const {
     assert(created_time > 0);
     if (t.has_value()) {
@@ -139,30 +118,7 @@ public:
       return t.value();
     }
   }
-
-  const void* void_ptr() const {
-    return &get();
-  }
-
-  T get_value() const {
-    return get();
-  }
-
-  void fill_any(Any&& a) const {
-    if (!has_value()) {
-      t = std::move(*static_cast<const T*>(a.void_ptr()));
-    }
-  }
 };
-
-struct EZombieRecord : Object {
-};
-
-template<typename X>
-struct ZombieRecord : EZombieRecord {
-  std::weak_ptr<ZombieNode<X>>
-};
-
 */
 
 // A MicroWave record a computation executed by bindZombie, to replay it.
