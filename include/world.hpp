@@ -15,6 +15,11 @@ struct World {
     return w;
   }
 
+  bool in_apocalypse = false;
+  ~World() {
+    in_apocalypse = true;
+  }
+
   Bag<std::shared_ptr<EZombieNode>> evict_pool;
 
   // Zombie are referenced by record while

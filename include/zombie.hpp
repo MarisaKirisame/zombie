@@ -8,6 +8,12 @@
 #include "world.hpp"
 #include "assert.hpp"
 
+template<typename T>
+T non_null(T&& x) {
+  ASSERT(x);
+  return std::forward<T>(x);
+}
+
 struct ScopeGuard {
   World& w;
   std::vector<Scope>& scopes;
@@ -18,47 +24,6 @@ struct ScopeGuard {
     scopes.pop_back();
   }
 };
-/*
-#include <unordered_map>
-#include <optional>
-#include <iostream>
-#include <map>
-#include <cassert>
-#include <type_traits>
-#include <any>
-
-#include "phantom.hpp"
-
-// T should manage it's own memory:
-// when T is construct, only then all memory is released.
-// this mean T should no contain Zombie or shared_ptr.
-// however, such cases is not incorrect, it merely mess with uncompute/recompute profitability a bit.
-template<typename T>
-struct Zombie : EMonster {
-private:
-  //Zombie() : created_time(-1) { }
-  Zombie<T>& operator=(Zombie<T>&& z) {
-    t = std::move(z.t);
-    z.t.reset();
-    created_time = std::move(z.created_time);
-    z.created_time = 0;
-    World::get_world().record.get_precise_node(created_time).value = this;
-    return *this;
-  }
-  Zombie<T>& operator=(const Zombie<T>&) = delete;
-  template<typename F, typename... Arg>
-  friend auto bindZombie(F&& f, const Zombie<Arg>&... x);
-public:
-  // 0 for moved Zombie, positive for normal, unique zombie, negative forward to corresponding positive.
-  tock created_time;
-
-  ~Zombie() {
-    if (created_time > 0) {
-      World::get_world().record.get_precise_node(created_time).delete_node();
-    }
-  }
-};
-*/
 
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
@@ -80,43 +45,14 @@ struct MicroWave : Object {
     input(input),
     start_time(start_time),
     end_time(end_time) { }
-  void replay() {
-    World& w = World::get_world();
-    struct Tardis {
-      World& w;
-      tock old_tock;
-      Tardis(World& w, const tock& new_tock) : w(w), old_tock(w.current_tock) {
-        w.current_tock = new_tock;
-      }
-      ~Tardis() {
-        w.current_tock = old_tock;
-      }
-    } t(w, start_time);
-    ScopeGuard sg(w);
-    w.current_tock++;
-    std::vector<std::shared_ptr<EZombieNode>> input_zombie;
-    for (const tock& t : input) {
-      if (w.record.has_precise(t)) {
-	/*monster.push_back(dynamic_cast<EMonster*>(w.record.get_precise_node(t).value));*/
-      } else {
-	ASSERT(false);
-      }
-    }
-  }
-  /*
-  void replay(const tock& start_at) {
-    std::vector<std::unique_ptr<EGuard>> guards;
-    for (EMonster* em : monster) {
-      guards.push_back(std::make_unique<EGuard>(em));
-    }
-    std::vector<const void*> in;
-    for (const auto& z : guards) {
-      in.push_back(z->get_ptr());
-    }
-    f(in);
-  }
-  */
+  void replay();
 };
+
+template <typename T>
+bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
+  using wt = std::weak_ptr<T>;
+  return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
+}
 
 // Manage a Zombie.
 // At most one pointer is not a nullptr.
@@ -141,6 +77,23 @@ struct GraveYard : Object {
   std::shared_ptr<EZombieNode> holding;
   explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : holding(ptr) { }
   explicit GraveYard() { }
+  // Arise my Zombie!
+  std::shared_ptr<EZombieNode> arise(const tock_tree<std::unique_ptr<Object>>::Node& node) {
+    if (!weak_is_nullptr(evictable)) {
+      ASSERT(evictable.lock());
+      std::cout << "weak" << std::endl;
+      return non_null(evictable.lock());
+    } else if (holding != nullptr) {
+      return non_null(holding);
+    } else {
+      // At your side my GraveYard!
+      dynamic_cast<MicroWave*>(node.parent->value.get())->replay();
+      auto ret = non_null(holding);
+      evictable = holding;
+      holding.reset();
+      return ret;
+    }
+  }
 };
 
 
@@ -175,6 +128,14 @@ auto gen_tuple(F func) {
 }
 
 struct EZombieNode : Object {
+  tock created_time;
+  EZombieNode(tock created_time) : created_time(created_time) { }
+  ~EZombieNode() {
+    auto& w = World::get_world();
+    if (!w.in_apocalypse) {
+      w.record.get_precise_node(created_time).delete_node();
+    }
+  }
   ptrdiff_t pool_index = -1;
   virtual const void* get_ptr() const = 0;
 };
@@ -186,17 +147,18 @@ struct BagObserver<std::shared_ptr<EZombieNode>> {
   }
 };
 
-template<typename X>
+template<typename T>
 struct ZombieNode : EZombieNode {
-  X x;
+  T t;
   const void* get_ptr() const {
-    return &x;
+    return &t;
   }
-  const X& get_ref() const {
-    return x;
+  const T& get_ref() const {
+    return t;
   }
+  ZombieNode(ZombieNode<T>&& t) = delete;
   template<typename... Args>
-  ZombieNode(Args&&... args) : x(std::forward<Args>(args)...) { }
+  ZombieNode(tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
 };
 
 // todo: it could be a shared_ptr to skip registering in node.
@@ -204,6 +166,10 @@ struct ZombieNode : EZombieNode {
 // at the lose of eviction granularity.
 
 // the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
+// T should manage it's own memory:
+// when T is construct, only then all memory is released.
+// this mean T should not hold shared_ptr.
+// T having Zombie zombie is allowed though.
 template<typename T>
 struct Zombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
@@ -225,8 +191,7 @@ struct Zombie {
 
   void evict() {
     if (evictable()) {
-      auto ptr = this->ptr.lock();
-      ASSERT(ptr);
+      auto ptr = non_null(this->ptr.lock());
       World::get_world().evict_pool.remove(ptr->pool_index);
     }
   }
@@ -260,16 +225,13 @@ struct Zombie {
     if (ret) {
       return ret;
     } else {
-      auto& n = World::get_world().record.get_node(created_time);
-      MicroWave* m = dynamic_cast<MicroWave*>(n.value.get());
-      if (m == nullptr) {
-	ASSERT(n.parent != nullptr);
-	m = dynamic_cast<MicroWave*>(n.parent->value.get());
+      auto& w = World::get_world();
+      if (!w.record.has_precise(created_time)) {
+	w.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
       }
-      ASSERT(m != nullptr);
-      m->replay();
-      std::cout << "!!!" << std::endl;
-      throw;
+      auto& n = w.record.get_precise_node(created_time);
+      GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
+      return non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->arise(n)));
     }
   }
 
@@ -279,17 +241,11 @@ struct Zombie {
     created_time = w.current_tock++;
     if (w.record.has_precise(created_time)) {
       throw;
-      /*auto& n = w.record.get_precise_node(created_time);
-        EMonster* m = dynamic_cast<EMonster*>(n.value);
-        if (!m->has_value()) {
-        m->fill_any(Any(T(std::forward<Args>(args)...)));
-        }
-        created_time *= -1;*/
+      /*auto& n = w.record.get_precise_node(created_time);*/
     } else {
-      auto shared = std::make_shared<ZombieNode<T>>(std::forward<Args>(args)...);
+      auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr = shared;
-      //w.evict_pool.insert(shared);
-      w.record.put({created_time, created_time+1}, std::make_unique<GraveYard>(shared));
+      w.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }
   }
 
@@ -307,7 +263,7 @@ struct Zombie {
   }
 
   T get_value() const {
-    return shared_ptr()->x;
+    return shared_ptr()->t;
   }
 };
 

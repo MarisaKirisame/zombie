@@ -121,7 +121,7 @@ struct tock_tree {
 
     void delete_node() {
       // the root node is not for deletion.
-      assert (parent != nullptr);
+      assert(parent != nullptr);
       std::map<tock, Node>& insert_to = parent->children;
       for (auto it = children.begin(); it != children.end();) {
         auto nh = children.extract(it++);
