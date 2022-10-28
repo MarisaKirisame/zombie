@@ -79,9 +79,6 @@ TEST(ZombieTest, ChainRecompute) {
   EXPECT_EQ(z.get_value(), 4);
 }
 
-/*
-
-
 TEST(ZombieTest, ChainRecomputeDestructed) {
   Zombie<int> x(1);
   Zombie<int> z = [&](){
@@ -111,6 +108,7 @@ TEST(ZombieTest, DiamondRecompute) {
   EXPECT_EQ(executed_time, 2);
 }
 
+/*
 TEST(ZombieTest, RecursiveEvictedRecompute) {
   // During Recompute, we might run out of memory to hold the newly computed value.
   // When that happend, Zombie might evict some value that it recursively recomputed,

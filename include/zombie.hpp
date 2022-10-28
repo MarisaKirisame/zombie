@@ -90,12 +90,18 @@ struct GraveYard : Object {
       return non_null(holding);
     } else {
       // At your side my GraveYard!
-      dynamic_cast<MicroWave*>(node.parent->value.get())->replay();
+      dynamic_cast<MicroWave*>(non_null(node.parent)->value.get())->replay();
       auto ret = non_null(holding);
-      evictable = holding;
-      holding.reset();
+      make_evictable();
       return ret;
     }
+  }
+
+  void make_evictable() {
+    ASSERT(holding);
+    World::get_world().evict_pool.insert(holding);
+    evictable = holding;
+    holding.reset();
   }
 };
 
@@ -105,13 +111,8 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
   void operator()(std::unique_ptr<Object>& node, typename tock_tree<std::unique_ptr<Object>>::Node* parent) {
     Object* obj = node.get();
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
-      if (gy->holding) {
-	if (parent != nullptr) {
-	  auto& bag = World::get_world().evict_pool;
-	  bag.insert(gy->holding);
-	  gy->evictable = gy->holding;
-	  gy->holding.reset();
-	}
+      if (gy->holding && parent != nullptr) {
+	gy->make_evictable();
       }
     } else {
       // type not found
