@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "tock.hpp"
-#include "world.hpp"
+#include "trailokya.hpp"
 #include "assert.hpp"
 
 template<typename T>
@@ -106,7 +106,7 @@ struct GraveYard : Object {
   }
   void make_evictable() {
     ASSERT(holding);
-    Trailokya::get_trailokya().evict_pool.insert(holding);
+    Trailokya::get_trailokya().book.insert(holding);
     evictable = holding;
     holding.reset();
   }
@@ -144,7 +144,7 @@ struct EZombieNode : Object {
   ~EZombieNode() {
     auto& t = Trailokya::get_trailokya();
     if (!t.in_ragnarok) {
-      t.record.get_precise_node(created_time).delete_node();
+      t.akasha.get_precise_node(created_time).delete_node();
     }
   }
   ptrdiff_t pool_index = -1;
@@ -200,7 +200,7 @@ struct Zombie {
   void evict() {
     if (evictable()) {
       auto ptr = non_null(this->ptr().lock());
-      Trailokya::get_trailokya().evict_pool.remove(ptr->pool_index);
+      Trailokya::get_trailokya().book.remove(ptr->pool_index);
     }
   }
   void force_evict() {
@@ -215,8 +215,8 @@ struct Zombie {
   std::weak_ptr<ZombieNode<T>> ptr() const {
     if (ptr_cache.expired()) {
       Trailokya& t = Trailokya::get_trailokya();
-      if (t.record.has_precise(created_time)) {
-	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(non_null(dynamic_cast<GraveYard*>(t.record.get_precise_node(created_time).value.get()))->summon()));
+      if (t.akasha.has_precise(created_time)) {
+	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(non_null(dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get()))->summon()));
       }
     }
     return ptr_cache.lock();
@@ -227,10 +227,10 @@ struct Zombie {
       return ret;
     } else {
       auto& t = Trailokya::get_trailokya();
-      if (!t.record.has_precise(created_time)) {
-	t.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
+      if (!t.akasha.has_precise(created_time)) {
+	t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
       }
-      auto& n = t.record.get_precise_node(created_time);
+      auto& n = t.akasha.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
       ret = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->arise(n)));
       ptr_cache = ret;
@@ -241,8 +241,8 @@ struct Zombie {
   void construct(Args&&... args) {
     Trailokya& t = Trailokya::get_trailokya();
     created_time = t.current_tock++;
-    if (t.record.has_precise(created_time)) {
-      auto& n = t.record.get_precise_node(created_time);
+    if (t.akasha.has_precise(created_time)) {
+      auto& n = t.akasha.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
       if (!gy->zombie_present()) {
 	gy->holding = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
@@ -250,7 +250,7 @@ struct Zombie {
     } else {
       auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr_cache = shared;
-      t.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
+      t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }
   }
   template<typename... Args>
@@ -293,6 +293,6 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  t.record.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
+  t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
   return std::move(ret);
 }

@@ -18,9 +18,9 @@ struct Trailokya {
   ~Trailokya() {
     in_ragnarok = true;
   }
-  Bag<std::shared_ptr<EZombieNode>> evict_pool;
+  Bag<std::shared_ptr<EZombieNode>> book;
   // Hold MicroWave and GraveYard.
-  tock_tree<std::unique_ptr<Object>> record;
+  tock_tree<std::unique_ptr<Object>> akasha;
   std::vector<Scope> scopes;
   tock current_tock = 1;
 };
