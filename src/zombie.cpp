@@ -1,26 +1,26 @@
 #include "zombie.hpp"
 
 void MicroWave::replay() {
-  World& w = World::get_world();
+  Trailokya& t = Trailokya::get_trailokya();
   struct Tardis {
-    World& w;
+    Trailokya& t;
     tock old_tock;
-    Tardis(World& w, const tock& new_tock) : w(w), old_tock(w.current_tock) {
-      w.current_tock = new_tock;
+    Tardis(Trailokya& t, const tock& new_tock) : t(t), old_tock(t.current_tock) {
+      t.current_tock = new_tock;
     }
     ~Tardis() {
-      w.current_tock = old_tock;
+      t.current_tock = old_tock;
     }
-  } t(w, start_time);
-  ScopeGuard sg(w);
-  w.current_tock++;
+  } tardis(t, start_time);
+  ScopeGuard sg(t);
+  t.current_tock++;
   std::vector<std::shared_ptr<EZombieNode>> input_zombie;
   std::vector<const void*> in;
-  for (const tock& t : input) {
-    if (!w.record.has_precise(t)) {
-      w.record.put({t, t + 1}, std::make_unique<GraveYard>());
+  for (const tock& input : inputs) {
+    if (!t.record.has_precise(input)) {
+      t.record.put({input, input + 1}, std::make_unique<GraveYard>());
     }
-    auto& n = w.record.get_precise_node(t);
+    auto& n = t.record.get_precise_node(input);
     auto ezn = non_null(dynamic_cast<GraveYard*>(n.value.get()))->arise(n);
     in.push_back(ezn->get_ptr());
     input_zombie.push_back(ezn);

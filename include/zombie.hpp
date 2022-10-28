@@ -15,9 +15,9 @@ T non_null(T&& x) {
 }
 
 struct ScopeGuard {
-  World& w;
+  Trailokya& w;
   std::vector<Scope>& scopes;
-  ScopeGuard(World& w) : w(w), scopes(w.scopes) {
+  ScopeGuard(Trailokya& w) : w(w), scopes(w.scopes) {
     scopes.push_back(Scope());
   }
   ~ScopeGuard() {
@@ -34,15 +34,15 @@ struct ScopeGuard {
 // The metadata must be updated accordingly.
 struct MicroWave : Object {
   std::function<void(const std::vector<const void*>& in)> f;
-  std::vector<tock> input;
+  std::vector<tock> inputs;
   tock start_time;
   tock end_time;
   MicroWave(std::function<void(const std::vector<const void*>& in)>&& f,
-	    const std::vector<tock>& input,
+	    const std::vector<tock>& inputs,
 	    const tock& start_time,
 	    const tock& end_time) :
     f(std::move(f)),
-    input(input),
+    inputs(inputs),
     start_time(start_time),
     end_time(end_time) { }
   void replay();
@@ -106,7 +106,7 @@ struct GraveYard : Object {
   }
   void make_evictable() {
     ASSERT(holding);
-    World::get_world().evict_pool.insert(holding);
+    Trailokya::get_trailokya().evict_pool.insert(holding);
     evictable = holding;
     holding.reset();
   }
@@ -142,9 +142,9 @@ struct EZombieNode : Object {
   tock created_time;
   EZombieNode(tock created_time) : created_time(created_time) { }
   ~EZombieNode() {
-    auto& w = World::get_world();
-    if (!w.in_ragnarok) {
-      w.record.get_precise_node(created_time).delete_node();
+    auto& t = Trailokya::get_trailokya();
+    if (!t.in_ragnarok) {
+      t.record.get_precise_node(created_time).delete_node();
     }
   }
   ptrdiff_t pool_index = -1;
@@ -200,7 +200,7 @@ struct Zombie {
   void evict() {
     if (evictable()) {
       auto ptr = non_null(this->ptr().lock());
-      World::get_world().evict_pool.remove(ptr->pool_index);
+      Trailokya::get_trailokya().evict_pool.remove(ptr->pool_index);
     }
   }
   void force_evict() {
@@ -214,9 +214,9 @@ struct Zombie {
   }
   std::weak_ptr<ZombieNode<T>> ptr() const {
     if (ptr_cache.expired()) {
-      World& w = World::get_world();
-      if (w.record.has_precise(created_time)) {
-	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(non_null(dynamic_cast<GraveYard*>(w.record.get_precise_node(created_time).value.get()))->summon()));
+      Trailokya& t = Trailokya::get_trailokya();
+      if (t.record.has_precise(created_time)) {
+	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(non_null(dynamic_cast<GraveYard*>(t.record.get_precise_node(created_time).value.get()))->summon()));
       }
     }
     return ptr_cache.lock();
@@ -226,11 +226,11 @@ struct Zombie {
     if (ret) {
       return ret;
     } else {
-      auto& w = World::get_world();
-      if (!w.record.has_precise(created_time)) {
-	w.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
+      auto& t = Trailokya::get_trailokya();
+      if (!t.record.has_precise(created_time)) {
+	t.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
       }
-      auto& n = w.record.get_precise_node(created_time);
+      auto& n = t.record.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
       ret = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->arise(n)));
       ptr_cache = ret;
@@ -239,10 +239,10 @@ struct Zombie {
   }
   template<typename... Args>
   void construct(Args&&... args) {
-    World& w = World::get_world();
-    created_time = w.current_tock++;
-    if (w.record.has_precise(created_time)) {
-      auto& n = w.record.get_precise_node(created_time);
+    Trailokya& t = Trailokya::get_trailokya();
+    created_time = t.current_tock++;
+    if (t.record.has_precise(created_time)) {
+      auto& n = t.record.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
       if (!gy->zombie_present()) {
 	gy->holding = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
@@ -250,7 +250,7 @@ struct Zombie {
     } else {
       auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr_cache = shared;
-      w.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
+      t.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }
   }
   template<typename... Args>
@@ -277,14 +277,14 @@ struct IsZombie<Zombie<T>> : std::true_type { };
 
 template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
-  World& w = World::get_world();
-  ScopeGuard sg(w);
+  Trailokya& t = Trailokya::get_trailokya();
+  ScopeGuard sg(t);
   std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.shared_ptr()...);
   auto y = std::apply([](const std::shared_ptr<ZombieNode<Arg>>&... g_){ return std::make_tuple<>(std::cref(g_->get_ref())...); }, g);
-  tock start_time = w.current_tock++;
+  tock start_time = t.current_tock++;
   auto ret = std::apply(f, y);
   static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
-  tock end_time = w.current_tock;
+  tock end_time = t.current_tock;
   ASSERT(end_time == ret.created_time + 1);
   std::vector<tock> in = {x.created_time...};
   std::function<void(const std::vector<const void*>&)> func =
@@ -293,6 +293,6 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
     };
-  w.record.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
+  t.record.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
   return std::move(ret);
 }

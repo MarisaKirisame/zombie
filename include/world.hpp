@@ -9,28 +9,18 @@ struct EZombieNode;
 struct Scope {
 };
 
-struct World {
-  static World& get_world() {
-    static World w;
-    return w;
+struct Trailokya {
+  static Trailokya& get_trailokya() {
+    static Trailokya t;
+    return t;
   }
-
   bool in_ragnarok = false;
-  ~World() {
+  ~Trailokya() {
     in_ragnarok = true;
   }
-
   Bag<std::shared_ptr<EZombieNode>> evict_pool;
-
-  // Zombie are referenced by record while
-  // Computer are held by record.
-  // Zombie are removed when it is destructed while
-  // Computer are removed and destructed when it has no children.
-  // Note that one cannot create a Computer with no children,
-  // as you have to return a Zombie, which become its children.
+  // Hold MicroWave and GraveYard.
   tock_tree<std::unique_ptr<Object>> record;
-
   std::vector<Scope> scopes;
-
   tock current_tock = 1;
 };
