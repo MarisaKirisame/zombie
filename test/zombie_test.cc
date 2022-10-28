@@ -66,6 +66,9 @@ TEST(ZombieTest, SourceNoEvict) {
 TEST(ZombieTest, Recompute) {
   Zombie<int> x(3);
   auto y = bindZombie([](const int& x) { return Zombie(x * 2); }, x);
+  y.force_unique_evict(); 
+  EXPECT_EQ(y.get_value(), 6);
+  ASSERT(y.evictable());
   y.force_unique_evict();
   EXPECT_EQ(y.get_value(), 6);
 }
@@ -74,8 +77,8 @@ TEST(ZombieTest, ChainRecompute) {
   Zombie<int> x(1);
   Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
   Zombie<int> z = bindZombie([](int y) { return Zombie(y * 2); }, y);
-  y.force_evict();
-  z.force_evict();
+  y.force_unique_evict();
+  z.force_unique_evict();
   EXPECT_EQ(z.get_value(), 4);
 }
 
@@ -85,7 +88,7 @@ TEST(ZombieTest, ChainRecomputeDestructed) {
     Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
     return bindZombie([](int y) { return Zombie(y * 2); }, y);
   }();
-  z.force_evict();
+  z.force_unique_evict();
   EXPECT_EQ(z.get_value(), 4);
 }
 
@@ -100,15 +103,14 @@ TEST(ZombieTest, DiamondRecompute) {
   Zombie<int> d = bindZombie([](int x) { return Zombie(x * 2); }, b);
   Zombie<int> e = bindZombie([](int x, int y) { return Zombie(x + y); }, c, d);
   EXPECT_EQ(executed_time, 1);
-  b.force_evict();
-  c.force_evict();
-  d.force_evict();
-  e.force_evict();
+  b.force_unique_evict();
+  c.force_unique_evict();
+  d.force_unique_evict();
+  e.force_unique_evict();
   EXPECT_EQ(e.get_value(), 8);
   EXPECT_EQ(executed_time, 2);
 }
 
-/*
 TEST(ZombieTest, RecursiveEvictedRecompute) {
   // During Recompute, we might run out of memory to hold the newly computed value.
   // When that happend, Zombie might evict some value that it recursively recomputed,
@@ -137,28 +139,18 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
     return Zombie(x * 2);
   }, b);
   Zombie<int> d = bindZombie([&](int x) {
-    b.force_evict();
+    b.force_unique_evict();
     return Zombie(x * 2);
   }, c);
   Zombie<int> e = bindZombie([](int x) { return Zombie(x * 2); }, b);
   Zombie<int> f = bindZombie([](int x, int y) { return Zombie(x + y); }, d, e);
   executed_time = 0;
-  b.force_evict();
-  c.force_evict();
-  d.force_evict();
-  e.force_evict();
-  f.force_evict();
+  ASSERT(b.evictable());
+  b.force_unique_evict();
+  c.force_unique_evict();
+  d.force_unique_evict();
+  e.force_unique_evict();
+  f.force_unique_evict();
   EXPECT_EQ(f.get_value(), 12);
   EXPECT_EQ(executed_time, 2);
 }
-
-TEST(ZombieTest, Lock) {
-  Zombie<int> a(0);
-  ASSERT(a.evictable());
-  bindZombie([&](int a_){
-    ASSERT(!a.evictable());
-    return Zombie(1);
-  }, a);
-  ASSERT(a.evictable());
-}
-*/
