@@ -104,7 +104,6 @@ struct GraveYard : Object {
       return ret;
     }
   }
-
   void make_evictable() {
     ASSERT(holding);
     World::get_world().evict_pool.insert(holding);
@@ -187,7 +186,6 @@ struct Zombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
   tock created_time;
   mutable std::weak_ptr<ZombieNode<T>> ptr_cache;
-
   bool evictable() const {
     auto ptr = this->ptr().lock();
     if (ptr) {
@@ -196,29 +194,24 @@ struct Zombie {
       return false;
     }
   }
-
   bool unique() const {
     return ptr().use_count() ==  1;
   }
-
   void evict() {
     if (evictable()) {
       auto ptr = non_null(this->ptr().lock());
       World::get_world().evict_pool.remove(ptr->pool_index);
     }
   }
-
   void force_evict() {
     ASSERT(evictable());
     evict();
   }
-
   void force_unique_evict() {
     ASSERT(evictable());
     ASSERT(unique());
     evict();
   }
-
   std::weak_ptr<ZombieNode<T>> ptr() const {
     if (ptr_cache.expired()) {
       World& w = World::get_world();
@@ -228,7 +221,6 @@ struct Zombie {
     }
     return ptr_cache.lock();
   }
-
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     auto ret = ptr().lock();
     if (ret) {
@@ -245,7 +237,6 @@ struct Zombie {
       return ret;
     }
   }
-
   template<typename... Args>
   void construct(Args&&... args) {
     World& w = World::get_world();
@@ -262,20 +253,16 @@ struct Zombie {
       w.record.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }
   }
-
   template<typename... Args>
   Zombie(Args&&... args) {
     construct(std::forward<Args>(args)...);
   }
-
   Zombie(const T& t) {
     construct(t);
   }
-
   Zombie(T&& t) {
     construct(std::move(t));
   }
-
   T get_value() const {
     return shared_ptr()->t;
   }

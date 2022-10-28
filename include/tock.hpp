@@ -79,7 +79,6 @@ struct tock_tree {
     Node(Node* parent, const tock_range& range, V&& value) :
       parent(parent), range(range), value(std::move(value)) { }
     std::map<tock, Node> children;
-
     bool children_in_range(const tock& t) const {
       auto it = largest_value_le(children, t);
       if (it == children.end()) {
@@ -89,7 +88,6 @@ struct tock_tree {
         return t < it->second.range.second;
       }
     }
-
     const Node& get_shallow(const tock& t) const {
       auto it = largest_value_le(children, t);
       assert(it != children.end());
@@ -97,7 +95,6 @@ struct tock_tree {
       assert(t < it->second.range.second);
       return it->second;
     }
-
     Node& get_shallow(const tock& t) {
       auto it = largest_value_le(children, t);
       assert(it != children.end());
@@ -105,20 +102,16 @@ struct tock_tree {
       assert(t < it->second.range.second);
       return it->second;
     }
-
     const Node& get_node(const tock& t) const {
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
-
     Node& get_node(const tock& t) {
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
-
     // get the most precise range that contain t
     V get(const tock& t) const {
       return get_node(t).value;
     }
-
     void delete_node() {
       // the root node is not for deletion.
       assert(parent != nullptr);
@@ -131,7 +124,6 @@ struct tock_tree {
       }
       parent->children.erase(range.first);
     }
-
     void check_invariant() const {
       std::optional<tock_range> prev_range;
       for (auto p : children) {
@@ -144,47 +136,36 @@ struct tock_tree {
         p.second.check_invariant();
         prev_range = curr_range;
       }
-
     }
   };
-
   Node n = Node(nullptr, tock_range(std::numeric_limits<tock>::min(), std::numeric_limits<tock>::max()), V());
-
   Node& get_node(const tock& t) {
     return n.get_node(t);
   }
-
   const Node& get_node(const tock& t) const {
     return n.get_node(t);
   }
-
   bool has_precise(const tock& t) const {
     return get_node(t).range.first == t;
   }
-
   Node& get_precise_node(const tock& t) {
     ASSERT(has_precise(t));
     return get_node(t);
   }
-
   const Node& get_precise_node(const tock& t) const {
     ASSERT(has_precise(t));
     return get_node(t);
   }
-
   // get the most precise range that contain t
   V get(const tock& t) const {
     return n.get(t);
   }
-
   void check_invariant() const {
     n.check_invariant();
   }
-  
   Node& put(const tock_range& r, const V& v) {
     return put(r, v);
   }
-
   Node& put(const tock_range& r, V&& v) {
     Node& n = get_node(r.first);
     // disallow inserting the same node twice
