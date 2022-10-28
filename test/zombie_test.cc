@@ -70,8 +70,6 @@ TEST(ZombieTest, Recompute) {
   EXPECT_EQ(y.get_value(), 6);
 }
 
-/*
-
 TEST(ZombieTest, ChainRecompute) {
   Zombie<int> x(1);
   Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
@@ -80,6 +78,9 @@ TEST(ZombieTest, ChainRecompute) {
   z.force_evict();
   EXPECT_EQ(z.get_value(), 4);
 }
+
+/*
+
 
 TEST(ZombieTest, ChainRecomputeDestructed) {
   Zombie<int> x(1);

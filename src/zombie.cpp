@@ -17,14 +17,13 @@ void MicroWave::replay() {
   std::vector<std::shared_ptr<EZombieNode>> input_zombie;
   std::vector<const void*> in;
   for (const tock& t : input) {
-    if (w.record.has_precise(t)) {
-      auto& n = w.record.get_precise_node(t);
-      auto ezn = non_null(dynamic_cast<GraveYard*>(n.value.get()))->arise(n);
-      in.push_back(ezn->get_ptr());
-      input_zombie.push_back(ezn);
-    } else {
-      ASSERT(false);
+    if (!w.record.has_precise(t)) {
+      w.record.put({t, t + 1}, std::make_unique<GraveYard>());
     }
+    auto& n = w.record.get_precise_node(t);
+    auto ezn = non_null(dynamic_cast<GraveYard*>(n.value.get()))->arise(n);
+    in.push_back(ezn->get_ptr());
+    input_zombie.push_back(ezn);
   }
   f(in);
 }
