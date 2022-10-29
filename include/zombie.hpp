@@ -121,7 +121,8 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
       if (gy->holding && parent != nullptr) {
 	gy->make_evictable();
       }
-    } else {
+    } else if (MicroWave* mw = dynamic_cast<MicroWave*>(obj)) { }
+    else {
       // type not found
       ASSERT(false);
     }
@@ -172,6 +173,12 @@ struct ZombieNode : EZombieNode {
   ZombieNode(tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
 };
 
+// todo: make tock a newtype
+struct FromTock {
+  tock created_time;
+  FromTock(tock created_time) : created_time(created_time) { }
+};
+
 // todo: it could be a shared_ptr to skip registering in node.
 // when that happend, we gain both space and time,
 // at the lose of eviction granularity.
@@ -216,7 +223,9 @@ struct Zombie {
     if (ptr_cache.expired()) {
       Trailokya& t = Trailokya::get_trailokya();
       if (t.akasha.has_precise(created_time)) {
-	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(non_null(dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get()))->summon()));
+	GraveYard* gy = dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get());
+	ASSERT(gy != nullptr);
+	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->summon()));
       }
     }
     return ptr_cache.lock();
@@ -263,6 +272,8 @@ struct Zombie {
   Zombie(T&& t) {
     construct(std::move(t));
   }
+  Zombie(FromTock&& ft) : created_time(ft.created_time) { }
+  Zombie(const FromTock& ft) : created_time(FromTock(ft)) { }
   T get_value() const {
     return shared_ptr()->t;
   }
@@ -279,20 +290,42 @@ template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   Trailokya& t = Trailokya::get_trailokya();
   ScopeGuard sg(t);
-  std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.shared_ptr()...);
-  auto y = std::apply([](const std::shared_ptr<ZombieNode<Arg>>&... g_){ return std::make_tuple<>(std::cref(g_->get_ref())...); }, g);
-  tock start_time = t.current_tock++;
-  auto ret = std::apply(f, y);
-  static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
-  tock end_time = t.current_tock;
-  ASSERT(end_time == ret.created_time + 1);
-  std::vector<tock> in = {x.created_time...};
-  std::function<void(const std::vector<const void*>&)> func =
-    [f = std::forward<F>(f)](const std::vector<const void*> in) {
-      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-      std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
-    };
-  t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
-  return std::move(ret);
+  if (!t.akasha.has_precise(t.current_tock)) {
+    std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.shared_ptr()...);
+    auto y = std::apply([](const std::shared_ptr<ZombieNode<Arg>>&... g_){ return std::make_tuple<>(std::cref(g_->get_ref())...); }, g);
+    tock start_time = t.current_tock++;
+    auto ret = std::apply(f, y);
+    static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
+    tock end_time = t.current_tock;
+    ASSERT(end_time == ret.created_time + 1);
+    std::vector<tock> in = {x.created_time...};
+    std::function<void(const std::vector<const void*>&)> func =
+      [f = std::forward<F>(f)](const std::vector<const void*> in) {
+	auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+	std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+	std::apply([&](const Arg*... arg){ return f(*arg...); }, args);
+      };
+    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
+    return std::move(ret);
+  } else {
+    auto& n = t.akasha.get_precise_node(t.current_tock);
+    t.current_tock = n.range.second;
+    using ret_type = decltype(f(std::declval<Arg>()...));
+    static_assert(IsZombie<ret_type>::value, "should be zombie");
+    ret_type ret(FromTock(t.current_tock - 1));
+    // we choose call-by-value because
+    // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
+    // 1: calculating ret will force it's dependency, and call-by-value should provide better locality:
+    //   to be precise, when this bindZombie is being replayed, it's dependency might be rematerialized for other use,
+    //   thus it make sense to replay this bindZombie, to avoid the dependency being evicted later.
+    // 2: rematerializing later require getting the GraveYard from the tock_tree,
+    //   which require traversing a datastructure,
+    //   while once context(zipper) is implemented, call-by-value doesnt need that.
+    // of course, we could and should benchmark and see whether it should be call-by-value or call-by-need.
+    constexpr bool call_by_value = true;
+    if (call_by_value) {
+      ret.shared_ptr();
+    }
+    return ret;
+  }
 }

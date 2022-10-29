@@ -18,24 +18,11 @@ TEST(ZombieTest, Resource) {
   static int destructor_count = 0;
   int last_destructor_count = 0;
   struct Resource {
-    bool moved = false;
     Resource() = default;
-    Resource(Resource&& r) {
-      r.moved = true;
-    }
-    Resource(const Resource& r) {
-      assert(!r.moved);
-    }
-    Resource& operator=(const Resource& r) {
-      throw;
-    }
-    Resource& operator=(Resource&& r) {
-      throw;
-    }
+    Resource(Resource&& r) = delete;
+    Resource(const Resource& r) = delete;
     ~Resource() {
-      if (!moved) {
-        ++destructor_count;
-      }
+      ++destructor_count;
     }
   };
   {
@@ -43,7 +30,7 @@ TEST(ZombieTest, Resource) {
     EXPECT_EQ(destructor_count, 0);
     {
       last_destructor_count = destructor_count;
-      Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie(Resource()); }, x);
+      Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie<Resource>(); }, x);
       ASSERT(destructor_count == last_destructor_count);
       last_destructor_count = destructor_count;
       y.force_unique_evict();
@@ -51,7 +38,6 @@ TEST(ZombieTest, Resource) {
       last_destructor_count = destructor_count;
     }
     EXPECT_EQ(destructor_count, last_destructor_count) << "evicted value does not get destructed again";
-    last_destructor_count = destructor_count;
   }
 }
 
@@ -153,4 +139,56 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
   f.force_unique_evict();
   EXPECT_EQ(f.get_value(), 12);
   EXPECT_EQ(executed_time, 2);
+}
+
+TEST(ZombieTest, ZombieRematWithSmallestFunctionTest) {
+  // While recursive test seems very contrived,
+  // recursive MicroWave happend when your value is recursive.
+  // In such a case, the Zombie will contain more Zombie.
+  // todo: test some recursive structure and function.
+  static size_t outer_executed_time = 0;
+  static size_t inner_executed_time = 0;
+  Zombie<int> x = bindZombie(
+    []() {
+      ++outer_executed_time;
+      return bindZombie(
+        []() {
+	  ++inner_executed_time;
+	  return Zombie(42);
+	});
+    });
+  EXPECT_EQ(outer_executed_time, 1);
+  EXPECT_EQ(inner_executed_time, 1);
+  EXPECT_EQ(x.get_value(), 42);
+  EXPECT_EQ(outer_executed_time, 1);
+  EXPECT_EQ(inner_executed_time, 1);
+  x.force_unique_evict();
+  EXPECT_EQ(outer_executed_time, 1);
+  EXPECT_EQ(inner_executed_time, 1);
+  EXPECT_EQ(x.get_value(), 42);
+  EXPECT_EQ(outer_executed_time, 1);
+  EXPECT_EQ(inner_executed_time, 2);
+}
+
+TEST(ZombieTest, SkipZombieAliveRecursiveFunctionTest) {
+  static size_t y_executed_time = 0;
+  static size_t z_executed_time = 0;
+  Zombie<int> x(1);
+  Zombie<int> z = bindZombie(
+    [](int x) {
+      ++z_executed_time;
+      Zombie<int> y = bindZombie(
+	[=]() {
+	  ++y_executed_time;
+	  return Zombie(2);
+	});
+      return Zombie(3);
+    }, x);
+  EXPECT_EQ(z.get_value(), 3);
+  EXPECT_EQ(y_executed_time, 1);
+  EXPECT_EQ(z_executed_time, 1);
+  z.force_unique_evict();
+  EXPECT_EQ(z.get_value(), 3);
+  EXPECT_EQ(y_executed_time, 1);
+  EXPECT_EQ(z_executed_time, 2);
 }
