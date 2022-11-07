@@ -1,4 +1,4 @@
-#include "zombie.hpp"
+#include "Zombie/zombie.hpp"
 
 #include <gtest/gtest.h>
 #include "assert.hpp"
