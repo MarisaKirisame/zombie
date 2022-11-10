@@ -184,6 +184,7 @@ struct EZombie {
 struct FromTock {
   tock created_time;
   FromTock(tock created_time) : created_time(created_time) { }
+  mutable std::weak_ptr<EZombieNode> ptr_cache;
 };
 
 // todo: it could be a shared_ptr to skip registering in node.
@@ -198,7 +199,6 @@ struct FromTock {
 template<typename T>
 struct Zombie : EZombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
-  mutable std::weak_ptr<ZombieNode<T>> ptr_cache;
   bool evictable() const {
     auto ptr = this->ptr().lock();
     if (ptr) {
