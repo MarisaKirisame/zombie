@@ -73,7 +73,7 @@ bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
 // and the revive-requester should get the value and make it evictable.
 //
 // todo: it look like we can use only one pointer by unioning it.
-// in such a case pointer tagging can be use to distinguish the three case. 
+// in such a case pointer tagging can be use to distinguish the three case.
 struct GraveYard : Object {
   std::weak_ptr<EZombieNode> evictable;
   std::shared_ptr<EZombieNode> holding;
@@ -175,12 +175,16 @@ struct ZombieNode : EZombieNode {
   ZombieNode(tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
 };
 
-//
+// Note that this type do not have a virtual destructor.
+// this save the pointer to the void table, and a EZombie only contain two
+// 64 bit field: created_time and ptr_cache.
+// As a consequence, Zombie only provide better API:
+// it cannot extend EZombie in any way.
 struct EZombie {
   tock created_time;
+  mutable std::weak_ptr<EZombieNode> ptr_cache;
   EZombie(tock created_time) : created_time(created_time) { }
   EZombie() { }
-  mutable std::weak_ptr<EZombieNode> ptr_cache;
   std::weak_ptr<EZombieNode> ptr() const {
     if (ptr_cache.expired()) {
       Trailokya& t = Trailokya::get_trailokya();
