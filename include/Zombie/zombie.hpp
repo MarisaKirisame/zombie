@@ -119,7 +119,7 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
     Object* obj = node.get();
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
       if (gy->holding && parent != nullptr) {
-	gy->make_evictable();
+        gy->make_evictable();
       }
     } else if (MicroWave* mw = dynamic_cast<MicroWave*>(obj)) { }
     else {
@@ -142,7 +142,7 @@ auto gen_tuple(F func) {
 struct EZombieNode : Object {
   tock created_time;
   EZombieNode(tock created_time) : created_time(created_time) { }
-  ~EZombieNode() {
+  virtual ~EZombieNode() {
     auto& t = Trailokya::get_trailokya();
     if (!t.in_ragnarok) {
       t.akasha.get_precise_node(created_time).delete_node();
@@ -162,7 +162,7 @@ struct BagObserver<std::shared_ptr<EZombieNode>> {
 template<typename T>
 struct ZombieNode : EZombieNode {
   T t;
-  const void* get_ptr() const {
+  const T* get_ptr() const {
     return &t;
   }
   const T& get_ref() const {
@@ -171,6 +171,13 @@ struct ZombieNode : EZombieNode {
   ZombieNode(ZombieNode<T>&& t) = delete;
   template<typename... Args>
   ZombieNode(tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
+};
+
+//
+struct EZombie {
+  tock created_time;
+  EZombie(tock created_time) : created_time(created_time) { }
+  EZombie() { }
 };
 
 // todo: make tock a newtype
@@ -189,9 +196,8 @@ struct FromTock {
 // this mean T should not hold shared_ptr.
 // T having Zombie zombie is allowed though.
 template<typename T>
-struct Zombie {
+struct Zombie : EZombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
-  tock created_time;
   mutable std::weak_ptr<ZombieNode<T>> ptr_cache;
   bool evictable() const {
     auto ptr = this->ptr().lock();
@@ -228,7 +234,7 @@ struct Zombie {
         ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->summon()));
       }
     }
-    return ptr_cache.lock();
+    return ptr_cache;
   }
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     auto ret = ptr().lock();
@@ -272,8 +278,8 @@ struct Zombie {
   Zombie(T&& t) {
     construct(std::move(t));
   }
-  Zombie(FromTock&& ft) : created_time(ft.created_time) { }
-  Zombie(const FromTock& ft) : created_time(FromTock(ft)) { }
+  Zombie(FromTock&& ft) : EZombie(ft.created_time) { }
+  Zombie(const FromTock& ft) : EZombie(FromTock(ft)) { }
   T get_value() const {
     return shared_ptr()->t;
   }
