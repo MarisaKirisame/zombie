@@ -223,9 +223,9 @@ struct Zombie {
     if (ptr_cache.expired()) {
       Trailokya& t = Trailokya::get_trailokya();
       if (t.akasha.has_precise(created_time)) {
-	GraveYard* gy = dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get());
-	ASSERT(gy != nullptr);
-	ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->summon()));
+        GraveYard* gy = dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get());
+        ASSERT(gy != nullptr);
+        ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->summon()));
       }
     }
     return ptr_cache.lock();
@@ -237,7 +237,7 @@ struct Zombie {
     } else {
       auto& t = Trailokya::get_trailokya();
       if (!t.akasha.has_precise(created_time)) {
-	t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
+        t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
       }
       auto& n = t.akasha.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
@@ -254,7 +254,7 @@ struct Zombie {
       auto& n = t.akasha.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
       if (!gy->zombie_present()) {
-	gy->holding = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
+        gy->holding = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       }
     } else {
       auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
