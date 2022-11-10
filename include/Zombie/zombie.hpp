@@ -178,34 +178,21 @@ struct EZombie {
   tock created_time;
   EZombie(tock created_time) : created_time(created_time) { }
   EZombie() { }
-};
-
-// todo: make tock a newtype
-struct FromTock {
-  tock created_time;
-  FromTock(tock created_time) : created_time(created_time) { }
   mutable std::weak_ptr<EZombieNode> ptr_cache;
-};
-
-// todo: it could be a shared_ptr to skip registering in node.
-// when that happend, we gain both space and time,
-// at the lose of eviction granularity.
-
-// the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
-// T should manage it's own memory:
-// when T is construct, only then all memory is released.
-// this mean T should not hold shared_ptr.
-// T having Zombie zombie is allowed though.
-template<typename T>
-struct Zombie : EZombie {
-  static_assert(!std::is_reference_v<T>, "should not be a reference");
+  std::weak_ptr<EZombieNode> ptr() const {
+    if (ptr_cache.expired()) {
+      Trailokya& t = Trailokya::get_trailokya();
+      if (t.akasha.has_precise(created_time)) {
+        GraveYard* gy = dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get());
+        ASSERT(gy != nullptr);
+        ptr_cache = non_null(std::dynamic_pointer_cast<EZombieNode>(gy->summon()));
+      }
+    }
+    return ptr_cache;
+  }
   bool evictable() const {
     auto ptr = this->ptr().lock();
-    if (ptr) {
-      return ptr->pool_index != -1;
-    } else {
-      return false;
-    }
+    return ptr && ptr->pool_index != -1;
   }
   bool unique() const {
     return ptr().use_count() ==  1;
@@ -225,18 +212,7 @@ struct Zombie : EZombie {
     ASSERT(unique());
     evict();
   }
-  std::weak_ptr<ZombieNode<T>> ptr() const {
-    if (ptr_cache.expired()) {
-      Trailokya& t = Trailokya::get_trailokya();
-      if (t.akasha.has_precise(created_time)) {
-        GraveYard* gy = dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get());
-        ASSERT(gy != nullptr);
-        ptr_cache = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->summon()));
-      }
-    }
-    return ptr_cache;
-  }
-  std::shared_ptr<ZombieNode<T>> shared_ptr() const {
+  std::shared_ptr<EZombieNode> shared_ptr() const {
     auto ret = ptr().lock();
     if (ret) {
       return ret;
@@ -247,11 +223,32 @@ struct Zombie : EZombie {
       }
       auto& n = t.akasha.get_precise_node(created_time);
       GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
-      ret = non_null(std::dynamic_pointer_cast<ZombieNode<T>>(gy->arise(n)));
+      ret = non_null(gy->arise(n));
       ptr_cache = ret;
       return ret;
     }
   }
+
+};
+
+// todo: make tock a newtype
+struct FromTock {
+  tock created_time;
+  FromTock(tock created_time) : created_time(created_time) { }
+};
+
+// todo: it could be a shared_ptr to skip registering in node.
+// when that happend, we gain both space and time,
+// at the lose of eviction granularity.
+
+// the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
+// T should manage it's own memory:
+// when T is construct, only then all memory is released.
+// this mean T should not hold shared_ptr.
+// T having Zombie zombie is allowed though.
+template<typename T>
+struct Zombie : EZombie {
+  static_assert(!std::is_reference_v<T>, "should not be a reference");
   template<typename... Args>
   void construct(Args&&... args) {
     Trailokya& t = Trailokya::get_trailokya();
@@ -280,6 +277,9 @@ struct Zombie : EZombie {
   }
   Zombie(FromTock&& ft) : EZombie(ft.created_time) { }
   Zombie(const FromTock& ft) : EZombie(FromTock(ft)) { }
+  std::shared_ptr<ZombieNode<T>> shared_ptr() const {
+    return non_null(std::dynamic_pointer_cast<ZombieNode<T>>(EZombie::shared_ptr()));
+  }
   T get_value() const {
     return shared_ptr()->t;
   }
