@@ -14,6 +14,14 @@ TEST(ZombieTest, Bind) {
   EXPECT_EQ(z.get_value(), 42);
 }
 
+TEST(ZombieTest, BindUnTyped) {
+  Zombie<int> x(6), y(7);
+  Zombie<int> z = bindZombieUnTyped([](const std::vector<const void*>& vec) {
+    return Zombie<int>(*static_cast<const int*>(vec[0]) * *static_cast<const int*>(vec[1]));
+  }, {x, y});
+  EXPECT_EQ(z.get_value(), 42);
+}
+
 TEST(ZombieTest, Resource) {
   static int destructor_count = 0;
   int last_destructor_count = 0;

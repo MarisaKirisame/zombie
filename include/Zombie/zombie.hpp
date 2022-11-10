@@ -38,13 +38,15 @@ struct MicroWave : Object {
   tock start_time;
   tock end_time;
   MicroWave(std::function<void(const std::vector<const void*>& in)>&& f,
-	    const std::vector<tock>& inputs,
-	    const tock& start_time,
-	    const tock& end_time) :
+             const std::vector<tock>& inputs,
+            const tock& start_time,
+            const tock& end_time) :
     f(std::move(f)),
     inputs(inputs),
     start_time(start_time),
     end_time(end_time) { }
+  static void play(const std::function<void(const std::vector<const void*>& in)>& f,
+                   const std::vector<tock>& inputs);
   void replay();
 };
 
@@ -294,10 +296,25 @@ struct IsZombie<Zombie<T>> : std::true_type { };
 
 template<typename RetType>
 RetType bindZombieSkip(Trailokya& t) {
+}
+
+template<typename ret_type>
+ret_type bindZombieRaw(std::function<void(const std::vector<const void*>&)>&& func, std::vector<tock>&& in) {
+  static_assert(IsZombie<ret_type>::value, "should be zombie");
+  Trailokya& t = Trailokya::get_trailokya();
+  ScopeGuard sg(t);
+  if (!t.akasha.has_precise(t.current_tock)) {
+    tock start_time = t.current_tock++;
+    MicroWave::play(func, in);
+    tock end_time = t.current_tock;
+    ret_type ret(FromTock(end_time - 1));
+    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
+    return std::move(ret);
+  } else {
     auto& n = t.akasha.get_precise_node(t.current_tock);
     t.current_tock = n.range.second;
-    static_assert(IsZombie<RetType>::value, "should be zombie");
-    RetType ret(FromTock(t.current_tock - 1));
+    static_assert(IsZombie<ret_type>::value, "should be zombie");
+    ret_type ret(FromTock(t.current_tock - 1));
     // we choose call-by-value because
     // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
     // 1: calculating ret will force it's dependency, and call-by-value should provide better locality:
@@ -312,41 +329,33 @@ RetType bindZombieSkip(Trailokya& t) {
       ret.shared_ptr();
     }
     return std::move(ret);
+  }
 }
 
 template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   using ret_type = decltype(f(std::declval<Arg>()...));
-  Trailokya& t = Trailokya::get_trailokya();
-  ScopeGuard sg(t);
-  if (!t.akasha.has_precise(t.current_tock)) {
-    std::tuple<std::shared_ptr<ZombieNode<Arg>>...> g(x.shared_ptr()...);
-    auto y = std::apply([](const std::shared_ptr<ZombieNode<Arg>>&... g_){ return std::make_tuple<>(std::cref(g_->get_ref())...); }, g);
-    tock start_time = t.current_tock++;
-    auto ret = std::apply(f, y);
-    static_assert(IsZombie<decltype(ret)>::value, "should be zombie");
-    tock end_time = t.current_tock;
-    ASSERT(end_time == ret.created_time + 1);
-    std::vector<tock> in = {x.created_time...};
-    std::function<void(const std::vector<const void*>&)> func =
-      [f = std::forward<F>(f)](const std::vector<const void*> in) {
-        auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-        std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-        std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
-      };
-    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
-    return std::move(ret);
-  } else {
-    return bindZombieSkip<ret_type>(t);
-  }
+  std::function<void(const std::vector<const void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<const void*> in) {
+      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+      std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
+    };
+  std::vector<tock> in = {x.created_time...};
+  return bindZombieRaw<ret_type>(std::move(func), std::move(in));
 }
 
 // While this function is not strictly necessary, as it could be replaced by binding and passing a Zombie<list<Any>>,
 // doing so is clumsy to use and inefficient.
-//template<typename F>
-//auto bindZombieUnTyped(F&& f, const std::vector<EZombie>& x) {
-//  
-//}
+template<typename F>
+auto bindZombieUnTyped(F&& f, const std::vector<EZombie>& x) {
+  using ret_type = decltype(f(std::declval<std::vector<const void*>>()));
+  std::vector<tock> in;
+  for (const EZombie& ez : x) {
+    in.push_back(ez.created_time);
+  }
+  return bindZombieRaw<ret_type>(f, std::move(in));
+}
 
 // exist only to assert that linking is ok
 void zombie_link_test();
