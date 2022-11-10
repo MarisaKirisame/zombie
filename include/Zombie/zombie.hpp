@@ -247,7 +247,7 @@ struct FromTock {
 // T should manage it's own memory:
 // when T is construct, only then all memory is released.
 // this mean T should not hold shared_ptr.
-// T having Zombie zombie is allowed though.
+// T having Zombie is allowed though.
 template<typename T>
 struct Zombie : EZombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
