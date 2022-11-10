@@ -1,3 +1,4 @@
+#include <iostream>
 #include "Zombie/zombie.hpp"
 
 void MicroWave::replay() {
@@ -26,4 +27,8 @@ void MicroWave::replay() {
     input_zombie.push_back(ezn);
   }
   f(in);
+}
+
+void zombie_link_test() {
+  std::cout << "zombie link ok!" << std::endl;
 }
