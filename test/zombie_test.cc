@@ -49,8 +49,8 @@ TEST(ZombieTest, Resource) {
   }
 }
 
-// todo: test for eagereviction
-// todo: test for cleanup
+// TODO: test for eagereviction
+// TODO: test for cleanup
 
 TEST(ZombieTest, SourceNoEvict) {
   Zombie<int> x(3);
@@ -153,7 +153,7 @@ TEST(ZombieTest, ZombieRematWithSmallestFunctionTest) {
   // While recursive test seems very contrived,
   // recursive MicroWave happend when your value is recursive.
   // In such a case, the Zombie will contain more Zombie.
-  // todo: test some recursive structure and function.
+  // TODO: test some recursive structure and function.
   static size_t outer_executed_time = 0;
   static size_t inner_executed_time = 0;
   Zombie<int> x = bindZombie(

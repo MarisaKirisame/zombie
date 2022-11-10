@@ -72,7 +72,7 @@ bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
 // When the Zombie is eventually revived, holding should be filled,
 // and the revive-requester should get the value and make it evictable.
 //
-// todo: it look like we can use only one pointer by unioning it.
+// TODO: it look like we can use only one pointer by unioning it.
 // in such a case pointer tagging can be use to distinguish the three case.
 struct GraveYard : Object {
   std::weak_ptr<EZombieNode> evictable;
@@ -237,13 +237,13 @@ struct EZombie {
 
 };
 
-// todo: make tock a newtype
+// TODO: make tock a newtype
 struct FromTock {
   tock created_time;
   FromTock(tock created_time) : created_time(created_time) { }
 };
 
-// todo: it could be a shared_ptr to skip registering in node.
+// TODO: it could be a shared_ptr to skip registering in node.
 // when that happend, we gain both space and time,
 // at the lose of eviction granularity.
 
