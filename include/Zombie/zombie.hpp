@@ -34,19 +34,19 @@ struct ScopeGuard {
 // The metadata must be updated accordingly.
 struct MicroWave : Object {
   std::function<void(const std::vector<const void*>& in)> f;
-  std::vector<tock> inputs;
-  tock start_time;
-  tock end_time;
+  std::vector<Tock> inputs;
+  Tock start_time;
+  Tock end_time;
   MicroWave(std::function<void(const std::vector<const void*>& in)>&& f,
-             const std::vector<tock>& inputs,
-            const tock& start_time,
-            const tock& end_time) :
+            const std::vector<Tock>& inputs,
+            const Tock& start_time,
+            const Tock& end_time) :
     f(std::move(f)),
     inputs(inputs),
     start_time(start_time),
     end_time(end_time) { }
   static void play(const std::function<void(const std::vector<const void*>& in)>& f,
-                   const std::vector<tock>& inputs);
+                   const std::vector<Tock>& inputs);
   void replay();
 };
 
@@ -142,8 +142,8 @@ auto gen_tuple(F func) {
 }
 
 struct EZombieNode : Object {
-  tock created_time;
-  EZombieNode(tock created_time) : created_time(created_time) { }
+  Tock created_time;
+  EZombieNode(Tock created_time) : created_time(created_time) { }
   virtual ~EZombieNode() {
     auto& t = Trailokya::get_trailokya();
     if (!t.in_ragnarok) {
@@ -172,7 +172,7 @@ struct ZombieNode : EZombieNode {
   }
   ZombieNode(ZombieNode<T>&& t) = delete;
   template<typename... Args>
-  ZombieNode(tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
+  ZombieNode(Tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
 };
 
 // Note that this type do not have a virtual destructor.
@@ -181,9 +181,9 @@ struct ZombieNode : EZombieNode {
 // As a consequence, Zombie only provide better API:
 // it cannot extend EZombie in any way.
 struct EZombie {
-  tock created_time;
+  Tock created_time;
   mutable std::weak_ptr<EZombieNode> ptr_cache;
-  EZombie(tock created_time) : created_time(created_time) { }
+  EZombie(Tock created_time) : created_time(created_time) { }
   EZombie() { }
   std::weak_ptr<EZombieNode> ptr() const {
     if (ptr_cache.expired()) {
@@ -237,12 +237,6 @@ struct EZombie {
 
 };
 
-// TODO: make tock a newtype
-struct FromTock {
-  tock created_time;
-  FromTock(tock created_time) : created_time(created_time) { }
-};
-
 // TODO: it could be a shared_ptr to skip registering in node.
 // when that happend, we gain both space and time,
 // at the lose of eviction granularity.
@@ -281,8 +275,8 @@ struct Zombie : EZombie {
   Zombie(T&& t) {
     construct(std::move(t));
   }
-  Zombie(FromTock&& ft) : EZombie(ft.created_time) { }
-  Zombie(const FromTock& ft) : EZombie(FromTock(ft)) { }
+  Zombie(Tock&& t) : EZombie(t) { }
+  Zombie(const Tock& t) : EZombie(Tock(t)) { }
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     return non_null(std::dynamic_pointer_cast<ZombieNode<T>>(EZombie::shared_ptr()));
   }
@@ -303,22 +297,22 @@ RetType bindZombieSkip(Trailokya& t) {
 }
 
 template<typename ret_type>
-ret_type bindZombieRaw(std::function<void(const std::vector<const void*>&)>&& func, std::vector<tock>&& in) {
+ret_type bindZombieRaw(std::function<void(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   static_assert(IsZombie<ret_type>::value, "should be zombie");
   Trailokya& t = Trailokya::get_trailokya();
   ScopeGuard sg(t);
   if (!t.akasha.has_precise(t.current_tock)) {
-    tock start_time = t.current_tock++;
+    Tock start_time = t.current_tock++;
     MicroWave::play(func, in);
-    tock end_time = t.current_tock;
-    ret_type ret(FromTock(end_time - 1));
+    Tock end_time = t.current_tock;
+    ret_type ret(Tock(end_time - 1));
     t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
     return std::move(ret);
   } else {
     auto& n = t.akasha.get_precise_node(t.current_tock);
     t.current_tock = n.range.second;
     static_assert(IsZombie<ret_type>::value, "should be zombie");
-    ret_type ret(FromTock(t.current_tock - 1));
+    ret_type ret(Tock(t.current_tock - 1));
     // we choose call-by-value because
     // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
     // 1: calculating ret will force it's dependency, and call-by-value should provide better locality:
@@ -345,7 +339,7 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
       std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
     };
-  std::vector<tock> in = {x.created_time...};
+  std::vector<Tock> in = {x.created_time...};
   return bindZombieRaw<ret_type>(std::move(func), std::move(in));
 }
 
@@ -354,7 +348,7 @@ auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
 template<typename F>
 auto bindZombieUnTyped(F&& f, const std::vector<EZombie>& x) {
   using ret_type = decltype(f(std::declval<std::vector<const void*>>()));
-  std::vector<tock> in;
+  std::vector<Tock> in;
   for (const EZombie& ez : x) {
     in.push_back(ez.created_time);
   }

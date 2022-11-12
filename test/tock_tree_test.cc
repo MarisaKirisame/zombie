@@ -3,6 +3,11 @@
 #include <gtest/gtest.h>
 #include "assert.hpp"
 
+TEST(TockTest, NumericLimit) {
+  ASSERT(std::numeric_limits<Tock>::min().tock == std::numeric_limits<decltype(std::declval<Tock>().tock)>::min());
+  ASSERT(std::numeric_limits<Tock>::max().tock == std::numeric_limits<decltype(std::declval<Tock>().tock)>::max());
+}
+
 TEST(TockTreeTest, ReversedOrder) {
   tock_tree<int> tt;
   tt.put({2,6}, 1);

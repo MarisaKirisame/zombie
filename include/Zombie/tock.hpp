@@ -21,10 +21,39 @@
 // and we use a single index instead of separate index, because Computer and Zombie relate -
 // the outer tock_range node can does everything an inner tock_range node does,
 // so one can replay that instead if the more fine grained option is absent.
-using tock = int64_t;
+struct Tock {
+  int64_t tock;
+  Tock() { }
+  Tock(int64_t tock) : tock(tock) { }
+  Tock& operator++() {
+    ++tock;
+    return *this;
+  }
+  Tock operator++(int) {
+    return tock++;
+  }
+  Tock operator+(Tock rhs) const { return tock + rhs.tock; }
+  Tock operator-(Tock rhs) const { return tock - rhs.tock; }
+  bool operator!=(Tock rhs) const { return tock != rhs.tock; }
+  bool operator==(Tock rhs) const { return tock == rhs.tock; }
+  bool operator<(Tock rhs) const { return tock < rhs.tock; }
+  bool operator<=(Tock rhs) const { return tock <= rhs.tock; }
+  bool operator>(Tock rhs) const { return tock > rhs.tock; }
+  bool operator>=(Tock rhs) const { return tock >= rhs.tock; }
+};
+
+template<>
+struct std::numeric_limits<Tock> {
+  static Tock min() {
+    return std::numeric_limits<decltype(std::declval<Tock>().tock)>::min();
+  }
+  static Tock max() {
+    return std::numeric_limits<decltype(std::declval<Tock>().tock)>::max();
+  }
+};
 
 // open-close.
-using tock_range = std::pair<tock, tock>;
+using tock_range = std::pair<Tock, Tock>;
 
 template<typename K, typename V>
 auto largest_value_le(const std::map<K, V>& m, const K& k) {
@@ -78,8 +107,8 @@ struct tock_tree {
       parent(parent), range(range), value(value) { }
     Node(Node* parent, const tock_range& range, V&& value) :
       parent(parent), range(range), value(std::move(value)) { }
-    std::map<tock, Node> children;
-    bool children_in_range(const tock& t) const {
+    std::map<Tock, Node> children;
+    bool children_in_range(const Tock& t) const {
       auto it = largest_value_le(children, t);
       if (it == children.end()) {
         return false;
@@ -88,34 +117,34 @@ struct tock_tree {
         return t < it->second.range.second;
       }
     }
-    const Node& get_shallow(const tock& t) const {
+    const Node& get_shallow(const Tock& t) const {
       auto it = largest_value_le(children, t);
       assert(it != children.end());
       assert(it->second.range.first <= t);
       assert(t < it->second.range.second);
       return it->second;
     }
-    Node& get_shallow(const tock& t) {
+    Node& get_shallow(const Tock& t) {
       auto it = largest_value_le(children, t);
       assert(it != children.end());
       assert(it->second.range.first <= t);
       assert(t < it->second.range.second);
       return it->second;
     }
-    const Node& get_node(const tock& t) const {
+    const Node& get_node(const Tock& t) const {
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
-    Node& get_node(const tock& t) {
+    Node& get_node(const Tock& t) {
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
     // get the most precise range that contain t
-    V get(const tock& t) const {
+    V get(const Tock& t) const {
       return get_node(t).value;
     }
     void delete_node() {
       // the root node is not for deletion.
       assert(parent != nullptr);
-      std::map<tock, Node>& insert_to = parent->children;
+      std::map<Tock, Node>& insert_to = parent->children;
       for (auto it = children.begin(); it != children.end();) {
         auto nh = children.extract(it++);
         nh.mapped().parent = parent;
@@ -138,26 +167,26 @@ struct tock_tree {
       }
     }
   };
-  Node n = Node(nullptr, tock_range(std::numeric_limits<tock>::min(), std::numeric_limits<tock>::max()), V());
-  Node& get_node(const tock& t) {
+  Node n = Node(nullptr, tock_range(std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()), V());
+  Node& get_node(const Tock& t) {
     return n.get_node(t);
   }
-  const Node& get_node(const tock& t) const {
+  const Node& get_node(const Tock& t) const {
     return n.get_node(t);
   }
-  bool has_precise(const tock& t) const {
+  bool has_precise(const Tock& t) const {
     return get_node(t).range.first == t;
   }
-  Node& get_precise_node(const tock& t) {
+  Node& get_precise_node(const Tock& t) {
     ASSERT(has_precise(t));
     return get_node(t);
   }
-  const Node& get_precise_node(const tock& t) const {
+  const Node& get_precise_node(const Tock& t) const {
     ASSERT(has_precise(t));
     return get_node(t);
   }
   // get the most precise range that contain t
-  V get(const tock& t) const {
+  V get(const Tock& t) const {
     return n.get(t);
   }
   void check_invariant() const {

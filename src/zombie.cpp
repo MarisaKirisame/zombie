@@ -2,11 +2,11 @@
 #include "Zombie/zombie.hpp"
 
 void MicroWave::play(const std::function<void(const std::vector<const void*>& in)>& f,
-                     const std::vector<tock>& inputs) {
+                     const std::vector<Tock>& inputs) {
   Trailokya& t = Trailokya::get_trailokya();
   std::vector<std::shared_ptr<EZombieNode>> input_zombie;
   std::vector<const void*> in;
-  for (const tock& input : inputs) {
+  for (const Tock& input : inputs) {
     if (!t.akasha.has_precise(input)) {
       t.akasha.put({input, input + 1}, std::make_unique<GraveYard>());
     }
@@ -22,8 +22,8 @@ void MicroWave::replay() {
   Trailokya& t = Trailokya::get_trailokya();
   struct Tardis {
     Trailokya& t;
-    tock old_tock;
-    Tardis(Trailokya& t, const tock& new_tock) : t(t), old_tock(t.current_tock) {
+    Tock old_tock;
+    Tardis(Trailokya& t, const Tock& new_tock) : t(t), old_tock(t.current_tock) {
       t.current_tock = new_tock;
     }
     ~Tardis() {

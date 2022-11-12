@@ -22,5 +22,5 @@ struct Trailokya {
   // Hold MicroWave and GraveYard.
   tock_tree<std::unique_ptr<Object>> akasha;
   std::vector<Scope> scopes;
-  tock current_tock = 1;
+  Tock current_tock = 1;
 };
