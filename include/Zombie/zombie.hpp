@@ -237,10 +237,15 @@ struct EZombie {
 
 };
 
+// The core of the library.
+// Represent something that could be recomputed to save space.
+// While Zombie is mutable, the inside is immutable.
+// Note that when you have a Zombie of Zombie, the inside is immutable by the above rule.
+//
 // TODO: it could be a shared_ptr to skip registering in node.
 // when that happend, we gain both space and time,
 // at the lose of eviction granularity.
-
+//
 // the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
 // T should manage it's own memory:
 // when T is construct, only then all memory is released.
