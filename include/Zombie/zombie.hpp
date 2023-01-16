@@ -123,7 +123,7 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
       if (gy->holding && parent != nullptr) {
         gy->make_evictable();
       }
-    } else if (MicroWave* mw = dynamic_cast<MicroWave*>(obj)) { }
+    } else if (dynamic_cast<MicroWave*>(obj)) { }
     else {
       // type not found
       ASSERT(false);
