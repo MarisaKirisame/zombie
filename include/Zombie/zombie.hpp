@@ -85,7 +85,6 @@ struct GraveYard : Object {
   // Does not revive if dead.
   std::shared_ptr<EZombieNode> summon() {
     if (!weak_is_nullptr(evictable)) {
-      ASSERT(evictable.lock());
       return non_null(evictable.lock());
     } else if (holding != nullptr) {
       return non_null(holding);
