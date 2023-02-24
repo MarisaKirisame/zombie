@@ -167,7 +167,7 @@ struct BagObserver<std::shared_ptr<EZombieNode>> {
 template<typename T>
 struct ZombieNode : EZombieNode {
   T t;
-  const T* get_ptr() const {
+  const void* get_ptr() const {
     return &t;
   }
   const T& get_ref() const {
