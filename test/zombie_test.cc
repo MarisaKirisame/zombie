@@ -200,3 +200,21 @@ TEST(ZombieTest, SkipZombieAliveRecursiveFunctionTest) {
   EXPECT_EQ(y_executed_time, 1);
   EXPECT_EQ(z_executed_time, 2);
 }
+
+TEST(ZombieTest, CopyTest) {
+  Zombie<int> x(1);
+  Zombie<int> y = x;
+  EXPECT_EQ(x.get_value(), y.get_value());
+}
+
+TEST(ZombieTest, StoreReturnTest) {
+  Zombie<int> a(1);
+  Zombie<int> b = bindZombie([&](int a){
+    Zombie<int> c(2);
+    Zombie<int> d(3);
+    return c;
+  }, a);
+  EXPECT_EQ(b.get_value(), 2);
+  b.force_unique_evict();
+  EXPECT_EQ(b.get_value(), 2);
+}

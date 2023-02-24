@@ -33,19 +33,23 @@ struct ScopeGuard {
 // Thus the work executed by the parent MicroWave will also change.
 // The metadata must be updated accordingly.
 struct MicroWave : Object {
-  std::function<void(const std::vector<const void*>& in)> f;
+  // we dont really use the Tock return type, but this allow one less boxing.
+  std::function<Tock(const std::vector<const void*>& in)> f;
   std::vector<Tock> inputs;
+  Tock output;
   Tock start_time;
   Tock end_time;
-  MicroWave(std::function<void(const std::vector<const void*>& in)>&& f,
+  MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
             const std::vector<Tock>& inputs,
+            const Tock& output,
             const Tock& start_time,
             const Tock& end_time) :
     f(std::move(f)),
     inputs(inputs),
+    output(output),
     start_time(start_time),
     end_time(end_time) { }
-  static void play(const std::function<void(const std::vector<const void*>& in)>& f,
+  static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
   void replay();
 };
@@ -269,6 +273,9 @@ struct Zombie : EZombie {
       t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }
   }
+  Zombie(const Zombie<T>& z) : EZombie(z) { }
+  Zombie(Zombie<T>& z) : EZombie(z) { }
+  Zombie(Zombie<T>&& z) : EZombie(std::move(z)) { }
   template<typename... Args>
   Zombie(Args&&... args) {
     construct(std::forward<Args>(args)...);
@@ -280,7 +287,8 @@ struct Zombie : EZombie {
     construct(std::move(t));
   }
   Zombie(Tock&& t) : EZombie(t) { }
-  Zombie(const Tock& t) : EZombie(Tock(t)) { }
+  Zombie(const Tock& t) : EZombie(t) { }
+  Zombie(Tock& t) : EZombie(t) { }
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     return non_null(std::dynamic_pointer_cast<ZombieNode<T>>(EZombie::shared_ptr()));
   }
@@ -296,27 +304,24 @@ struct IsZombie : std::false_type { };
 template<typename T>
 struct IsZombie<Zombie<T>> : std::true_type { };
 
-template<typename RetType>
-RetType bindZombieSkip(Trailokya& t) {
-}
-
 template<typename ret_type>
-ret_type bindZombieRaw(std::function<void(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
+ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   static_assert(IsZombie<ret_type>::value, "should be zombie");
   Trailokya& t = Trailokya::get_trailokya();
   ScopeGuard sg(t);
   if (!t.akasha.has_precise(t.current_tock)) {
     Tock start_time = t.current_tock++;
-    MicroWave::play(func, in);
+    Tock out = MicroWave::play(func, in);
     Tock end_time = t.current_tock;
-    ret_type ret(Tock(end_time - 1));
-    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, start_time, end_time));
+    ret_type ret(out);
+    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, out, start_time, end_time));
     return std::move(ret);
   } else {
     auto& n = t.akasha.get_precise_node(t.current_tock);
     t.current_tock = n.range.second;
     static_assert(IsZombie<ret_type>::value, "should be zombie");
-    ret_type ret(Tock(t.current_tock - 1));
+    MicroWave* mv = non_null(dynamic_cast<MicroWave*>(n.value.get()));
+    ret_type ret(mv->output);
     // we choose call-by-value because
     // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
     // 1: calculating ret will force it's dependency, and call-by-value should provide better locality:
@@ -337,11 +342,12 @@ ret_type bindZombieRaw(std::function<void(const std::vector<const void*>&)>&& fu
 template<typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<Arg>& ...x) {
   using ret_type = decltype(f(std::declval<Arg>()...));
-  std::function<void(const std::vector<const void*>&)> func =
+  std::function<Tock(const std::vector<const void*>&)> func =
     [f = std::forward<F>(f)](const std::vector<const void*> in) {
       auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-      std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
+      auto z = std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
+      return z.created_time;
     };
   std::vector<Tock> in = {x.created_time...};
   return bindZombieRaw<ret_type>(std::move(func), std::move(in));
@@ -356,7 +362,12 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie>& x) {
   for (const EZombie& ez : x) {
     in.push_back(ez.created_time);
   }
-  return bindZombieRaw<ret_type>(f, std::move(in));
+  std::function<Tock(const std::vector<const void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<const void*> in) {
+      auto z = f(in);
+      return z.created_time;
+    };
+  return bindZombieRaw<ret_type>(std::move(func), std::move(in));
 }
 
 // exist only to assert that linking is ok

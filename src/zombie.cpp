@@ -1,7 +1,7 @@
 #include <iostream>
 #include "Zombie/zombie.hpp"
 
-void MicroWave::play(const std::function<void(const std::vector<const void*>& in)>& f,
+Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                      const std::vector<Tock>& inputs) {
   Trailokya& t = Trailokya::get_trailokya();
   std::vector<std::shared_ptr<EZombieNode>> input_zombie;
@@ -15,7 +15,7 @@ void MicroWave::play(const std::function<void(const std::vector<const void*>& in
     in.push_back(ezn->get_ptr());
     input_zombie.push_back(ezn);
   }
-  f(in);
+  return f(in);
 }
 
 void MicroWave::replay() {
