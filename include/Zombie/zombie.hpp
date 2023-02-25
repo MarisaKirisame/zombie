@@ -14,17 +14,6 @@ T non_null(T&& x) {
   return std::forward<T>(x);
 }
 
-struct ScopeGuard {
-  Trailokya& w;
-  std::vector<Scope>& scopes;
-  ScopeGuard(Trailokya& w) : w(w), scopes(w.scopes) {
-    scopes.push_back(Scope());
-  }
-  ~ScopeGuard() {
-    scopes.pop_back();
-  }
-};
-
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
 // When that happend, the outer MicroWave will not replay the inner one,
@@ -308,7 +297,6 @@ template<typename ret_type>
 ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   static_assert(IsZombie<ret_type>::value, "should be zombie");
   Trailokya& t = Trailokya::get_trailokya();
-  ScopeGuard sg(t);
   if (!t.akasha.has_precise(t.current_tock)) {
     Tock start_time = t.current_tock++;
     Tock out = MicroWave::play(func, in);

@@ -20,17 +20,16 @@ Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in
 
 void MicroWave::replay() {
   Trailokya& t = Trailokya::get_trailokya();
-  struct Tardis {
+  struct Cronus {
     Trailokya& t;
     Tock old_tock;
-    Tardis(Trailokya& t, const Tock& new_tock) : t(t), old_tock(t.current_tock) {
+    Cronus(Trailokya& t, const Tock& new_tock) : t(t), old_tock(t.current_tock) {
       t.current_tock = new_tock;
     }
-    ~Tardis() {
+    ~Cronus() {
       t.current_tock = old_tock;
     }
-  } tardis(t, start_time);
-  ScopeGuard sg(t);
+  } cronus(t, start_time);
   t.current_tock++;
   play(f, inputs);
 }
