@@ -49,71 +49,31 @@ bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
   return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
 }
 
-// Manage a Zombie.
-// At most one pointer is not a nullptr.
-//
-// When evictable is present,
-// The managed is a normal Zombie, that might be evicted from memory.
-// note that the weak_ptr will not be expired().
-// this is because when Zombie die the accompanying GraveYard is removed.
-//
-// When holding is present,
-// The managed is a Zombie which should not be evicted right now.
-//
-// When no pointer is present,
-// This mean the Zombie is dead, but we would like to revive it.
-// When the Zombie is eventually revived, holding should be filled,
-// and the revive-requester should get the value and make it evictable.
-//
-// TODO: it look like we can use only one pointer by unioning it.
-// in such a case pointer tagging can be use to distinguish the three case.
-struct GraveYard : Object {
-  std::weak_ptr<EZombieNode> evictable;
-  std::shared_ptr<EZombieNode> holding;
-  explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : holding(ptr) { }
-  explicit GraveYard() { }
-  bool zombie_present() {
-    return (!weak_is_nullptr(evictable)) || holding != nullptr;
+struct RecomputeLater : Phantom {
+  Tock created_time;
+  std::weak_ptr<EZombieNode> weak_ptr;
+  RecomputeLater(const Tock& created_time, const std::shared_ptr<EZombieNode>& ptr) : created_time(created_time), weak_ptr(ptr) { }
+  void evict() override {
+    auto& t = Trailokya::get_trailokya();
+    t.akasha.get_precise_node(created_time).delete_node();
   }
-  // Does not revive if dead.
-  std::shared_ptr<EZombieNode> summon() {
-    if (!weak_is_nullptr(evictable)) {
-      return non_null(evictable.lock());
-    } else if (holding != nullptr) {
-      return non_null(holding);
-    } else {
-      return std::shared_ptr<EZombieNode>();
-    }
-  }
-  // Arise my Zombie!
-  std::shared_ptr<EZombieNode> arise(const tock_tree<std::unique_ptr<Object>>::Node& node) {
-    auto ret = summon();
-    if (ret) {
-      return ret;
-    } else {
-      // At your side my GraveYard!
-      dynamic_cast<MicroWave*>(non_null(node.parent)->value.get())->replay();
-      ret = non_null(holding);
-      make_evictable();
-      return ret;
-    }
-  }
-  void make_evictable() {
-    ASSERT(holding);
-    Trailokya::get_trailokya().book.insert(holding);
-    evictable = holding;
-    holding.reset();
-  }
+  void notify_bag_index_changed(size_t idx) override;
 };
 
+struct GraveYard : Object {
+  std::shared_ptr<EZombieNode> ptr;
+  explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : ptr(ptr) { }
+};
 
 template<>
 struct NotifyParentChanged<std::unique_ptr<Object>> {
-  void operator()(std::unique_ptr<Object>& node, typename tock_tree<std::unique_ptr<Object>>::Node* parent) {
-    Object* obj = node.get();
+  void operator()(typename tock_tree<std::unique_ptr<Object>>::Node& n) {
+    Object* obj = n.value.get();
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
-      if (gy->holding && parent != nullptr) {
-        gy->make_evictable();
+      if (n.parent != nullptr && n.parent->parent != nullptr) {
+        tock_range tr = n.range;
+        ASSERT(tr.first + 1 == tr.second);
+        Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr));
       }
     } else if (dynamic_cast<MicroWave*>(obj)) { }
     else {
@@ -136,20 +96,15 @@ auto gen_tuple(F func) {
 struct EZombieNode : Object {
   Tock created_time;
   EZombieNode(Tock created_time) : created_time(created_time) { }
-  virtual ~EZombieNode() {
-    auto& t = Trailokya::get_trailokya();
-    if (!t.in_ragnarok) {
-      t.akasha.get_precise_node(created_time).delete_node();
-    }
-  }
+  virtual ~EZombieNode() { }
   ptrdiff_t pool_index = -1;
   virtual const void* get_ptr() const = 0;
 };
 
 template<>
-struct BagObserver<std::shared_ptr<EZombieNode>> {
-  void operator()(std::shared_ptr<EZombieNode>& t, size_t idx) {
-    t->pool_index = idx;
+struct NotifyBagIndexChanged<std::unique_ptr<Phantom>> {
+  void operator()(std::unique_ptr<Phantom>& p, size_t idx) {
+    non_null(p)->notify_bag_index_changed(idx);
   }
 };
 
@@ -181,9 +136,8 @@ struct EZombie {
     if (ptr_cache.expired()) {
       Trailokya& t = Trailokya::get_trailokya();
       if (t.akasha.has_precise(created_time)) {
-        GraveYard* gy = dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get());
-        ASSERT(gy != nullptr);
-        ptr_cache = non_null(std::dynamic_pointer_cast<EZombieNode>(gy->summon()));
+        GraveYard* gy = non_null(dynamic_cast<GraveYard*>(t.akasha.get_precise_node(created_time).value.get()));
+        ptr_cache = non_null(gy->ptr);
       }
     }
     return ptr_cache;
@@ -198,7 +152,7 @@ struct EZombie {
   void evict() {
     if (evictable()) {
       auto ptr = non_null(this->ptr().lock());
-      Trailokya::get_trailokya().book.remove(ptr->pool_index);
+      Trailokya::get_trailokya().book.remove(ptr->pool_index)->evict();
     }
   }
   void force_evict() {
@@ -217,11 +171,24 @@ struct EZombie {
     } else {
       auto& t = Trailokya::get_trailokya();
       if (!t.akasha.has_precise(created_time)) {
-        t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>());
+        std::shared_ptr<EZombieNode> strong;
+        struct Homura {
+          Trailokya& t;
+          Tardis old_tardis;
+          Homura(Trailokya& t, const Tardis& new_tardis) : t(t), old_tardis(t.tardis) {
+            t.tardis = new_tardis;
+          }
+          ~Homura() {
+            t.tardis = old_tardis;
+          }
+        } h(t, Tardis { created_time, &strong });
+        dynamic_cast<MicroWave*>(t.akasha.get_node(created_time).value.get())->replay();
+        ret = non_null(strong);
+      } else {
+        auto& n = t.akasha.get_precise_node(created_time);
+        GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
+        ret = non_null(gy->ptr);
       }
-      auto& n = t.akasha.get_precise_node(created_time);
-      GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
-      ret = non_null(gy->arise(n));
       ptr_cache = ret;
       return ret;
     }
@@ -250,16 +217,13 @@ struct Zombie : EZombie {
   void construct(Args&&... args) {
     Trailokya& t = Trailokya::get_trailokya();
     created_time = t.current_tock++;
-    if (t.akasha.has_precise(created_time)) {
-      auto& n = t.akasha.get_precise_node(created_time);
-      GraveYard* gy = non_null(dynamic_cast<GraveYard*>(n.value.get()));
-      if (!gy->zombie_present()) {
-        gy->holding = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
-      }
-    } else {
+    if (!t.akasha.has_precise(created_time)) {
       auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr_cache = shared;
       t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
+    }
+    if (t.tardis.forward_at == created_time) {
+      *t.tardis.forward_to = shared_ptr();
     }
   }
   Zombie(const Zombie<T>& z) : EZombie(z) { }

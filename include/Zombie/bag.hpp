@@ -5,7 +5,7 @@
 
 // May god forgive my sin.
 template<typename T>
-struct BagObserver {
+struct NotifyBagIndexChanged {
   void operator()(T& t, size_t idx) { }
 };
 
@@ -18,12 +18,18 @@ struct Bag {
   Bag(std::initializer_list<T> l) : vec(l) { }
   void insert(const T& t) {
     vec.push_back(t);
-    BagObserver<T>()(vec.back(), vec.size() - 1);
+    NotifyBagIndexChanged<T>()(vec.back(), vec.size() - 1);
   }
-  void remove(size_t i) {
+  void insert(T&& t) {
+    vec.push_back(std::move(t));
+    NotifyBagIndexChanged<T>()(vec.back(), vec.size() - 1);
+  }
+  T remove(size_t i) {
     std::swap(vec[i], vec.back());
+    NotifyBagIndexChanged<T>()(vec[i], i);
+    T t = std::move(vec.back());
     vec.pop_back();
-    BagObserver<T>()(vec[i], i);
+    return t;
   }
   T& operator[](size_t i) {
     return vec[i];

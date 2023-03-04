@@ -7,11 +7,7 @@ Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in
   std::vector<std::shared_ptr<EZombieNode>> input_zombie;
   std::vector<const void*> in;
   for (const Tock& input : inputs) {
-    if (!t.akasha.has_precise(input)) {
-      t.akasha.put({input, input + 1}, std::make_unique<GraveYard>());
-    }
-    auto& n = t.akasha.get_precise_node(input);
-    auto ezn = non_null(dynamic_cast<GraveYard*>(n.value.get()))->arise(n);
+    auto ezn = EZombie(input).shared_ptr();
     in.push_back(ezn->get_ptr());
     input_zombie.push_back(ezn);
   }
@@ -34,6 +30,11 @@ void MicroWave::replay() {
   play(f, inputs);
 }
 
+void RecomputeLater::notify_bag_index_changed(size_t idx) {
+  non_null(weak_ptr.lock())->pool_index = idx;
+}
+
 void zombie_link_test() {
   std::cout << "zombie link ok!" << std::endl;
 }
+

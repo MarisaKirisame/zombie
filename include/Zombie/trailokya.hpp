@@ -11,20 +11,20 @@ struct Tardis {
   std::shared_ptr<EZombieNode>* forward_to = nullptr;
 };
 
+struct Phantom {
+  virtual ~Phantom() { }
+  virtual void evict() = 0;
+  virtual void notify_bag_index_changed(size_t new_index) = 0;
+};
+
 struct Trailokya {
   static Trailokya& get_trailokya() {
     static Trailokya t;
     return t;
   }
-  // i have double free without this. figure out why.
-  bool in_ragnarok = false;
-  ~Trailokya() {
-    in_ragnarok = true;
-  }
   // Hold MicroWave and GraveYard.
   tock_tree<std::unique_ptr<Object>> akasha;
-  // Note that book goes after akasha, as destruction of book access akasha
-  Bag<std::shared_ptr<EZombieNode>> book;
+  Bag<std::unique_ptr<Phantom>> book;
   Tardis tardis;
   Tock current_tock = 1;
 };

@@ -60,7 +60,7 @@ TEST(ZombieTest, SourceNoEvict) {
 TEST(ZombieTest, Recompute) {
   Zombie<int> x(3);
   auto y = bindZombie([](const int& x) { return Zombie(x * 2); }, x);
-  y.force_unique_evict(); 
+  y.force_unique_evict();
   EXPECT_EQ(y.get_value(), 6);
   ASSERT(y.evictable());
   y.force_unique_evict();
@@ -149,7 +149,7 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
   EXPECT_EQ(executed_time, 2);
 }
 
-TEST(ZombieTest, ZombieRematWithSmallestFunctionTest) {
+TEST(ZombieTest, ZombieRematWithSmallestFunction) {
   // While recursive test seems very contrived,
   // recursive MicroWave happend when your value is recursive.
   // In such a case, the Zombie will contain more Zombie.
@@ -178,7 +178,7 @@ TEST(ZombieTest, ZombieRematWithSmallestFunctionTest) {
   EXPECT_EQ(inner_executed_time, 2);
 }
 
-TEST(ZombieTest, SkipZombieAliveRecursiveFunctionTest) {
+TEST(ZombieTest, SkipZombieAliveRecursiveFunction) {
   static size_t y_executed_time = 0;
   static size_t z_executed_time = 0;
   Zombie<int> x(1);
@@ -201,13 +201,13 @@ TEST(ZombieTest, SkipZombieAliveRecursiveFunctionTest) {
   EXPECT_EQ(z_executed_time, 2);
 }
 
-TEST(ZombieTest, CopyTest) {
+TEST(ZombieTest, Copy) {
   Zombie<int> x(1);
   Zombie<int> y = x;
   EXPECT_EQ(x.get_value(), y.get_value());
 }
 
-TEST(ZombieTest, StoreReturnTest) {
+TEST(ZombieTest, StoreReturn) {
   Zombie<int> a(1);
   Zombie<int> b = bindZombie([&](int a){
     Zombie<int> c(2);
