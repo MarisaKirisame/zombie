@@ -1,5 +1,5 @@
 #include <iostream>
-#include "Zombie/zombie.hpp"
+#include "zombie/zombie.hpp"
 
 Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                      const std::vector<Tock>& inputs) {

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <set>
+#include <cstddef>
 
 // May god forgive my sin.
 template<typename T>

@@ -1,7 +1,6 @@
-#include "Zombie/bag.hpp"
+#include "zombie/bag.hpp"
 
 #include <gtest/gtest.h>
-#include "assert.hpp"
 
 TEST(BagTest, Bag) {
   Bag<int> b({0, 1, 2, 3, 4});

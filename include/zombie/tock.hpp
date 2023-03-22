@@ -3,8 +3,8 @@
 #include <iostream>
 #include <map>
 #include <cassert>
-
-#include "assert.hpp"
+#include <limits>
+#include <optional>
 
 // start at 0.
 // a tock pass whenever a Computer start execution, or a Zombie is created.
@@ -178,11 +178,11 @@ struct tock_tree {
     return get_node(t).range.first == t;
   }
   Node& get_precise_node(const Tock& t) {
-    ASSERT(has_precise(t));
+    assert(has_precise(t));
     return get_node(t);
   }
   const Node& get_precise_node(const Tock& t) const {
-    ASSERT(has_precise(t));
+    assert(has_precise(t));
     return get_node(t);
   }
   // get the most precise range that contain t
@@ -198,8 +198,8 @@ struct tock_tree {
   Node& put(const tock_range& r, V&& v) {
     Node& n = get_node(r.first);
     // disallow inserting the same node twice
-    ASSERT(n.range.first != r.first);
-    ASSERT(range_dominate(n.range, r));
+    assert(n.range.first != r.first);
+    assert(range_dominate(n.range, r));
     auto* inserted = &n.children;
     auto it = inserted->insert({r.first, Node(&n, r, std::move(v))}).first;
     Node& inserted_node = it->second;

@@ -6,11 +6,10 @@
 
 #include "tock.hpp"
 #include "trailokya.hpp"
-#include "assert.hpp"
 
 template<typename T>
 T non_null(T&& x) {
-  ASSERT(x);
+  assert(x);
   return std::forward<T>(x);
 }
 
@@ -72,13 +71,13 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
       if (n.parent != nullptr && n.parent->parent != nullptr) {
         tock_range tr = n.range;
-        ASSERT(tr.first + 1 == tr.second);
+        assert(tr.first + 1 == tr.second);
         Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr));
       }
     } else if (dynamic_cast<MicroWave*>(obj)) { }
     else {
       // type not found
-      ASSERT(false);
+      assert(false);
     }
   }
 };
@@ -156,12 +155,12 @@ struct EZombie {
     }
   }
   void force_evict() {
-    ASSERT(evictable());
+    assert(evictable());
     evict();
   }
   void force_unique_evict() {
-    ASSERT(evictable());
-    ASSERT(unique());
+    assert(evictable());
+    assert(unique());
     evict();
   }
   std::shared_ptr<EZombieNode> shared_ptr() const {

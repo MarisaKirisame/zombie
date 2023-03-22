@@ -1,7 +1,6 @@
-#include "Zombie/zombie.hpp"
+#include "zombie/zombie.hpp"
 
 #include <gtest/gtest.h>
-#include "assert.hpp"
 
 TEST(ZombieTest, Create) {
   Zombie<int> x(42);
@@ -39,7 +38,7 @@ TEST(ZombieTest, Resource) {
     {
       last_destructor_count = destructor_count;
       Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie<Resource>(); }, x);
-      ASSERT(destructor_count == last_destructor_count);
+      assert(destructor_count == last_destructor_count);
       last_destructor_count = destructor_count;
       y.force_unique_evict();
       EXPECT_EQ(destructor_count, last_destructor_count+1) << "evict does not release resource";
@@ -62,7 +61,7 @@ TEST(ZombieTest, Recompute) {
   auto y = bindZombie([](const int& x) { return Zombie(x * 2); }, x);
   y.force_unique_evict();
   EXPECT_EQ(y.get_value(), 6);
-  ASSERT(y.evictable());
+  assert(y.evictable());
   y.force_unique_evict();
   EXPECT_EQ(y.get_value(), 6);
 }
@@ -139,7 +138,7 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
   Zombie<int> e = bindZombie([](int x) { return Zombie(x * 2); }, b);
   Zombie<int> f = bindZombie([](int x, int y) { return Zombie(x + y); }, d, e);
   executed_time = 0;
-  ASSERT(b.evictable());
+  assert(b.evictable());
   b.force_unique_evict();
   c.force_unique_evict();
   d.force_unique_evict();
