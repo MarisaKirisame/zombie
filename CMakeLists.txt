@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 project(zombie)
 
-file(GLOB ALL_SRCS "src/*.cpp")
+file(GLOB_RECURSE ALL_SRCS "src/*.cpp")
 add_library(zombie_lib ${ALL_SRCS})
 target_include_directories(zombie_lib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
@@ -10,7 +12,19 @@ target_include_directories(zombie_lib PUBLIC
 target_compile_features(zombie_lib PUBLIC cxx_std_17)
 
 install(TARGETS zombie_lib EXPORT zombie)
+install(DIRECTORY include DESTINATION ./)
+
 install(EXPORT zombie DESTINATION lib/cmake/zombie)
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+  Config.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/zombie-config.cmake
+  INSTALL_DESTINATION lib/cmake)
+
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/zombie-config.cmake
+  DESTINATION lib/cmake/zombie)
 
 add_executable(debug debug.cpp)
 target_link_libraries(debug zombie_lib)
