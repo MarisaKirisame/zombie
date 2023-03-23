@@ -7,7 +7,8 @@ add_library(zombie_lib ${ALL_SRCS})
 target_include_directories(zombie_lib PUBLIC include)
 target_compile_features(zombie_lib PUBLIC cxx_std_17)
 
-install(TARGETS zombie_lib FILE zombie.cmake)
+install(TARGETS zombie_lib)
+install(EXPORT zombie)
 
 add_executable(debug debug.cpp)
 target_link_libraries(debug zombie_lib)
