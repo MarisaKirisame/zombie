@@ -4,7 +4,11 @@ project(zombie)
 
 file(GLOB ALL_SRCS "src/*.cpp")
 add_library(zombie_lib ${ALL_SRCS})
-target_include_directories(zombie_lib PUBLIC include)
+target_include_directories(zombie_lib PUBLIC
+  $<BUILD_INTERFACE:include>
+  $<INSTALL_INTERFACE:include>
+  ))
+
 target_compile_features(zombie_lib PUBLIC cxx_std_17)
 
 install(TARGETS zombie_lib EXPORT zombie)
