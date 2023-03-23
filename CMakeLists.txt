@@ -10,7 +10,7 @@ target_include_directories(zombie_lib PUBLIC
 target_compile_features(zombie_lib PUBLIC cxx_std_17)
 
 install(TARGETS zombie_lib EXPORT zombie)
-install(EXPORT zombie DESTINATION lib/${CMAKE_LIBRARY_ARCHITECTURE}/cmake/zombie)
+install(EXPORT zombie DESTINATION lib/cmake/zombie)
 
 add_executable(debug debug.cpp)
 target_link_libraries(debug zombie_lib)
