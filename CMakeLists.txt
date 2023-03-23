@@ -7,7 +7,7 @@ add_library(zombie_lib ${ALL_SRCS})
 target_include_directories(zombie_lib PUBLIC include)
 target_compile_features(zombie_lib PUBLIC cxx_std_17)
 
-install(TARGETS zombie_lib)
+install(TARGETS zombie_lib EXPORT zombie)
 install(EXPORT zombie DESTINATION share)
 
 add_executable(debug debug.cpp)
