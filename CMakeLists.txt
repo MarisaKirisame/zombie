@@ -5,7 +5,7 @@ project(zombie)
 file(GLOB ALL_SRCS "src/*.cpp")
 add_library(zombie_lib ${ALL_SRCS})
 target_include_directories(zombie_lib PUBLIC
-  $<BUILD_INTERFACE:include> $<INSTALL_INTERFACE:include>)
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
 target_compile_features(zombie_lib PUBLIC cxx_std_17)
 
