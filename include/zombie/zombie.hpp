@@ -248,6 +248,9 @@ struct Zombie : EZombie {
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     return non_null(std::dynamic_pointer_cast<ZombieNode<T>>(EZombie::shared_ptr()));
   }
+  void recompute() const {
+    shared_ptr();
+  }
   T get_value() const {
     return shared_ptr()->t;
   }
