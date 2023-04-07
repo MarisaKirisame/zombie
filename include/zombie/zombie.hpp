@@ -122,10 +122,11 @@ struct ZombieNode : EZombieNode {
 };
 
 // Note that this type do not have a virtual destructor.
-// this save the pointer to the void table, and a EZombie only contain two
-// 64 bit field: created_time and ptr_cache.
+// Doing so save the pointer to the virtual method table,
+//   and a EZombie only contain two 64 bit field:
+//   created_time and ptr_cache.
 // As a consequence, Zombie only provide better API:
-// it cannot extend EZombie in any way.
+//   it cannot extend EZombie in any way.
 struct EZombie {
   Tock created_time;
   mutable std::weak_ptr<EZombieNode> ptr_cache;
@@ -140,6 +141,9 @@ struct EZombie {
       }
     }
     return ptr_cache;
+  }
+  bool evicted() const {
+    return ptr() == nullptr;
   }
   bool evictable() const {
     auto ptr = this->ptr().lock();
