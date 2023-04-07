@@ -59,7 +59,9 @@ TEST(ZombieTest, SourceNoEvict) {
 TEST(ZombieTest, Recompute) {
   Zombie<int> x(3);
   auto y = bindZombie([](const int& x) { return Zombie(x * 2); }, x);
+  EXPECT_FALSE(y.evicted());
   y.force_unique_evict();
+  EXPECT_TRUE(y.evicted());
   EXPECT_EQ(y.get_value(), 6);
   assert(y.evictable());
   y.force_unique_evict();
