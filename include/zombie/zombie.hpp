@@ -266,7 +266,7 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
     Tock end_time = t.current_tock;
     ret_type ret(out);
     t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, out, start_time, end_time));
-    return std::move(ret);
+    return ret;
   } else {
     auto& n = t.akasha.get_precise_node(t.current_tock);
     t.current_tock = n.range.second;
@@ -286,7 +286,7 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
     if (call_by_value) {
       ret.shared_ptr();
     }
-    return std::move(ret);
+    return ret;
   }
 }
 
