@@ -143,7 +143,7 @@ struct EZombie {
     return ptr_cache;
   }
   bool evicted() const {
-    return ptr() == nullptr;
+    return ptr().lock() == nullptr;
   }
   bool evictable() const {
     auto ptr = this->ptr().lock();
