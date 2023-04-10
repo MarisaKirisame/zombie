@@ -6,9 +6,9 @@
 
 // May god forgive my sin.
 template<typename T>
-struct NotifyBagIndexChanged {
-  void operator()(T& t, size_t idx) { }
-};
+struct NotifyBagIndexChanged; //{
+//  void operator()(const T& t, size_t idx) { }
+//};
 
 // an unordered container of T.
 // allow constant time insert, remove, and lookup.
@@ -17,17 +17,20 @@ struct Bag {
   std::vector<T> vec;
   Bag() { }
   Bag(std::initializer_list<T> l) : vec(l) { }
+  static void notify(const T& t, const size_t& idx) {
+    NotifyBagIndexChanged<T>()(t, idx);
+  }
   void insert(const T& t) {
     vec.push_back(t);
-    NotifyBagIndexChanged<T>()(vec.back(), vec.size() - 1);
+    notify(vec.back(), vec.size() - 1);
   }
   void insert(T&& t) {
     vec.push_back(std::move(t));
-    NotifyBagIndexChanged<T>()(vec.back(), vec.size() - 1);
+    notify(vec.back(), vec.size() - 1);
   }
   T remove(size_t i) {
     std::swap(vec[i], vec.back());
-    NotifyBagIndexChanged<T>()(vec[i], i);
+    notify(vec[i], i);
     T t = std::move(vec.back());
     vec.pop_back();
     return t;

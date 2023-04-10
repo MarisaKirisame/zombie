@@ -92,9 +92,9 @@ template<typename V>
 struct tock_tree;
 
 template<typename T>
-struct NotifyParentChanged {
-  void operator()(typename tock_tree<T>::Node&) { }
-};
+struct NotifyParentChanged;// {
+//  void operator()(const typename tock_tree<T>::Node&) { }
+//};
 
 template<typename V>
 struct tock_tree {
@@ -148,7 +148,7 @@ struct tock_tree {
       for (auto it = children.begin(); it != children.end();) {
         auto nh = children.extract(it++);
         nh.mapped().parent = parent;
-        NotifyParentChanged<V>()(nh.mapped());
+        notify(nh.mapped());
         insert_to.insert(std::move(nh));
       }
       parent->children.erase(range.first);
@@ -167,6 +167,9 @@ struct tock_tree {
       }
     }
   };
+  static void notify(const Node& n) {
+    NotifyParentChanged<V>()(n);
+  }
   Node n = Node(nullptr, tock_range(std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()), V());
   Node& get_node(const Tock& t) {
     return n.get_node(t);
@@ -203,13 +206,13 @@ struct tock_tree {
     auto* inserted = &n.children;
     auto it = inserted->insert({r.first, Node(&n, r, std::move(v))}).first;
     Node& inserted_node = it->second;
-    NotifyParentChanged<V>()(inserted_node);
+    notify(inserted_node);
     ++it;
     while (it != inserted->end() && range_dominate(r, it->second.range)) {
       auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
       inserted_node.children.insert(std::move(nh));
-      NotifyParentChanged<V>()(nh.mapped());
+      notify(nh.mapped());
     }
     return inserted_node;
   }

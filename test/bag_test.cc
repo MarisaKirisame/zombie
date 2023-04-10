@@ -2,6 +2,12 @@
 
 #include <gtest/gtest.h>
 
+template<>
+struct NotifyBagIndexChanged<int> {
+  void operator()(const int&, const size_t&) {
+  }
+};
+
 TEST(BagTest, Bag) {
   Bag<int> b({0, 1, 2, 3, 4});
   EXPECT_EQ(b.size(), 5);

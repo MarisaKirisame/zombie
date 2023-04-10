@@ -2,6 +2,12 @@
 
 #include <gtest/gtest.h>
 
+template<>
+struct NotifyParentChanged<int> {
+  void operator()(const tock_tree<int>::Node&) {
+  }
+};
+
 TEST(TockTest, NumericLimit) {
   assert(std::numeric_limits<Tock>::min().tock == std::numeric_limits<decltype(std::declval<Tock>().tock)>::min());
   assert(std::numeric_limits<Tock>::max().tock == std::numeric_limits<decltype(std::declval<Tock>().tock)>::max());

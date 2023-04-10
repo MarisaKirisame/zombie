@@ -66,7 +66,7 @@ struct GraveYard : Object {
 
 template<>
 struct NotifyParentChanged<std::unique_ptr<Object>> {
-  void operator()(typename tock_tree<std::unique_ptr<Object>>::Node& n) {
+  void operator()(const typename tock_tree<std::unique_ptr<Object>>::Node& n) {
     Object* obj = n.value.get();
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
       if (n.parent != nullptr && n.parent->parent != nullptr) {
@@ -102,7 +102,7 @@ struct EZombieNode : Object {
 
 template<>
 struct NotifyBagIndexChanged<std::unique_ptr<Phantom>> {
-  void operator()(std::unique_ptr<Phantom>& p, size_t idx) {
+  void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
     non_null(p)->notify_bag_index_changed(idx);
   }
 };
