@@ -8,9 +8,9 @@ int main() {
   struct Unit { };
   ZombieClock zc;
 
-  auto time_taken = zc.timed<Unit>([&]() {
+  auto time_taken = zc.timed([&]() {
     zc.fast_forward(1s);
-    auto t = zc.timed<Unit>([&]() {
+    auto t = zc.timed([&]() {
       zc.fast_forward(1s);
       return Unit();
     }).second;

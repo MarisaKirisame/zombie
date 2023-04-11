@@ -20,9 +20,9 @@ TEST(ZombieClockTest, Time) {
   struct Unit { };
   ZombieClock zc;
 
-  auto time_taken = zc.timed<Unit>([&]() {
+  auto time_taken = zc.timed([&]() {
     zc.fast_forward(1s);
-    auto t = zc.timed<Unit>([&]() {
+    auto t = zc.timed([&]() {
       zc.fast_forward(1s);
       return Unit();
     }).second;
@@ -31,4 +31,21 @@ TEST(ZombieClockTest, Time) {
   }).second;
   EXPECT_GE(time_taken, 1s);
   EXPECT_LT(time_taken, 2s);
+
+  struct Recur {
+    ZombieClock& zc;
+    void operator()(size_t i) {
+      if (i > 0) {
+        auto t = zc.timed([&]() {
+          zc.fast_forward(1s);
+          (*this)(i - 1);
+          zc.fast_forward(1s);
+          return Unit();
+        }).second;
+        EXPECT_GE(t, 2s);
+        EXPECT_LT(t, 3s);
+      }
+    }
+  };
+  Recur({zc})(10);
 }

@@ -7,19 +7,7 @@
 #include <iostream>
 #include <cassert>
 
-// TODO: look into code, and remove all RAII replacable by this
-template<typename T>
-T bracket(const std::function<void()>& open, const std::function<T()>& f, const std::function<void()>& close) {
-  struct Guard {
-    const std::function<void()>& close;
-    Guard(const std::function<void()>& close) : close(close) { }
-    ~Guard() {
-      close();
-    }
-  } guard(close);
-  open();
-  return f();
-}
+#include "common.hpp"
 
 using ns = std::chrono::nanoseconds;
 
@@ -64,24 +52,23 @@ struct ZombieClock {
     ZombieRawClock::singleton().fast_forward(n);
   }
 
-  template<typename T>
-  std::pair<T, ns> timed(const std::function<T()>& f) {
+  template<typename F>
+  std::pair<decltype(std::declval<F>()()), ns> timed(const F& f) {
     ns taken_time;
-    T t = bracket([&](){
-                    stack.push_back(Node());
-                  },
-                  f,
-                  [&](){
-                    assert(!stack.empty());
-                    ns current_time = ZombieRawClock::singleton().time();
-                    ns minus_time = stack.back().constructed_time + stack.back().skipping_time;
-                    assert(current_time >= minus_time);
-                    taken_time = current_time - minus_time;
-                    stack.pop_back();
-                    if (!stack.empty()) {
-                      stack.back().skipping_time += taken_time;
-                    }
-                  });
+    auto t = bracket([&](){ stack.push_back(Node()); },
+                     f,
+                     [&](){
+                       assert(!stack.empty());
+                       ns current_time = ZombieRawClock::singleton().time();
+                       ns skipping_time = stack.back().skipping_time;
+                       ns minus_time = stack.back().constructed_time + skipping_time;
+                       assert(current_time >= minus_time);
+                       taken_time = current_time - minus_time;
+                       stack.pop_back();
+                       if (!stack.empty()) {
+                         stack.back().skipping_time += taken_time + skipping_time;
+                       }
+                     });
     return {t, taken_time};
   }
 };

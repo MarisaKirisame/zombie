@@ -6,6 +6,7 @@
 
 #include "tock.hpp"
 #include "trailokya.hpp"
+#include "common.hpp"
 
 template<typename T>
 T non_null(T&& x) {
@@ -175,17 +176,10 @@ struct EZombie {
       auto& t = Trailokya::get_trailokya();
       if (!t.akasha.has_precise(created_time)) {
         std::shared_ptr<EZombieNode> strong;
-        struct Homura {
-          Trailokya& t;
-          Tardis old_tardis;
-          Homura(Trailokya& t, const Tardis& new_tardis) : t(t), old_tardis(t.tardis) {
-            t.tardis = new_tardis;
-          }
-          ~Homura() {
-            t.tardis = old_tardis;
-          }
-        } h(t, Tardis { created_time, &strong });
-        dynamic_cast<MicroWave*>(t.akasha.get_node(created_time).value.get())->replay();
+        Tardis tardis = t.tardis;
+        bracket([&]() { t.tardis = Tardis { created_time, &strong }; },
+                [&]() { dynamic_cast<MicroWave*>(t.akasha.get_node(created_time).value.get())->replay(); },
+                [&]() { t.tardis = tardis; });
         ret = non_null(strong);
       } else {
         auto& n = t.akasha.get_precise_node(created_time);

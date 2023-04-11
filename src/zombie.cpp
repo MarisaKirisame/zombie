@@ -1,5 +1,7 @@
 #include <iostream>
+
 #include "zombie/zombie.hpp"
+#include "zombie/common.hpp"
 
 Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                      const std::vector<Tock>& inputs) {
@@ -16,18 +18,10 @@ Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in
 
 void MicroWave::replay() {
   Trailokya& t = Trailokya::get_trailokya();
-  struct Cronus {
-    Trailokya& t;
-    Tock old_tock;
-    Cronus(Trailokya& t, const Tock& new_tock) : t(t), old_tock(t.current_tock) {
-      t.current_tock = new_tock;
-    }
-    ~Cronus() {
-      t.current_tock = old_tock;
-    }
-  } cronus(t, start_time);
-  t.current_tock++;
-  play(f, inputs);
+  Tock tock = t.current_tock;
+  bracket([&]() { t.current_tock = start_time; },
+          [&]() { ++t.current_tock; play(f, inputs); },
+          [&]() { t.current_tock = tock; });
 }
 
 void RecomputeLater::notify_bag_index_changed(size_t idx) {
