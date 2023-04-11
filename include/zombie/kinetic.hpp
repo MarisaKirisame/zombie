@@ -3,6 +3,23 @@
 #include <cstdint>
 #include <optional>
 #include <cassert>
+#include <vector>
+#include <random>
+#include <iostream>
+#include <unordered_set>
+
+inline int64_t div_ceiling(int64_t x, int64_t y) {
+  if (y < 0) {
+    x = -x;
+    y = -y;
+  }
+  if (x > 0) {
+    return ((x - 1) / y) + 1;
+  } else {
+    return x / y;
+  }
+}
+
 
 // An affine function.
 // Note that it is in i64_t,
@@ -12,6 +29,10 @@ struct AffFunction {
   // We choose x_shift as this make updating latency much easier.
   // This should not effect the implementation of kinetc data structure in anyway.
   int64_t slope, x_shift;
+
+  friend std::ostream& operator<<(std::ostream& os, const AffFunction& f);
+
+  AffFunction(int64_t slope, int64_t x_shift) : slope(slope), x_shift(x_shift) { }
 
   int64_t operator()(int64_t x) const {
     return slope * (x + x_shift);
@@ -27,21 +48,21 @@ struct AffFunction {
     int64_t y_delta = rhs.slope * x_delta;
     // note that x_delta is based on rhs, but slope_delta is based on *this.
     int64_t slope_delta = slope - rhs.slope;
-    if (slope_delta == 0) {
+    if (slope_delta <= 0) {
       return std::optional<int64_t>();
-    } else if (slope_delta > 0) {
-      // note that integer division round toward 0, but we want it to round down.
-      return postcondition_check(-x_shift + (y_delta - 1) / slope_delta);
     } else {
-      // slope_delta < 0
-      return postcondition_check(-x_shift -((y_delta - 1) / -slope_delta));
+      assert(slope_delta > 0);
+      return postcondition_check(-x_shift + div_ceiling(y_delta, slope_delta));
     }
   }
- 
+
   // return Some(x) if,
   //   forall x' < x,
   //     (*this)(x') <= rhs(x') /\
-  //     !((*this)(x) <= rhs(x))
+  //     !((*this)(x) <= rhs(x)).
+  //   note that due to property of Affine Function,
+  //     forall x' > x,
+  //     !((*this)(x') <= rhs(x'))
   // return None if such x does not exist.
   std::optional<int64_t> le_until(const AffFunction& rhs) const {
     auto postcondition_check = [&](int64_t val) {
@@ -56,14 +77,11 @@ struct AffFunction {
     int64_t y_delta = rhs.slope * x_delta;
     // note that x_delta is based on rhs, but slope_delta is based on *this.
     int64_t slope_delta = slope - rhs.slope;
-    if (slope_delta == 0) {
+    if (slope_delta <= 0) {
       return std::optional<int64_t>();
-    } else if (slope_delta > 0) {
-      // note that integer division round toward 0, but we want it to round down.
-      return postcondition_check(-x_shift + y_delta / slope_delta);
     } else {
-      // slope_delta < 0
-      return postcondition_check(-x_shift -(y_delta / -slope_delta));
+      assert(slope_delta > 0);
+      return postcondition_check(-x_shift + div_ceiling(y_delta + 1, slope_delta));
     }
   }
 
@@ -76,9 +94,10 @@ struct AffFunction {
   }
 
 };
-/*
-// Note: if this become a bottleneck,
-//   read the thesis and <Faster Kinetic Heaps and Their Use in Broadcast Scheduling> more carefully.
+
+inline std::ostream& operator<<(std::ostream& os, const AffFunction& f) {
+  return os << "(" << f.slope << "(x+" << f.x_shift << "))";
+}
 
 inline bool heap_is_root(size_t i) {
   return i == 0;
@@ -97,6 +116,10 @@ inline size_t heap_right_child(size_t i) {
   return heap_left_child(i) + 1;
 }
 
+// Note: if this become a bottleneck,
+//   read the thesis and <Faster Kinetic Heaps and Their Use in Broadcast Scheduling> more carefully.
+
+
 // There is four kinetic priority queue:
 //   KineticHeap, KineticHanger, KineticHeater, and KineticTournament.
 // I think KineticHanger is the best, but since KineticHeap is simpler,
@@ -107,263 +130,569 @@ inline size_t heap_right_child(size_t i) {
 //   This is false for us.
 //   I am not sure if KineticHeater have this problem or not.
 
-// note: do not store this into e.g. red black tree or hash, as we only use break_time.
-// the correct way is probably to implement comparison operator outside
-struct Certificate {
-  size_t heap_idx;
-};
-
-
+// todo: I think the right way to do this
+//   is to make the class take extra params,
+//   but this will do for now.
 template<typename T>
 struct NotifyHeapIndexChanged; //{
-//  void operator()(const std::vector<std::pair<const typename MinHeap<T>::NodeT*, size_t>>&) { }
+//  void operator()(const T&, const size_t&);
 //};
 
 template<typename T>
 struct NotifyHeapElementRemoved; //{
-//  void operator()(const typename MinHeap<T>::NodeT&) { }
+//  void operator()(const T&);
 //};
 
+template<typename T, typename SelfClass>
+struct MinHeapCRTP {
+  SelfClass& self() {
+    return static_cast<SelfClass&>(*this);
+  }
 
-// todo: we have 3 heaps and potentially more,
-// perhaps we should have some code reuse.
-template<typename T>
-struct MinHeap {
-  struct Node {
-    T t;
-    int64_t key;
-  };
-  std::vector<Node> arr;
+  const SelfClass& self() const {
+    return static_cast<const SelfClass&>(*this);
+  }
 
-  using notice = std::vector<std::pair<Node*, size_t>>;
+  T& peek() {
+    return self()[0];
+  }
 
-  void notify(const notice& n) {
-    NotifyHeapIndexChanged<T>()(n);
+  const T& peek() const {
+    return self()[0];
+  }
+
+  T pop() {
+    return self().remove(0);
+  }
+
+  void flow(const size_t& idx, bool idx_notified) {
+    assert(self().has_value(idx));
+    if (!heap_is_root(idx)) {
+      size_t pidx = heap_parent(idx);
+      if (self().cmp(self()[idx], self()[pidx])) {
+        self().swap(idx, pidx);
+        if (!idx_notified) {
+          self().notify_changed(idx);
+        }
+        flow(pidx, true);
+        self().notify_changed(pidx);
+      }
+    }
+  }
+
+  void sink(const size_t& idx, bool idx_notified) {
+    size_t a_child_idx = heap_left_child(idx);
+    size_t b_child_idx = heap_right_child(idx);
+    if (self().has_value(a_child_idx) || self().has_value(b_child_idx)) {
+      size_t smaller_idx = [&](){
+        if (!self().has_value(a_child_idx)) {
+          return b_child_idx;
+        } else if (!self().has_value(b_child_idx)) {
+          return a_child_idx;
+        } else {
+          return self().cmp(self()[a_child_idx], self()[b_child_idx]) ? a_child_idx : b_child_idx;
+        }
+      }();
+      if (self().cmp(self()[smaller_idx], self()[idx])) {
+        self().swap(idx, smaller_idx);
+        if (!idx_notified) {
+          self().notify_changed(idx);
+        }
+        sink(smaller_idx, true);
+        self().notify_changed(smaller_idx);
+      }
+    }
+  }
+
+  void rebalance(const size_t& idx, bool idx_notified) {
+    assert(self().has_value(idx));
+    flow(idx, idx_notified);
+    sink(idx, idx_notified);
+  }
+};
+
+template<typename T,
+	 typename Compare = std::less<T>,
+	 typename NHIC = NotifyHeapIndexChanged<T>,
+	 typename NHER = NotifyHeapElementRemoved<T>>
+struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
+  // maybe we should use a rootish array?
+  std::vector<T> arr;
+
+  void notify_changed(const size_t& i) {
+    assert(has_value(i));
+    nhic(static_cast<const T&>(arr[i]), i);
+  }
+
+  void notify_removed(const T& t) {
+    nher(t);
   }
 
   void swap(const size_t& l, const size_t& r) {
     std::swap(arr[l], arr[r]);
   }
 
-  bool empty() {
+  bool empty() const {
     return arr.empty();
   }
 
-  size_t size() {
+  size_t size() const {
     return arr.size();
   }
 
-  bool idx_lt(const size_t& l, const size_t& r) {
-    return arr[l] < arr[r];
+  void push(const T& t) {
+    arr.push_back(t);
+    this->flow(arr.size() - 1, true);
+    notify_changed(arr.size() - 1);
   }
 
-  void flow(const size_t& idx, notice& n, bool idx_added=false) {
-    if (!heap_is_root(idx)) {
-      size_t pidx = heap_parent(idx);
-      if (idx_lt(idx, pidx)) {
-	swap(idx, pidx);
-	if (!idx_added) {
-	  n.push_back({&arr[idx], idx});
-	}
-	n.push_back({&arr[pidx], pidx});
-	flow(pidx, n, true);
-      }
-    }
+  bool has_value(const size_t& idx) const {
+    return idx < arr.size();
   }
 
-  void sink(const size_t& idx, notice& n, bool idx_added=false) {
-    size_t l_child_idx = heap_left_child(idx);
-    size_t r_child_idx = heap_right_child(idx);
-    if (l_child_idx < arr.size()) {
-      size_t smaller_idx = (r_child_idx < arr.size() && idx_lt(r_child_idx, l_child_idx)) ? r_child_idx : l_child_idx;
-      if (idx_lt(smaller_idx, idx)) {
-	swap(idx, smaller_idx);
-	if (!idx_added) {
-	  n.push_back({&arr[idx], idx});
-	}
-	n.push_back({&arr[smaller_idx], smaller_idx});
-	sink(smaller_idx, n, true);
-      }
-    }
+  const T& operator[](const size_t& idx) const {
+    assert(has_value(idx));
+    return arr[idx];
   }
 
-  void push(const T& t, const int64_t& key) {
-    arr.push_back({t, key});
-    notice n;
-    flow(arr.size() - 1, n);
-    notify(n);
-  }
-
-  T peek() {
-    return arr[0].t;
-  }
-
-  int64_t peek_key() {
-    return arr[0].key;
-  }
-
-  T pop() {
-    return remove(0);
+  T& operator[](const size_t& idx) {
+    assert(has_value(idx));
+    return arr[idx];
   }
 
   T remove(const size_t& idx) {
-    T ret = std::move(arr[idx].t);
+    assert(has_value(idx));
+    T ret = std::move(arr[idx]);
     swap(idx, arr.size() - 1);
     arr.pop_back();
-    notice n;
-    n.push_back({&arr[idx], idx});
-    flow(idx, n, true);
-    sink(idx, n, true);
-    // todo: one single function, so no broken invariant
-    notify(n);
-    NotifyHeapElementRemoved(T);
+    notify_removed(ret);
+    if (idx < arr.size()) {
+      this->rebalance(idx, true);
+      notify_changed(idx);
+    }
+    return ret;
+  }
+
+  Compare cmp;
+  NHIC nhic;
+  NHER nher;
+
+  MinNormalHeap(const Compare& cmp = Compare(),
+		const NHIC& nhic = NHIC(),
+		const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) {
+  }
+
+  std::vector<T> values() const {
+    return arr;
+  }
+};
+
+template<typename T,
+	 typename Compare = std::less<T>,
+	 typename NHIC = NotifyHeapIndexChanged<T>,
+	 typename NHER = NotifyHeapElementRemoved<T>>
+struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
+  std::random_device rd;
+
+  bool coin() {
+    std::uniform_int_distribution<> distrib(0, 1);
+    return distrib(rd) == 0;
+  }
+
+  std::vector<std::optional<T>> arr;
+
+  void swap(const size_t& l, const size_t& r) {
+    std::swap(arr[l], arr[r]);
+  }
+
+  size_t size_ = 0;
+
+  void notify_changed(const size_t& i) {
+    assert(has_value(i));
+    nhic(static_cast<const T&>(arr[i].value()), i);
+  }
+
+  void notify_removed(const T& t) {
+    nher(t);
+  }
+
+  size_t size() const {
+    return size_;
+  }
+
+  bool empty() const {
+    return size() == 0;
+  }
+
+  void hang(T& t, const size_t& idx) {
+    if (!(idx < arr.size())) {
+      arr.resize(idx + 1);
+    }
+    if (arr[idx].has_value()) {
+      // todo: huh, is 'prioritizing an empty child' a worthwhile optimization?
+      size_t child_idx = heap_left_child(idx) + (coin() ? 0 : 1);
+      if (cmp(t, arr[idx].value())) {
+        std::swap(t, arr[idx].value());
+        notify_changed(idx);
+      }
+      hang(t, child_idx);
+    } else {
+      arr[idx] = t;
+      notify_changed(idx);
+    }
+  }
+
+  void push(const T& t) {
+    T t_ = t;
+    hang(t_, 0);
+    ++size_;
+  }
+
+  bool has_value(const size_t& idx) const {
+    return idx < arr.size() && arr[idx].has_value();
+  }
+
+  const T& operator[](const size_t& idx) const {
+    assert(has_value(idx));
+    return arr[idx].value();
+  }
+
+  const T& peek() const {
+    return (*this)[0];
+  }
+
+  T& operator[](const size_t& idx) {
+    assert(has_value(idx));
+    return arr[idx].value();
+  }
+
+  void remove_noret(const size_t& idx) {
+    assert(has_value(idx));
+    size_t child_idx_a = heap_left_child(idx);
+    size_t child_idx_b = heap_right_child(idx);
+    if ((!has_value(child_idx_a)) && (!has_value(child_idx_b))) {
+      arr[idx] = std::optional<T>();
+    } else {
+      size_t child_idx = [&](){
+        if (has_value(child_idx_a) && has_value(child_idx_b)) {
+          return cmp(arr[child_idx_a].value(), arr[child_idx_b].value()) ? child_idx_a : child_idx_b;
+        } else if (has_value(child_idx_a)) {
+          // !has_value(child_idx_b);
+          return child_idx_a;
+        } else {
+          // has_value(child_idx_b) && !has_value(child_idx_a);
+          return child_idx_b;
+        }
+      }();
+      arr[idx] = std::move(arr[child_idx]);
+      notify_changed(idx);
+      remove_noret(child_idx);
+    }
+  }
+
+  // todo: maybe we should rebuild and shrink once small enough.
+  T remove(const size_t& idx) {
+    assert(has_value(idx));
+    T ret = std::move(arr[idx].value());
+    remove_noret(idx);
+    --size_;
+    notify_removed(ret);
+    return ret;
+  }
+
+  Compare cmp;
+  NHIC nhic;
+  NHER nher;
+
+  MinHanger(const Compare& cmp = Compare(),
+	    const NHIC& nhic = NHIC(),
+	    const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) {
+  }
+
+  std::vector<T> values() {
+    std::vector<T> ret;
+    for (const std::optional<T>& ot : arr) {
+      if (ot) {
+        ret.push_back(ot.value());
+      }
+    }
     return ret;
   }
 };
 
-template<typename T>
+template<typename T,
+	 bool hanger,
+	 typename Compare = std::less<T>,
+	 typename NHIC = NotifyHeapIndexChanged<T>,
+	 typename NHER = NotifyHeapElementRemoved<T>>
+
+using MinHeap = std::conditional_t<hanger, MinHanger<T, Compare, NHIC, NHER>, MinNormalHeap<T, Compare, NHIC, NHER>>;
+
+template<typename T, bool hanger>
 struct KineticMinHeap {
+  using self_t = KineticMinHeap<T, hanger>;
+
   struct Node {
     T t;
     AffFunction f;
-    ptrdiff_t certificate_idx = -1;
+    ptrdiff_t cert_idx = -1;
   };
-  // maybe we should use a rootish array to reduce latency?
-  std::vector<Node> arr;
 
-  MinHeap<Certificate> certificate_queue;
+  struct Certificate {
+    int64_t break_time;
+    // when we remove a node we remove it's certificate.
+    // but when we remove a certificate we change the cert_idx in the node.
+    // to avoid that looping back causing bad access, we will set this to -1 when so.
+    ptrdiff_t heap_idx;
+  };
 
   int64_t time;
 
-  using notice = std::vector<std::pair<Node*, size_t>>;
-
-  void update_certificate(size_t idx) {
-    assert(!heap_is_root(idx));
-    size_t pidx = heap_parent(idx);
-    if (certificate_idx != -1) {
-      certificate_queue.remove(certificate_idx);
+  struct CompareNode {
+    self_t& h;
+    bool operator()(const Node& l, const Node& r) {
+      return l.f(h.time) < r.f(h.time);
     }
+  };
 
-    auto break_time = arr[idx].f.ge_until(arr[pidx].f);
-    if (break_time) {
-      certificate_queue.push({idx}, break_time.value());
+  std::unordered_set<size_t> pending_recert;
+
+  void will_recert(const size_t& idx) {
+    pending_recert.insert(idx);
+    pending_recert.insert(heap_left_child(idx));
+    pending_recert.insert(heap_right_child(idx));
+  }
+
+  void cert_invariant_no_dup() {
+    std::unordered_set<int> heap_idx;
+    for (const Certificate& cert: cert_queue.values()) {
+      assert(heap_idx.count(cert.heap_idx) == 0);
+      heap_idx.insert(cert.heap_idx);
     }
   }
 
-  void notify(const notice& n) {
-    for (const auto& p : n) {
-      size_t idx = p.second;
-      if (!heap_is_root(idx)) {
-	update_certificate(idx);
+  void cert_invariant_heap_cert_id() {
+    for (const Certificate& cert: cert_queue.values()) {
+      size_t cert_idx = heap[cert.heap_idx].cert_idx;
+      assert(cert_idx != -1);
+      assert(cert_queue[cert_idx].heap_idx == cert.heap_idx);
+    }
+  }
+
+  // should be maintained even when heap break due to time advancement.
+  void cert_invariant() {
+    cert_invariant_no_dup();
+    cert_invariant_heap_cert_id();
+    if (!cert_queue.empty()) {
+      assert(cert_queue.peek().break_time > time);
+    }
+  }
+
+  void invariant() {
+    cert_invariant();
+  }
+
+  void recert(const size_t& idx) {
+    if (heap.has_value(idx)) {
+      const Node& n = heap[idx];
+      ptrdiff_t cert_idx = n.cert_idx;
+      if (heap_is_root(idx)) {
+        if (cert_idx != -1) {
+          cert_queue.remove(cert_idx);
+        }
+      } else {
+        size_t pidx = heap_parent(idx);
+        assert(heap.has_value(pidx));
+        const Node& p = heap[pidx];
+        std::optional<int64_t> break_time = n.f.ge_until(p.f);
+        if (cert_idx != -1 && break_time) {
+          Certificate& cert = cert_queue[cert_idx];
+          assert(cert.heap_idx == idx);
+          if (cert.break_time != break_time.value()) {
+            cert.break_time = break_time.value();
+            cert_queue.rebalance(cert_idx, false);
+          }
+        } else if (cert_idx == -1 && break_time) {
+          cert_queue.push({break_time.value(), idx});
+          assert(n.cert_idx != -1);
+        } else if (cert_idx != -1 && (!break_time)) {
+          assert(cert_queue[cert_idx].heap_idx == idx);
+          cert_queue.remove(cert_idx);
+          assert(n.cert_idx == -1);
+        } else {
+          assert(cert_idx == -1);
+          assert(!break_time);
+        }
       }
-      size_t lcidx = heap_left_child(idx);
-      if (lcidx < arr.size()) {
-	update_certificate(lcidx);
-	size_t rcidx = heap_right_child(idx);
-	if (rcidx < arr.size()) {
-	  update_certificate(rcidx);
-	}
-      }
     }
   }
 
-  void swap(const size_t& l, const size_t& r) {
-    std::swap(arr[l], arr[r]);
+  void recert() {
+    cert_invariant();
+    for (size_t idx: pending_recert) {
+      recert(idx);
+      cert_invariant();
+    }
+    pending_recert.clear();
   }
 
-  bool empty() {
-    return arr.empty();
-  }
+  struct NodeIndexChanged {
+    self_t& h;
 
-  size_t size() {
-    return arr.size();
-  }
+    void operator()(const Node& n, const size_t& idx) {
+      if (n.cert_idx != -1) {
+        h.cert_queue[n.cert_idx].heap_idx = idx;
+      }
+      h.will_recert(idx);
+    }
+  };
 
-  bool idx_lt(const size_t& l, const size_t& r) {
-    return arr[l] < arr[r];
-  }
+  struct NodeElementRemoved {
+    self_t& h;
 
-  void flow(const size_t& idx, notice& n, bool idx_added=false) {
-    if (!heap_is_root(idx)) {
-      size_t pidx = heap_parent(idx);
-      if (idx_lt(idx, pidx)) {
-	swap(idx, pidx);
-	if (!idx_added) {
-	  n.push_back({&arr[idx], idx});
-	}
-	n.push_back({&arr[pidx], pidx});
-	flow(pidx, n, true);
+    void operator()(const Node& n) {
+      if (n.cert_idx != -1) {
+        h.cert_queue[n.cert_idx].heap_idx = -1;
+        h.cert_queue.remove(n.cert_idx);
       }
     }
-  }
+  };
 
-  void sink(const size_t& idx, notice& n, bool idx_added=false) {
-    size_t l_child_idx = heap_left_child(idx);
-    size_t r_child_idx = heap_right_child(idx);
-    if (l_child_idx < arr.size()) {
-      size_t smaller_idx = (r_child_idx < arr.size() && idx_lt(r_child_idx, l_child_idx)) ? r_child_idx : l_child_idx;
-      if (idx_lt(smaller_idx, idx)) {
-	swap(idx, smaller_idx);
-	if (!idx_added) {
-	  n.push_back({&arr[idx], idx});
-	}
-	n.push_back({&arr[smaller_idx], smaller_idx});
-	sink(smaller_idx, n, true);
+  struct CompareCertificate {
+    bool operator()(const Certificate& l, const Certificate& r) {
+      return l.break_time < r.break_time;
+    }
+  };
+
+  struct CertificateIndexChanged {
+    self_t& h;
+    void operator()(const Certificate& c, const size_t& idx) {
+      h.heap[c.heap_idx].cert_idx = idx;
+    }
+  };
+
+  struct CertificateElementRemoved {
+    self_t& h;
+    void operator()(const Certificate& c) {
+      if (c.heap_idx != -1) {
+        h.heap[c.heap_idx].cert_idx = -1;
       }
     }
+  };
+
+  MinHeap<Node, hanger, CompareNode, NodeIndexChanged, NodeElementRemoved> heap;
+
+  size_t size() const {
+    return heap.size();
   }
 
-  void push(const T& t, const int64_t& key) {
-    arr.push_back({t, key});
-    notice n;
-    flow(arr.size() - 1, n);
-    notify(n);
+  bool empty() const {
+    return heap.empty();
   }
 
-  T peek() {
-    return arr[0].t;
+  // do not use hanger - hanger is only useful in kinetic setting.
+  MinHeap<Certificate, false, CompareCertificate, CertificateIndexChanged, CertificateElementRemoved> cert_queue;
+
+  void push(const T& t, const AffFunction& f) {
+    heap.push(Node{t, f});
+    recert();
+    invariant();
+  }
+
+  T& peek() {
+    return heap[0].t;
+  }
+
+  const T& peek() const {
+    return heap[0].t;
   }
 
   T pop() {
-    return remove(0);
-  }
-
-  T remove(const size_t& idx) {
-    T ret = std::move(arr[idx].t);
-    swap(idx, arr.size() - 1);
-    arr.pop_back();
-    notice n;
-    n.push_back({&arr[idx], idx});
-    flow(idx, n, true);
-    sink(idx, n, true);
-    notify(n)
+    T ret = heap.pop().t;
+    recert();
     return ret;
   }
 
   // note: others priority invariant are also broken when we fix(idx).
   //   it is fine, as we will call fix on them individually.
   //   in general it is not fine though.
-  void fix(const size_t& idx, notice& n) {
-    flow(idx, n);
+  void fix(const size_t& idx) {
+    heap.flow(idx, false);
   }
 
   void advance_to(int64_t new_time) {
     assert(new_time >= time);
     time = new_time;
-    while (!certificate_queue.empty()) {
-      Certificate c = certificate_queue.peek();
+    while (!cert_queue.empty()) {
+      Certificate c = cert_queue.peek();
       if (c.break_time <= time) {
-	fix(c.idx);
-	certificate_queue.pop();
+        fix(c.heap_idx);
+        cert_queue.pop();
       } else {
         break;
       }
     }
   }
 
+  KineticMinHeap(int64_t time) :
+    time(time),
+    heap(CompareNode{*this}, NodeIndexChanged{*this}, NodeElementRemoved{*this}),
+    cert_queue(CompareCertificate(), CertificateIndexChanged{*this}, CertificateElementRemoved{*this}) { }
 };
 
 template<typename T>
-struct KineticMinHanger {
+struct FakeKineticMinHeap {
+  struct Node {
+    T t;
+    int64_t value;
+    AffFunction f;
+  };
+
+  struct CompareNode {
+    bool operator()(const Node& l, const Node& r) {
+      return l.value < r.value;
+    }
+  };
+
+  struct NodeIndexChanged {
+    void operator()(const Node& n, const size_t& idx) { }
+  };
+
+  struct NodeElementRemoved {
+    void operator()(const Node& n) { }
+  };
+
+  MinHeap<Node, false, CompareNode, NodeIndexChanged, NodeElementRemoved> heap;
+
+  int64_t time;
+
+  FakeKineticMinHeap(int64_t time) : time(time) { }
+
+  void push(const T& t, const AffFunction& f) {
+    heap.push({t, f(time), f});
+  }
+
+  size_t size() const {
+    return heap.size();
+  }
+
+  bool empty() const {
+    return heap.empty();
+  }
+
+  T pop() {
+    return heap.pop().t;
+  }
+
+  void advance_to(int64_t new_time) {
+    assert(new_time >= time);
+    time = new_time;
+    std::vector<Node> v = heap.values();
+    while (!heap.empty()) {
+      heap.pop();
+    }
+    for (const Node& n: v) {
+      heap.push({n.t, n.f(time), n.f});
+    }
+  }
 };
-*/
