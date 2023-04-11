@@ -129,7 +129,7 @@ inline size_t heap_right_child(size_t i) {
 //   This is false for us.
 //   I am not sure if KineticHeater have this problem or not.
 
-// todo: I think the right way to do this
+// TODO: I think the right way to do this
 //   is to make the class take extra params,
 //   but this will do for now.
 template<typename T>
@@ -328,7 +328,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
       arr.resize(idx + 1);
     }
     if (arr[idx].has_value()) {
-      // todo: huh, is 'prioritizing an empty child' a worthwhile optimization?
+      // TODO: huh, is 'prioritizing an empty child' a worthwhile optimization?
       size_t child_idx = heap_left_child(idx) + (coin() ? 0 : 1);
       if (cmp(t, arr[idx].value())) {
         std::swap(t, arr[idx].value());
@@ -389,7 +389,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     }
   }
 
-  // todo: maybe we should rebuild and shrink once small enough.
+  // TODO: maybe we should rebuild and shrink once small enough.
   T remove(const size_t& idx) {
     assert(has_value(idx));
     T ret = std::move(arr[idx].value());

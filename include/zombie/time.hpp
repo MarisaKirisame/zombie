@@ -5,7 +5,7 @@
 #include <vector>
 #include <functional>
 
-// todo: look into code, and remove all RAII replacable by this
+// TODO: look into code, and remove all RAII replacable by this
 template<typename T>
 T bracket(const std::function<void()>& open, const std::function<T()>& f, const std::function<void()>& close) {
   struct Guard {
@@ -25,7 +25,7 @@ using ns = std::chrono::nanoseconds;
 //   providing fast forwarding ability.
 // Useful for testing, and for including additional time uncaptured in bindZombie,
 //   e.g. Zombie's use in gegl.
-// todo: the right way is to add configurability to Zombie, not via such an adhoc patch.
+// TODO: the right way is to add configurability to Zombie, not via such an adhoc patch.
 struct ZombieRawClock {
   using time_t = decltype(std::chrono::steady_clock::now());
 
