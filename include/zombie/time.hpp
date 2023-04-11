@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 #include <functional>
+#include <iostream>
+#include <cassert>
 
 // TODO: look into code, and remove all RAII replacable by this
 template<typename T>
@@ -49,7 +51,7 @@ struct ZombieRawClock {
 };
 
 // In zombie, we want the time or bindZombie to not include that of recursive bindZombie.
-// This class take care of that
+// This class take care of that.
 struct ZombieClock {
   struct Node {
     ns constructed_time = ZombieRawClock::singleton().time();
@@ -58,17 +60,28 @@ struct ZombieClock {
 
   std::vector<Node> stack;
 
+  void fast_forward(ns n) {
+    ZombieRawClock::singleton().fast_forward(n);
+  }
+
   template<typename T>
   std::pair<T, ns> timed(const std::function<T()>& f) {
-    ns skipping_time;
+    ns taken_time;
     T t = bracket([&](){
                     stack.push_back(Node());
                   },
                   f,
                   [&](){
-                    skipping_time = stack.back().skipping_time;
+                    assert(!stack.empty());
+                    ns current_time = ZombieRawClock::singleton().time();
+                    ns minus_time = stack.back().constructed_time + stack.back().skipping_time;
+                    assert(current_time >= minus_time);
+                    taken_time = current_time - minus_time;
                     stack.pop_back();
+                    if (!stack.empty()) {
+                      stack.back().skipping_time += taken_time;
+                    }
                   });
-    return {t, skipping_time};
+    return {t, taken_time};
   }
 };
