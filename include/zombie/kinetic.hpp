@@ -20,7 +20,6 @@ inline int64_t div_ceiling(int64_t x, int64_t y) {
   }
 }
 
-
 // An affine function.
 // Note that it is in i64_t,
 // because floating point scare me.
