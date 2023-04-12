@@ -3,7 +3,7 @@
 template<typename A, typename B, typename C>
 decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
   a();
-  std::declval<B>()() ret = b();
+  decltype(std::declval<B>()()) ret = b();
   c();
   return ret;
 }
