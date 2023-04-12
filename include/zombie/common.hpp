@@ -8,6 +8,6 @@ decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
     ~Guard() {
       c();
     }
-  } g(c);
+  } g({c});
   return b();
 }
