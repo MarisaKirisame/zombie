@@ -38,15 +38,18 @@ struct ZombieRawClock {
   }
 };
 
-// In zombie, we want the time or bindZombie to not include that of recursive bindZombie.
+// In zombie, we want the time or bindZombie to not include that of recursive remat.
 // This class take care of that.
 struct ZombieClock {
   struct Node {
     ns constructed_time = ZombieRawClock::singleton().time();
     ns skipping_time = ns(0);
+    ns time() {
+      return ZombieRawClock::singleton().time() - skipping_time;
+    }
   };
 
-  std::vector<Node> stack;
+  std::vector<Node> stack { Node() };
 
   void fast_forward(ns n) {
     ZombieRawClock::singleton().fast_forward(n);
@@ -54,21 +57,29 @@ struct ZombieClock {
 
   template<typename F>
   std::pair<decltype(std::declval<F>()()), ns> timed(const F& f) {
-    ns taken_time;
-    auto t = bracket([&](){ stack.push_back(Node()); },
-                     f,
-                     [&](){
-                       assert(!stack.empty());
-                       ns current_time = ZombieRawClock::singleton().time();
-                       ns skipping_time = stack.back().skipping_time;
-                       ns minus_time = stack.back().constructed_time + skipping_time;
-                       assert(current_time >= minus_time);
-                       taken_time = current_time - minus_time;
-                       stack.pop_back();
-                       if (!stack.empty()) {
-                         stack.back().skipping_time += taken_time + skipping_time;
-                       }
-                     });
-    return {t, taken_time};
+    assert(!stack.empty());
+    size_t ss = stack.size();
+    ns before = stack.back().time();
+    auto t = f();
+    assert(ss == stack.size());
+    ns after = stack.back().time();
+    return {std::move(t), after - before};
+  }
+
+  template<typename F>
+  decltype(std::declval<F>()()) block(const F& f) {
+    return bracket([&]() { stack.push_back(Node()); },
+                   f,
+                   [&]() {
+                     assert(!stack.empty());
+                     ns constructed_time = stack.back().constructed_time;
+                     ns skipping_time = stack.back().skipping_time;
+                     ns current_time = stack.back().time();
+                     assert(current_time > constructed_time);
+                     ns taken_time = current_time - constructed_time;
+                     stack.pop_back();
+                     assert(!stack.empty());
+                     stack.back().skipping_time += taken_time + skipping_time;
+                   });
   }
 };

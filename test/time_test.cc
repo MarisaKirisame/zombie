@@ -20,19 +20,26 @@ TEST(ZombieClockTest, Time) {
   struct Unit { };
   ZombieClock zc;
 
-  auto time_taken = zc.timed([&]() {
-    zc.fast_forward(1s);
-    auto t = zc.timed([&]() {
-      zc.fast_forward(1s);
-      return Unit();
-    }).second;
-    EXPECT_GE(t, 1s);
-    return Unit();
-  }).second;
-  EXPECT_GE(time_taken, 1s);
-  EXPECT_LT(time_taken, 2s);
+  struct RecurBlocked {
+    ZombieClock& zc;
+    void operator()(size_t i) {
+      if (i > 0) {
+        auto t = zc.timed([&]() {
+          zc.fast_forward(1s);
+          zc.block([&]() {
+            (*this)(i - 1);
+          });
+          zc.fast_forward(1s);
+          return Unit();
+        }).second;
+        EXPECT_GE(t, 2s);
+        EXPECT_LT(t, 3s);
+      }
+    }
+  };
+  RecurBlocked({zc})(10);
 
-  struct Recur {
+  struct RecurNoBlocked {
     ZombieClock& zc;
     void operator()(size_t i) {
       if (i > 0) {
@@ -42,10 +49,10 @@ TEST(ZombieClockTest, Time) {
           zc.fast_forward(1s);
           return Unit();
         }).second;
-        EXPECT_GE(t, 2s);
-        EXPECT_LT(t, 3s);
+        EXPECT_GE(t, i * 2s);
+        EXPECT_LT(t, i * 2s + 1s);
       }
     }
   };
-  Recur({zc})(10);
+  RecurNoBlocked({zc})(10);
 }
