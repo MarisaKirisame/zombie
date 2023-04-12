@@ -280,9 +280,8 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   NHER nher;
 
   MinNormalHeap(const Compare& cmp = Compare(),
-		const NHIC& nhic = NHIC(),
-		const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) {
-  }
+                const NHIC& nhic = NHIC(),
+                const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) { }
 
   std::vector<T> values() const {
     return arr;
@@ -398,9 +397,8 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
   NHER nher;
 
   MinHanger(const Compare& cmp = Compare(),
-	    const NHIC& nhic = NHIC(),
-	    const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) {
-  }
+            const NHIC& nhic = NHIC(),
+            const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) { }
 
   std::vector<T> values() {
     std::vector<T> ret;
