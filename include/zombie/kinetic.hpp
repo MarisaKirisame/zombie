@@ -128,6 +128,8 @@ inline size_t heap_right_child(size_t i) {
 //     will not be too far off from the initial size.
 //   This is false for us.
 //   I am not sure if KineticHeater have this problem or not.
+// TODO: implement kinetic heater
+// TODO: implement kinetic tournament
 
 // TODO: I think the right way to do this
 //   is to make the class take extra params,
@@ -208,6 +210,16 @@ struct MinHeapCRTP {
     flow(idx, idx_notified);
     sink(idx, idx_notified);
   }
+
+  void notify_changed(const size_t& i) {
+    assert(self().has_value(i));
+    self().nhic(static_cast<const T&>(self()[i]), i);
+  }
+
+  void notify_removed(const T& t) {
+    self().nher(t);
+  }
+
 };
 
 template<typename T,
@@ -217,15 +229,6 @@ template<typename T,
 struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   // maybe we should use a rootish array?
   std::vector<T> arr;
-
-  void notify_changed(const size_t& i) {
-    assert(has_value(i));
-    nhic(static_cast<const T&>(arr[i]), i);
-  }
-
-  void notify_removed(const T& t) {
-    nher(t);
-  }
 
   void swap(const size_t& l, const size_t& r) {
     std::swap(arr[l], arr[r]);
@@ -242,7 +245,7 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   void push(const T& t) {
     arr.push_back(t);
     this->flow(arr.size() - 1, true);
-    notify_changed(arr.size() - 1);
+    this->notify_changed(arr.size() - 1);
   }
 
   bool has_value(const size_t& idx) const {
@@ -264,10 +267,10 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
     T ret = std::move(arr[idx]);
     swap(idx, arr.size() - 1);
     arr.pop_back();
-    notify_removed(ret);
+    this->notify_removed(ret);
     if (idx < arr.size()) {
       this->rebalance(idx, true);
-      notify_changed(idx);
+      this->notify_changed(idx);
     }
     return ret;
   }
@@ -306,15 +309,6 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
 
   size_t size_ = 0;
 
-  void notify_changed(const size_t& i) {
-    assert(has_value(i));
-    nhic(static_cast<const T&>(arr[i].value()), i);
-  }
-
-  void notify_removed(const T& t) {
-    nher(t);
-  }
-
   size_t size() const {
     return size_;
   }
@@ -332,12 +326,12 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
       size_t child_idx = heap_left_child(idx) + (coin() ? 0 : 1);
       if (cmp(t, arr[idx].value())) {
         std::swap(t, arr[idx].value());
-        notify_changed(idx);
+        this->notify_changed(idx);
       }
       hang(t, child_idx);
     } else {
       arr[idx] = t;
-      notify_changed(idx);
+      this->notify_changed(idx);
     }
   }
 
@@ -384,7 +378,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
         }
       }();
       arr[idx] = std::move(arr[child_idx]);
-      notify_changed(idx);
+      this->notify_changed(idx);
       remove_noret(child_idx);
     }
   }
@@ -395,7 +389,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     T ret = std::move(arr[idx].value());
     remove_noret(idx);
     --size_;
-    notify_removed(ret);
+    this->notify_removed(ret);
     return ret;
   }
 
