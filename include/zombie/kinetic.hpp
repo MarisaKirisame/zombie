@@ -248,6 +248,12 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
     this->notify_changed(arr.size() - 1);
   }
 
+  void push(T&& t) {
+    arr.push_back(std::forward<T>(t));
+    this->flow(arr.size() - 1, true);
+    this->notify_changed(arr.size() - 1);
+  }
+
   bool has_value(const size_t& idx) const {
     return idx < arr.size();
   }
@@ -334,7 +340,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
       else
           hang(std::forward<T>(t), child_idx);
     } else {
-      arr[idx] = std::move(t);
+      arr[idx] = std::forward<T>(t);
       this->notify_changed(idx);
     }
   }
@@ -433,6 +439,7 @@ using MinHeap = std::conditional_t<hanger, MinHanger<T, Compare, NHIC, NHER>, Mi
 
 
 
+
 template<typename T>
 struct NotifyIndexChanged; // {
 //  void operator()(const T&, const size_t&);
@@ -459,7 +466,7 @@ public:
   }
 
   void push(T&& t, const AffFunction& f) {
-    heap.push(Node{std::move(t), f});
+    heap.push(Node{std::forward<T>(t), f});
     recert();
     invariant();
   }
@@ -470,7 +477,7 @@ public:
   }
 
   void insert(T&& t, const AffFunction &f) {
-      push(std::move(t), f);
+      push(std::forward<T>(t), f);
   }
 
 
@@ -725,6 +732,10 @@ struct FakeKineticMinHeap {
     heap.push({t, f(time), f});
   }
 
+  void push(T&& t, const AffFunction& f) {
+    heap.push({std::forward<T>(t), f(time), f});
+  }
+
   size_t size() const {
     return heap.size();
   }
@@ -740,12 +751,14 @@ struct FakeKineticMinHeap {
   void advance_to(int64_t new_time) {
     assert(new_time >= time);
     time = new_time;
-    std::vector<Node> v = heap.values();
+
+    MinHeap<Node, false, CompareNode, NodeIndexChanged, NodeElementRemoved> new_heap;
     while (!heap.empty()) {
-      heap.pop();
+      auto n = heap.pop();
+      n.value = n.f(time);
+      new_heap.push(std::move(n));
     }
-    for (const Node& n: v) {
-      heap.push({n.t, n.f(time), n.f});
-    }
+
+    heap = std::move(new_heap);
   }
 };
