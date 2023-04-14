@@ -8,12 +8,6 @@
 #include "trailokya.hpp"
 #include "common.hpp"
 
-template<typename T>
-T non_null(T&& x) {
-  assert(x);
-  return std::forward<T>(x);
-}
-
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
 // When that happend, the outer MicroWave will not replay the inner one,
@@ -28,6 +22,7 @@ struct MicroWave : Object {
   Tock output;
   Tock start_time;
   Tock end_time;
+
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
             const std::vector<Tock>& inputs,
             const Tock& output,
@@ -38,33 +33,85 @@ struct MicroWave : Object {
     output(output),
     start_time(start_time),
     end_time(end_time) { }
+
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
   void replay();
 };
 
-template <typename T>
-bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
-  using wt = std::weak_ptr<T>;
-  return !weak.owner_before(wt{}) && !wt{}.owner_before(weak);
-}
 
+// EZombieNode is a type-erased interface to a computed value.
+// The value may be evicted later and need to be recomputed when needed again.
+struct EZombieNode : Object {
+  Tock created_time;
+  ptrdiff_t pool_index = -1;
+
+  EZombieNode(Tock created_time) : created_time(created_time) { }
+  virtual ~EZombieNode() { }
+
+  virtual const void* get_ptr() const = 0;
+};
+
+
+
+// ZombieNode is the concrete implementation of EZombieNode,
+template<typename T>
+struct ZombieNode : EZombieNode {
+  T t;
+
+  const void* get_ptr() const override {
+    return &t;
+  }
+  const T& get_ref() const {
+    return t;
+  }
+
+  ZombieNode(ZombieNode<T>&& t) = delete;
+
+  template<typename... Args>
+  ZombieNode(Tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
+};
+
+
+// RecomputeLater wraps holds a weak pointer to a EZombieNode,
+// and is stored in Trailokya::book for eviction.
 struct RecomputeLater : Phantom {
   Tock created_time;
   std::weak_ptr<EZombieNode> weak_ptr;
+
   RecomputeLater(const Tock& created_time, const std::shared_ptr<EZombieNode>& ptr) : created_time(created_time), weak_ptr(ptr) { }
+
   void evict() override {
     auto& t = Trailokya::get_trailokya();
     t.akasha.get_precise_node(created_time).delete_node();
   }
-  void notify_bag_index_changed(size_t idx) override;
+
+  void notify_bag_index_changed(size_t idx) override {
+      non_null(weak_ptr.lock())->pool_index = idx;
+  }
 };
 
+
+template<>
+struct NotifyBagIndexChanged<std::unique_ptr<Phantom>> {
+  void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
+    non_null(p)->notify_bag_index_changed(idx);
+  }
+};
+
+
+
+// GraveYard wraps around a shared pointer to EZombieNode,
+// and should be stored in a tock tree (Trailokya::akasha).
 struct GraveYard : Object {
   std::shared_ptr<EZombieNode> ptr;
   explicit GraveYard(const std::shared_ptr<EZombieNode>& ptr) : ptr(ptr) { }
 };
 
+
+// Trailokya::akasha should hold only two kinds of value:
+// 1. MicroWave
+// 2. shared_ptr<EZombieNode>, wrapped in GraveYard
 template<>
 struct NotifyParentChanged<std::unique_ptr<Object>> {
   void operator()(const typename tock_tree<std::unique_ptr<Object>>::Node& n) {
@@ -75,52 +122,13 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
         assert(tr.first + 1 == tr.second);
         Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr));
       }
-    } else if (dynamic_cast<MicroWave*>(obj)) { }
-    else {
-      // type not found
-      assert(false);
-    }
+    } else
+        assert (dynamic_cast<MicroWave*>(obj));
   }
 };
 
-template<typename F, size_t... Is>
-auto gen_tuple_impl(F func, std::index_sequence<Is...> ) {
-  return std::make_tuple(func(Is)...);
-}
 
-template<size_t N, typename F>
-auto gen_tuple(F func) {
-  return gen_tuple_impl(func, std::make_index_sequence<N>{} );
-}
 
-struct EZombieNode : Object {
-  Tock created_time;
-  EZombieNode(Tock created_time) : created_time(created_time) { }
-  virtual ~EZombieNode() { }
-  ptrdiff_t pool_index = -1;
-  virtual const void* get_ptr() const = 0;
-};
-
-template<>
-struct NotifyBagIndexChanged<std::unique_ptr<Phantom>> {
-  void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
-    non_null(p)->notify_bag_index_changed(idx);
-  }
-};
-
-template<typename T>
-struct ZombieNode : EZombieNode {
-  T t;
-  const void* get_ptr() const {
-    return &t;
-  }
-  const T& get_ref() const {
-    return t;
-  }
-  ZombieNode(ZombieNode<T>&& t) = delete;
-  template<typename... Args>
-  ZombieNode(Tock created_time, Args&&... args) : EZombieNode(created_time), t(std::forward<Args>(args)...) { }
-};
 
 // Note that this type do not have a virtual destructor.
 // Doing so save the pointer to the virtual method table,
@@ -131,8 +139,10 @@ struct ZombieNode : EZombieNode {
 struct EZombie {
   Tock created_time;
   mutable std::weak_ptr<EZombieNode> ptr_cache;
+
   EZombie(Tock created_time) : created_time(created_time) { }
   EZombie() { }
+
   std::weak_ptr<EZombieNode> ptr() const {
     if (ptr_cache.expired()) {
       Trailokya& t = Trailokya::get_trailokya();
@@ -143,6 +153,7 @@ struct EZombie {
     }
     return ptr_cache;
   }
+
   bool evicted() const {
     return ptr().lock() == nullptr;
   }
@@ -153,6 +164,7 @@ struct EZombie {
   bool unique() const {
     return ptr().use_count() ==  1;
   }
+
   void evict() {
     if (evictable()) {
       auto ptr = non_null(this->ptr().lock());
@@ -168,6 +180,7 @@ struct EZombie {
     assert(unique());
     evict();
   }
+
   std::shared_ptr<EZombieNode> shared_ptr() const {
     auto ret = ptr().lock();
     if (ret) {
@@ -191,6 +204,7 @@ struct EZombie {
     }
   }
 
+
 };
 
 // The core of the library.
@@ -210,12 +224,13 @@ struct EZombie {
 template<typename T>
 struct Zombie : EZombie {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
+
   template<typename... Args>
   void construct(Args&&... args) {
     Trailokya& t = Trailokya::get_trailokya();
     created_time = t.current_tock++;
     if (!t.akasha.has_precise(created_time)) {
-      auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
+     auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr_cache = shared;
       t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }
@@ -223,6 +238,7 @@ struct Zombie : EZombie {
       *t.tardis.forward_to = shared_ptr();
     }
   }
+
   Zombie(const Zombie<T>& z) : EZombie(z) { }
   Zombie(Zombie<T>& z) : EZombie(z) { }
   Zombie(Zombie<T>&& z) : EZombie(std::move(z)) { }
@@ -239,6 +255,7 @@ struct Zombie : EZombie {
   Zombie(Tock&& t) : EZombie(t) { }
   Zombie(const Tock& t) : EZombie(t) { }
   Zombie(Tock& t) : EZombie(t) { }
+
   std::shared_ptr<ZombieNode<T>> shared_ptr() const {
     return non_null(std::dynamic_pointer_cast<ZombieNode<T>>(EZombie::shared_ptr()));
   }
@@ -249,6 +266,19 @@ struct Zombie : EZombie {
     return shared_ptr()->t;
   }
 };
+
+
+
+
+template<typename F, size_t... Is>
+auto gen_tuple_impl(F func, std::index_sequence<Is...> ) {
+  return std::make_tuple(func(Is)...);
+}
+
+template<size_t N, typename F>
+auto gen_tuple(F func) {
+  return gen_tuple_impl(func, std::make_index_sequence<N>{} );
+}
 
 
 template<typename T>

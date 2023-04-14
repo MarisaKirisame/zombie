@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "tock.hpp"
 #include "bag.hpp"
 #include "base.hpp"
