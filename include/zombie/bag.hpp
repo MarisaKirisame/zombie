@@ -6,7 +6,7 @@
 
 // May god forgive my sin.
 template<typename T>
-struct NotifyBagIndexChanged; //{
+struct NotifyIndexChanged; //{
 //  void operator()(const T& t, size_t idx) { }
 //};
 
@@ -61,6 +61,6 @@ public:
 
 private:
   static void notify(const T& t, const size_t& idx) {
-    NotifyBagIndexChanged<T>()(t, idx);
+    NotifyIndexChanged<T>()(t, idx);
   }
 };

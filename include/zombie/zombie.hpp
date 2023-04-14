@@ -86,16 +86,16 @@ struct RecomputeLater : Phantom {
     t.akasha.get_precise_node(created_time).delete_node();
   }
 
-  void notify_bag_index_changed(size_t idx) override {
+  void notify_index_changed(size_t idx) override {
       non_null(weak_ptr.lock())->pool_index = idx;
   }
 };
 
 
 template<>
-struct NotifyBagIndexChanged<std::unique_ptr<Phantom>> {
+struct NotifyIndexChanged<std::unique_ptr<Phantom>> {
   void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
-    non_null(p)->notify_bag_index_changed(idx);
+    non_null(p)->notify_index_changed(idx);
   }
 };
 
@@ -120,7 +120,7 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
       if (n.parent != nullptr && n.parent->parent != nullptr) {
         tock_range tr = n.range;
         assert(tr.first + 1 == tr.second);
-        Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr));
+        Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr), AffFunction { 0, 0 });
       }
     } else
         assert (dynamic_cast<MicroWave*>(obj));

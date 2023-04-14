@@ -288,6 +288,8 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   }
 };
 
+
+
 template<typename T,
 	 typename Compare = std::less<T>,
 	 typename NHIC = NotifyHeapIndexChanged<T>,
@@ -316,7 +318,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     return size() == 0;
   }
 
-  void hang(T& t, const size_t& idx) {
+  void hang(T&& t, const size_t& idx) {
     if (!(idx < arr.size())) {
       arr.resize(idx + 1);
     }
@@ -324,19 +326,27 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
       // TODO: huh, is 'prioritizing an empty child' a worthwhile optimization?
       size_t child_idx = heap_left_child(idx) + (coin() ? 0 : 1);
       if (cmp(t, arr[idx].value())) {
-        std::swap(t, arr[idx].value());
+        T t0 = std::forward<T>(arr[idx].value());
+        arr[idx] = std::forward<T>(t);
         this->notify_changed(idx);
+        hang(std::forward<T>(t0), child_idx);
       }
-      hang(t, child_idx);
+      else
+          hang(std::forward<T>(t), child_idx);
     } else {
-      arr[idx] = t;
+      arr[idx] = std::move(t);
       this->notify_changed(idx);
     }
   }
 
   void push(const T& t) {
     T t_ = t;
-    hang(t_, 0);
+    hang(std::move(t_), 0);
+    ++size_;
+  }
+
+  void push(T&& t) {
+    hang(std::forward<T>(t), 0);
     ++size_;
   }
 
@@ -419,8 +429,100 @@ template<typename T,
 
 using MinHeap = std::conditional_t<hanger, MinHanger<T, Compare, NHIC, NHER>, MinNormalHeap<T, Compare, NHIC, NHER>>;
 
+
+
+
+
+template<typename T>
+struct NotifyIndexChanged; // {
+//  void operator()(const T&, const size_t&);
+//};
+
+
+
 template<typename T, bool hanger>
 struct KineticMinHeap {
+public:
+  size_t size() const {
+    return heap.size();
+  }
+
+  bool empty() const {
+    return heap.empty();
+  }
+
+
+  void push(const T& t, const AffFunction& f) {
+    heap.push(Node{t, f});
+    recert();
+    invariant();
+  }
+
+  void push(T&& t, const AffFunction& f) {
+    heap.push(Node{std::move(t), f});
+    recert();
+    invariant();
+  }
+
+
+  void insert(const T& t, const AffFunction &f) {
+      push(t, f);
+  }
+
+  void insert(T&& t, const AffFunction &f) {
+      push(std::move(t), f);
+  }
+
+
+  T& peek() {
+    return heap[0].t;
+  }
+
+  const T& peek() const {
+    return heap[0].t;
+  }
+
+  T pop() {
+    T ret = heap.pop().t;
+    recert();
+    return ret;
+  }
+
+
+  T remove(size_t i) {
+      T ret = heap.remove(i).t;
+      recert();
+      return ret;
+  }
+
+
+  T& operator[](size_t i) {
+      return heap[i].t;
+  }
+
+
+  void advance_to(int64_t new_time) {
+    assert(new_time >= time);
+    time = new_time;
+    while (!cert_queue.empty()) {
+      Certificate c = cert_queue.peek();
+      if (c.break_time <= time) {
+        fix(c.heap_idx);
+        cert_queue.pop();
+      } else {
+        break;
+      }
+    }
+  }
+
+
+  KineticMinHeap(int64_t time) :
+    time(time),
+    heap(CompareNode{*this}, NodeIndexChanged{*this}, NodeElementRemoved{*this}),
+    cert_queue(CompareCertificate(), CertificateIndexChanged{*this}, CertificateElementRemoved{*this}) { }
+
+
+private:
   using self_t = KineticMinHeap<T, hanger>;
 
   struct Node {
@@ -428,6 +530,37 @@ struct KineticMinHeap {
     AffFunction f;
     ptrdiff_t cert_idx = -1;
   };
+
+  struct CompareNode {
+    self_t& h;
+    bool operator()(const Node& l, const Node& r) {
+      return l.f(h.time) < r.f(h.time);
+    }
+  };
+
+  struct NodeIndexChanged {
+    self_t& h;
+
+    void operator()(const Node& n, const size_t& idx) {
+      if (n.cert_idx != -1) {
+        h.cert_queue[n.cert_idx].heap_idx = idx;
+      }
+      h.will_recert(idx);
+      NotifyIndexChanged<T>()(n.t, idx);
+    }
+  };
+
+  struct NodeElementRemoved {
+    self_t& h;
+
+    void operator()(const Node& n) {
+      if (n.cert_idx != -1) {
+        h.cert_queue[n.cert_idx].heap_idx = -1;
+        h.cert_queue.remove(n.cert_idx);
+      }
+    }
+  };
+
 
   struct Certificate {
     int64_t break_time;
@@ -437,17 +570,40 @@ struct KineticMinHeap {
     ptrdiff_t heap_idx;
   };
 
-  int64_t time;
-
-  struct CompareNode {
-    self_t& h;
-    bool operator()(const Node& l, const Node& r) {
-      return l.f(h.time) < r.f(h.time);
+  struct CompareCertificate {
+    bool operator()(const Certificate& l, const Certificate& r) {
+      return l.break_time < r.break_time;
     }
   };
 
+  struct CertificateIndexChanged {
+    self_t& h;
+    void operator()(const Certificate& c, const size_t& idx) {
+      h.heap[c.heap_idx].cert_idx = idx;
+    }
+  };
+
+  struct CertificateElementRemoved {
+    self_t& h;
+    void operator()(const Certificate& c) {
+      if (c.heap_idx != -1) {
+        h.heap[c.heap_idx].cert_idx = -1;
+      }
+    }
+  };
+
+
+
+private:
+  int64_t time;
   std::unordered_set<size_t> pending_recert;
 
+  MinHeap<Node, hanger, CompareNode, NodeIndexChanged, NodeElementRemoved> heap;
+  // do not use hanger - hanger is only useful in kinetic setting.
+  MinHeap<Certificate, false, CompareCertificate, CertificateIndexChanged, CertificateElementRemoved> cert_queue;
+
+
+private:
   void will_recert(const size_t& idx) {
     pending_recert.insert(idx);
     pending_recert.insert(heap_left_child(idx));
@@ -527,82 +683,6 @@ struct KineticMinHeap {
     pending_recert.clear();
   }
 
-  struct NodeIndexChanged {
-    self_t& h;
-
-    void operator()(const Node& n, const size_t& idx) {
-      if (n.cert_idx != -1) {
-        h.cert_queue[n.cert_idx].heap_idx = idx;
-      }
-      h.will_recert(idx);
-    }
-  };
-
-  struct NodeElementRemoved {
-    self_t& h;
-
-    void operator()(const Node& n) {
-      if (n.cert_idx != -1) {
-        h.cert_queue[n.cert_idx].heap_idx = -1;
-        h.cert_queue.remove(n.cert_idx);
-      }
-    }
-  };
-
-  struct CompareCertificate {
-    bool operator()(const Certificate& l, const Certificate& r) {
-      return l.break_time < r.break_time;
-    }
-  };
-
-  struct CertificateIndexChanged {
-    self_t& h;
-    void operator()(const Certificate& c, const size_t& idx) {
-      h.heap[c.heap_idx].cert_idx = idx;
-    }
-  };
-
-  struct CertificateElementRemoved {
-    self_t& h;
-    void operator()(const Certificate& c) {
-      if (c.heap_idx != -1) {
-        h.heap[c.heap_idx].cert_idx = -1;
-      }
-    }
-  };
-
-  MinHeap<Node, hanger, CompareNode, NodeIndexChanged, NodeElementRemoved> heap;
-
-  size_t size() const {
-    return heap.size();
-  }
-
-  bool empty() const {
-    return heap.empty();
-  }
-
-  // do not use hanger - hanger is only useful in kinetic setting.
-  MinHeap<Certificate, false, CompareCertificate, CertificateIndexChanged, CertificateElementRemoved> cert_queue;
-
-  void push(const T& t, const AffFunction& f) {
-    heap.push(Node{t, f});
-    recert();
-    invariant();
-  }
-
-  T& peek() {
-    return heap[0].t;
-  }
-
-  const T& peek() const {
-    return heap[0].t;
-  }
-
-  T pop() {
-    T ret = heap.pop().t;
-    recert();
-    return ret;
-  }
 
   // note: others priority invariant are also broken when we fix(idx).
   //   it is fine, as we will call fix on them individually.
@@ -610,26 +690,8 @@ struct KineticMinHeap {
   void fix(const size_t& idx) {
     heap.flow(idx, false);
   }
-
-  void advance_to(int64_t new_time) {
-    assert(new_time >= time);
-    time = new_time;
-    while (!cert_queue.empty()) {
-      Certificate c = cert_queue.peek();
-      if (c.break_time <= time) {
-        fix(c.heap_idx);
-        cert_queue.pop();
-      } else {
-        break;
-      }
-    }
-  }
-
-  KineticMinHeap(int64_t time) :
-    time(time),
-    heap(CompareNode{*this}, NodeIndexChanged{*this}, NodeElementRemoved{*this}),
-    cert_queue(CompareCertificate(), CertificateIndexChanged{*this}, CertificateElementRemoved{*this}) { }
 };
+
 
 template<typename T>
 struct FakeKineticMinHeap {

@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 
 template<>
-struct NotifyBagIndexChanged<int> {
+struct NotifyIndexChanged<int> {
   void operator()(const int&, const size_t&) {
   }
 };

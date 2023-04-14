@@ -54,6 +54,13 @@ TEST(HeapTest, Kinetic) {
   HeapTest<false>();
 }
 
+
+
+template<>
+struct NotifyIndexChanged<int> {
+    void operator()(const int &, const size_t &) {}
+};
+
 template<bool hanger>
 void KineticHeapTest() {
   std::vector<std::pair<int, int>> v0 = {{5, 20}, {1, 7}, {2, 19}, {11, 12}, {10, 16}, {14, 13}, {9, 3}, {4, 15}, {18, 17}, {8, 6}};

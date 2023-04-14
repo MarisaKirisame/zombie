@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "tock.hpp"
-#include "bag.hpp"
+#include "kinetic.hpp"
 #include "base.hpp"
 
 struct EZombieNode;
@@ -16,17 +16,24 @@ struct Tardis {
 struct Phantom {
   virtual ~Phantom() { }
   virtual void evict() = 0;
-  virtual void notify_bag_index_changed(size_t new_index) = 0;
+  virtual void notify_index_changed(size_t new_index) = 0;
 };
 
+
+const constexpr bool hanger = true;
+
 struct Trailokya {
+  // Hold MicroWave and GraveYard.
+  tock_tree<std::unique_ptr<Object>> akasha;
+  KineticMinHeap<std::unique_ptr<Phantom>, hanger> book;
+  Tardis tardis;
+  Tock current_tock = 1;
+
+
+  Trailokya() : book(0) {}
+
   static Trailokya& get_trailokya() {
     static Trailokya t;
     return t;
   }
-  // Hold MicroWave and GraveYard.
-  tock_tree<std::unique_ptr<Object>> akasha;
-  Bag<std::unique_ptr<Phantom>> book;
-  Tardis tardis;
-  Tock current_tock = 1;
 };
