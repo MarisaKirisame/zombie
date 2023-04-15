@@ -8,6 +8,14 @@
 #include "trailokya.hpp"
 #include "common.hpp"
 
+struct Time {
+  
+};
+
+struct Space {
+  
+};
+
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
 // When that happend, the outer MicroWave will not replay the inner one,
@@ -22,6 +30,9 @@ struct MicroWave : Object {
   Tock output;
   Tock start_time;
   Tock end_time;
+
+  Time time_taken;
+  Space space_taken;
 
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
             const std::vector<Tock>& inputs,
