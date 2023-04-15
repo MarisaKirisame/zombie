@@ -137,11 +137,11 @@ void KineticHeapTest() {
 }
 
 TEST(KineticHeapTest, Kinetic) {
-  // KineticHeapTest<true , false>();
+  KineticHeapTest<true , false>();
   KineticHeapTest<false, false>();
 }
 
 TEST(KineticHeapTest, UniqueElement) {
-  // KineticHeapTest<true , true>();
+  KineticHeapTest<true , true>();
   KineticHeapTest<false, true>();
 }

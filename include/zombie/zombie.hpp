@@ -230,7 +230,7 @@ struct Zombie : EZombie {
     Trailokya& t = Trailokya::get_trailokya();
     created_time = t.current_tock++;
     if (!t.akasha.has_precise(created_time)) {
-     auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
+      auto shared = std::make_shared<ZombieNode<T>>(created_time, std::forward<Args>(args)...);
       ptr_cache = shared;
       t.akasha.put({created_time, created_time + 1}, std::make_unique<GraveYard>(shared));
     }

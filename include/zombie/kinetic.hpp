@@ -332,10 +332,10 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
       // TODO: huh, is 'prioritizing an empty child' a worthwhile optimization?
       size_t child_idx = heap_left_child(idx) + (coin() ? 0 : 1);
       if (cmp(t, arr[idx].value())) {
-        T t0 = std::forward<T>(arr[idx].value());
-        arr[idx] = std::forward<T>(t);
+        T t0 = std::move(arr[idx].value());
+        arr[idx] = std::move(t);
         this->notify_changed(idx);
-        hang(std::forward<T>(t0), child_idx);
+        hang(std::move(t0), child_idx);
       }
       else
           hang(std::forward<T>(t), child_idx);
