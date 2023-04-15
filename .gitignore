@@ -31,5 +31,9 @@
 *.out
 *.app
 
+# CCLS language server
+**/.ccls-cache
+compile_commands.json
+
 _build/
 *~

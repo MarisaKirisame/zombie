@@ -24,10 +24,6 @@ void MicroWave::replay() {
           [&]() { t.current_tock = tock; });
 }
 
-void RecomputeLater::notify_bag_index_changed(size_t idx) {
-  non_null(weak_ptr.lock())->pool_index = idx;
-}
-
 void zombie_link_test() {
   std::cout << "zombie link ok!" << std::endl;
 }
