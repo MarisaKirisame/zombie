@@ -198,11 +198,10 @@ TEST(ZombieTest, SkipZombieAliveRecursiveFunction) {
   Zombie<int> z = bindZombie(
     [](int x) {
       ++z_executed_time;
-      Zombie<int> y = bindZombie(
-	[=]() {
-	  ++y_executed_time;
-	  return Zombie(2);
-	});
+      Zombie<int> y = bindZombie([=]() {
+        ++y_executed_time;
+        return Zombie(2);
+      });
       return Zombie(3);
     }, x);
   EXPECT_EQ(z.get_value(), 3);
@@ -230,4 +229,41 @@ TEST(ZombieTest, StoreReturn) {
   EXPECT_EQ(b.get_value(), 2);
   b.force_unique_evict();
   EXPECT_EQ(b.get_value(), 2);
+}
+
+struct Block {
+  size_t size;
+  Block(size_t size) : size(size) { }
+};
+
+template<>
+struct GetSize<Block> {
+  size_t operator()(const Block& b) {
+    return b.size;
+  }
+};
+
+TEST(ZombieTest, Reaper) {
+  size_t MB_in_bytes = 1 >> 19;
+
+  Zombie<Block> a(MB_in_bytes);
+  Zombie<Block> b = bindZombie([&](const Block& a) {
+    Trailokya::get_trailokya().zc.fast_forward(1s);
+    return Zombie<Block>(MB_in_bytes);
+  }, a);
+  Zombie<Block> c = bindZombie([&](const Block& a) {
+    Trailokya::get_trailokya().zc.fast_forward(1s);
+    return Zombie<Block>(MB_in_bytes);
+  }, a);
+  Zombie<Block> d = bindZombie([&](const Block& a) {
+    Trailokya::get_trailokya().zc.fast_forward(1s);
+    return Zombie<Block>(MB_in_bytes);
+  }, a);
+  Trailokya::get_trailokya().zc.fast_forward(1s);
+  b.get_value();
+  Trailokya::get_trailokya().reaper->murder();
+  EXPECT_FALSE(a.evicted());
+  EXPECT_FALSE(b.evicted());
+  EXPECT_TRUE(c.evicted());
+  EXPECT_FALSE(d.evicted());
 }

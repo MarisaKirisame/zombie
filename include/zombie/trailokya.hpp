@@ -22,6 +22,8 @@ struct Phantom {
 
 const constexpr bool hanger = true;
 
+struct Reaper;
+
 struct Trailokya {
   // Hold MicroWave and GraveYard.
   tock_tree<std::unique_ptr<Object>> akasha;
@@ -29,8 +31,10 @@ struct Trailokya {
   Tardis tardis;
   Tock current_tock = 1;
   ZombieClock zc;
+  std::unique_ptr<Reaper> reaper = std::make_unique<Reaper>(*this);
 
-  Trailokya() : book(0) {}
+  Trailokya();
+  ~Trailokya();
 
   static Trailokya& get_trailokya() {
     static Trailokya t;
@@ -39,7 +43,9 @@ struct Trailokya {
 };
 
 struct Reaper {
-  Trailokya& t = Trailokya::get_trailokya();
+  Trailokya& t;
+
+  Reaper(Trailokya& t) : t(t) { }
 
   bool have_soul() {
     return t.book.empty();
@@ -49,13 +55,19 @@ struct Reaper {
     t.book.advance_to(Time(t.zc.time()).count());
   }
 
-  void evict_one() {
+  void murder() {
     advance();
-    t.book.pop();
+    t.book.pop()->evict();
   }
 
   aff_t score() {
     advance();
     return t.book.get_aff(t.book.min_idx())(t.book.time());
+  }
+
+  void mass_extinction(aff_t threshold) {
+    while(have_soul() && score() < threshold) {
+      murder();
+    }
   }
 };

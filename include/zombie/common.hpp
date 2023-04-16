@@ -32,6 +32,7 @@ bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
 static_assert(sizeof(__int128) == 16);
 using int128_t = __int128;
 using ns = std::chrono::nanoseconds;
+using namespace std::chrono_literals;
 
 // Note that we need to divide space by time, and since we are using fixed int,
 //   we have to fence against underflow.

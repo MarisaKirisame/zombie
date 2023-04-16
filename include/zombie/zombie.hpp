@@ -299,7 +299,7 @@ struct Zombie : EZombie {
     shared_ptr();
   }
   T get_value() const {
-    return shared_ptr()->t;
+    return shared_ptr()->get_ref();
   }
 };
 
