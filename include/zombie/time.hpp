@@ -9,8 +9,6 @@
 
 #include "common.hpp"
 
-using ns = std::chrono::nanoseconds;
-
 // A slight wrapper above standard clock,
 //   providing fast forwarding ability.
 // Useful for testing, and for including additional time uncaptured in bindZombie,
@@ -50,6 +48,10 @@ struct ZombieClock {
   };
 
   std::vector<Node> stack { Node() };
+
+  ns time() {
+    return ZombieRawClock::singleton().time();
+  }
 
   void fast_forward(ns n) {
     ZombieRawClock::singleton().fast_forward(n);

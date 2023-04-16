@@ -2,8 +2,6 @@
 
 #include <gtest/gtest.h>
 
-using namespace std::chrono_literals;
-
 TEST(ZombieRawClockTest, Time) {
   ZombieRawClock& zc = ZombieRawClock::singleton();
   auto a = zc.time();
