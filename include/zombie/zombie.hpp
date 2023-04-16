@@ -8,14 +8,6 @@
 #include "trailokya.hpp"
 #include "common.hpp"
 
-struct Time {
-  
-};
-
-struct Space {
-  
-};
-
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
 // When that happend, the outer MicroWave will not replay the inner one,
@@ -32,18 +24,19 @@ struct MicroWave : Object {
   Tock end_time;
 
   Time time_taken;
-  Space space_taken;
 
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
             const std::vector<Tock>& inputs,
             const Tock& output,
             const Tock& start_time,
-            const Tock& end_time) :
+            const Tock& end_time,
+            const Time& time_taken):
     f(std::move(f)),
     inputs(inputs),
     output(output),
     start_time(start_time),
-    end_time(end_time) { }
+    end_time(end_time),
+    time_taken(time_taken) { }
 
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
@@ -56,24 +49,49 @@ struct MicroWave : Object {
 struct EZombieNode : Object {
   Tock created_time;
   ptrdiff_t pool_index = -1;
+  mutable Time last_accessed;
 
-  EZombieNode(Tock created_time) : created_time(created_time) { }
+  void accessed() const {
+    Trailokya& t = Trailokya::get_trailokya();
+    last_accessed = Time(t.zc.time());
+    if (pool_index != -1) {
+      assert(pool_index >= 0);
+      t.book.update_aff(pool_index, [&](const AffFunction& f) {
+        return AffFunction(f.slope, -last_accessed.count());
+      });
+    }
+  }
+
+  EZombieNode(Tock created_time) : created_time(created_time), last_accessed(Trailokya::get_trailokya().zc.time()) { }
+
+  virtual Space get_size() const = 0;
+
   virtual ~EZombieNode() { }
 
   virtual const void* get_ptr() const = 0;
 };
 
-
+template<typename T>
+struct GetSize; // {
+//   Space operator()(const T&);
+// };
 
 // ZombieNode is the concrete implementation of EZombieNode,
 template<typename T>
 struct ZombieNode : EZombieNode {
   T t;
 
+  Space get_size() const override {
+    return GetSize<T>()(t);
+  }
+
   const void* get_ptr() const override {
+    accessed();
     return &t;
   }
+
   const T& get_ref() const {
+    accessed();
     return t;
   }
 
@@ -129,12 +147,17 @@ struct NotifyParentChanged<std::unique_ptr<Object>> {
     Object* obj = n.value.get();
     if (GraveYard* gy = dynamic_cast<GraveYard*>(obj)) {
       if (n.parent != nullptr && n.parent->parent != nullptr) {
+        MicroWave* pobj = non_null(dynamic_cast<MicroWave*>(n.parent->value.get()));
         tock_range tr = n.range;
         assert(tr.first + 1 == tr.second);
-        Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr), AffFunction { 0, 0 });
+        // This is a min heap, so we have to flip the slope.
+        // Recently accessed node should have the higest score of 0, so shift is just -last_accessed.
+        AffFunction aff { -((static_cast<int128_t>(pobj->time_taken.count()) * (1UL << 63)) / gy->ptr->get_size().count()), (-gy->ptr->last_accessed.count()) };
+        Trailokya::get_trailokya().book.insert(std::make_unique<RecomputeLater>(tr.first, gy->ptr), std::move(aff));
       }
-    } else
-        assert (dynamic_cast<MicroWave*>(obj));
+    } else {
+      assert (dynamic_cast<MicroWave*>(obj));
+    }
   }
 };
 
@@ -182,10 +205,12 @@ struct EZombie {
       Trailokya::get_trailokya().book.remove(ptr->pool_index)->evict();
     }
   }
+
   void force_evict() {
     assert(evictable());
     evict();
   }
+
   void force_unique_evict() {
     assert(evictable());
     assert(unique());
@@ -304,10 +329,12 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
   Trailokya& t = Trailokya::get_trailokya();
   if (!t.akasha.has_precise(t.current_tock)) {
     Tock start_time = t.current_tock++;
-    Tock out = MicroWave::play(func, in);
+    std::pair<Tock, ns> p = t.zc.timed([&](){ return MicroWave::play(func, in); });
+    Tock out = p.first;
+    ns time_taken = p.second;
     Tock end_time = t.current_tock;
     ret_type ret(out);
-    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, out, start_time, end_time));
+    t.akasha.put({start_time, end_time}, std::make_unique<MicroWave>(std::move(func), in, out, start_time, end_time, Time(time_taken)));
     return ret;
   } else {
     auto& n = t.akasha.get_precise_node(t.current_tock);

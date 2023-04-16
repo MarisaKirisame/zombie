@@ -19,9 +19,11 @@ Tock MicroWave::play(const std::function<Tock(const std::vector<const void*>& in
 void MicroWave::replay() {
   Trailokya& t = Trailokya::get_trailokya();
   Tock tock = t.current_tock;
-  bracket([&]() { t.current_tock = start_time; },
-          [&]() { ++t.current_tock; play(f, inputs); },
-          [&]() { t.current_tock = tock; });
+  t.zc.block([&]() {
+    bracket([&]() { t.current_tock = start_time; },
+            [&]() { ++t.current_tock; play(f, inputs); },
+            [&]() { t.current_tock = tock; });
+  });
 }
 
 void zombie_link_test() {

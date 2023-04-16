@@ -4,19 +4,18 @@
 
 using namespace std::chrono_literals;
 
-int main() {
-  struct Unit { };
-  ZombieClock zc;
+template<>
+struct GetSize<int> {
+  Space operator()(const int&) {
+    return sizeof(int);
+  }
+};
 
-  auto time_taken = zc.timed([&]() {
-    zc.fast_forward(1s);
-    auto t = zc.timed([&]() {
-      zc.fast_forward(1s);
-      return Unit();
-    }).second;
-    assert(t >= 1s);
-    return Unit();
-  }).second;
-  assert(time_taken >= 1s);
-  assert(time_taken < 2s);
+int main() {
+  Zombie<int> x(1);
+  Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
+  Zombie<int> z = bindZombie([](int y) { return Zombie(y * 2); }, y);
+  y.force_unique_evict();
+  z.force_unique_evict();
+  assert(z.get_value() == 4);
 }
