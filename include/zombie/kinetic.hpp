@@ -436,7 +436,7 @@ struct FakeKineticMinHeap {
   FakeKineticMinHeap(int64_t time) : time_(time) { }
 
   void push(const T& t, const AffFunction& f) {
-    heap.push({t, f(time), f});
+    heap.push({t, f(time_), f});
   }
 
   void push(T&& t, const AffFunction& f) {
