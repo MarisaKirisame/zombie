@@ -150,13 +150,11 @@ public:
   void push(const T& t, const AffFunction& f) {
     heap.push(Node{t, f});
     recert();
-    invariant();
   }
 
   void push(T&& t, const AffFunction& f) {
     heap.push(Node{std::forward<T>(t), f});
     recert();
-    invariant();
   }
 
   void insert(const T& t, const AffFunction &f) {
@@ -389,10 +387,8 @@ private:
   }
 
   void recert() {
-    cert_invariant();
     for (size_t idx: pending_recert) {
       recert(idx);
-      cert_invariant();
     }
     pending_recert.clear();
   }
