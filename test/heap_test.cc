@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+
 TEST(AffTest, Kinetic) {
   std::vector<AffFunction> v {{5,5}, {6,6}, {7,6}};
   for (size_t i = 0; i < v.size(); ++i) {
@@ -17,12 +18,12 @@ TEST(AffTest, Kinetic) {
   EXPECT_TRUE(f.le_until(g).has_value());
 }
 
-template<bool hanger, bool is_unique>
+template<typename Heap, bool is_unique>
 void HeapTest() {
   std::vector<int> v = {94, 21, 19, 26, 5, 87, 80, 93, 60, 77, 24, 10, 82, 92, 17, 40, 11, 98, 42, 78};
 
   using E = Element<is_unique>;
-  MinHeap<E, hanger> h;
+  Heap h;
   size_t size = 0;
   for (int i : v) {
     h.push(E{i});
@@ -43,11 +44,11 @@ void HeapTest() {
 }
 
 TEST(HeapTest, Kinetic) {
-  HeapTest<true , false>();
-  HeapTest<false, false>();
+  HeapTest<MinHeap<Element<false>, true >, false>();
+  HeapTest<MinHeap<Element<false>, false>, false>();
 }
 
 TEST(HeapTest, UniqueElement) {
-  HeapTest<true , true>();
-  HeapTest<false, true>();
+  HeapTest<MinHeap<Element<true>, true >, true>();
+  HeapTest<MinHeap<Element<true>, false>, true>();
 }

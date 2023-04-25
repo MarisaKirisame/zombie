@@ -88,59 +88,59 @@ inline bool range_nointersect(const tock_range& l, const tock_range& r) {
   return l.second <= r.first;
 }
 
-template<typename V>
-struct tock_tree;
-
-template<typename T>
-struct NotifyParentChanged;// {
-//  void operator()(const typename tock_tree<T>::Node&) { }
-//};
-
-template<typename V>
+template<typename V, typename NotifyParentChanged>
 struct tock_tree {
+public:
+  using Data = std::pair<tock_range, V>;
+
+private:
   struct Node {
     // nullptr iff toplevel
     Node* parent;
-    tock_range range;
-    V value;
-    Node(Node* parent, const tock_range& range, const V& value) :
-      parent(parent), range(range), value(value) { }
-    Node(Node* parent, const tock_range& range, V&& value) :
-      parent(parent), range(range), value(std::move(value)) { }
+    Data data;
     std::map<Tock, Node> children;
+
+    Node(Node* parent, const tock_range& range, const V& value) :
+      parent(parent), data{range, value} { }
+    Node(Node* parent, const tock_range& range, V&& value) :
+      parent(parent), data{range, std::move(value)} { }
+
+
     bool children_in_range(const Tock& t) const {
       auto it = largest_value_le(children, t);
       if (it == children.end()) {
         return false;
       } else {
-        assert(it->second.range.first <= t);
-        return t < it->second.range.second;
+        assert(it->second.data.first.first <= t);
+        return t < it->second.data.first.second;
       }
     }
+
     const Node& get_shallow(const Tock& t) const {
       auto it = largest_value_le(children, t);
       assert(it != children.end());
-      assert(it->second.range.first <= t);
-      assert(t < it->second.range.second);
+      assert(it->second.data.first.first <= t);
+      assert(t < it->second.data.first.second);
       return it->second;
     }
+
     Node& get_shallow(const Tock& t) {
       auto it = largest_value_le(children, t);
       assert(it != children.end());
-      assert(it->second.range.first <= t);
-      assert(t < it->second.range.second);
+      assert(it->second.data.first.first <= t);
+      assert(t < it->second.data.first.second);
       return it->second;
     }
+
     const Node& get_node(const Tock& t) const {
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
+
     Node& get_node(const Tock& t) {
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
-    // get the most precise range that contain t
-    V get(const Tock& t) const {
-      return get_node(t).value;
-    }
+
+
     void delete_node() {
       // the root node is not for deletion.
       assert(parent != nullptr);
@@ -151,14 +151,15 @@ struct tock_tree {
         notify(nh.mapped());
         insert_to.insert(std::move(nh));
       }
-      parent->children.erase(range.first);
+      parent->children.erase(data.first.first);
     }
+
     void check_invariant() const {
       std::optional<tock_range> prev_range;
       for (auto p : children) {
-        const auto& curr_range = p.second.range;
+        const auto& curr_range = p.second.data.first;
         assert(range_ok(curr_range));
-        assert(range_dominate(range, curr_range));
+        assert(range_dominate(data.first, curr_range));
         if (prev_range.has_value()) {
           assert(range_nointersect(prev_range.value(), curr_range));
         }
@@ -167,68 +168,87 @@ struct tock_tree {
       }
     }
   };
+
   static void notify(const Node& n) {
-    NotifyParentChanged<V>()(n);
+    const Data* parent = n.parent == nullptr ? nullptr : &n.parent->data;
+    NotifyParentChanged()(n.data, parent);
   }
+
+
+public:
   Node n = Node(nullptr, tock_range(std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()), V());
-  Node& get_node(const Tock& t) {
-    return n.get_node(t);
+
+
+  Data& get_node(const Tock& t) {
+    return n.get_node(t).data;
   }
-  const Node& get_node(const Tock& t) const {
-    return n.get_node(t);
+
+  const Data& get_node(const Tock& t) const {
+    return n.get_node(t).data;
   }
+
   bool has_precise(const Tock& t) const {
-    return get_node(t).range.first == t;
+    return get_node(t).first.first == t;
   }
-  Node& get_precise_node(const Tock& t) {
+
+  Data& get_precise_node(const Tock& t) {
     assert(has_precise(t));
     return get_node(t);
   }
-  const Node& get_precise_node(const Tock& t) const {
+
+  const Data& get_precise_node(const Tock& t) const {
     assert(has_precise(t));
     return get_node(t);
   }
-  // get the most precise range that contain t
-  V get(const Tock& t) const {
-    return n.get(t);
-  }
+
+
   void check_invariant() const {
     n.check_invariant();
   }
-  Node& put(const tock_range& r, const V& v) {
+
+  Data& put(const tock_range& r, const V& v) {
     return put(r, v);
   }
-  Node& put(const tock_range& r, V&& v) {
-    Node& n = get_node(r.first);
+
+  Data& put(const tock_range& r, V&& v) {
+    Node& n = this->n.get_node(r.first);
     // disallow inserting the same node twice
-    assert(n.range.first != r.first);
-    assert(range_dominate(n.range, r));
+    assert(n.data.first.first != r.first);
+    assert(range_dominate(n.data.first, r));
+
     auto* inserted = &n.children;
     auto it = inserted->insert({r.first, Node(&n, r, std::move(v))}).first;
     Node& inserted_node = it->second;
     notify(inserted_node);
     ++it;
-    while (it != inserted->end() && range_dominate(r, it->second.range)) {
+    while (it != inserted->end() && range_dominate(r, it->second.data.first)) {
       auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
       inserted_node.children.insert(std::move(nh));
       notify(nh.mapped());
     }
-    return inserted_node;
+    return inserted_node.data;
+  }
+
+
+  void remove_precise(const Tock& t) {
+    assert(has_precise(t));
+    n.get_node(t).delete_node();
   }
 };
 
-template<typename V>
-std::ostream& print(std::ostream& os, const typename tock_tree<V>::Node& n) {
-  os << "Node " << n.value << " [" << n.range.first << ", " << n.range.second << ")" << " {" << std::endl;
+
+template<typename V, typename NPC>
+std::ostream& print(std::ostream& os, const typename tock_tree<V, NPC>::Node& n) {
+  os << "Node " << n.data.second << " [" << n.data.first.first << ", " << n.data.first.second << ")" << " {" << std::endl;
   for (const auto& p : n.children) {
     print<V>(os, p.second);
   }
   return os << "}" << std::endl;
 }
 
-template<typename V>
-std::ostream& operator<<(std::ostream& os, const tock_tree<V>& v) {
+template<typename V, typename NPC>
+std::ostream& operator<<(std::ostream& os, const tock_tree<V, NPC>& v) {
   print<V>(os, v.n);
   return os;
 }

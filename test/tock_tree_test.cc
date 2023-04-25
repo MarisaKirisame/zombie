@@ -2,9 +2,8 @@
 
 #include <gtest/gtest.h>
 
-template<>
-struct NotifyParentChanged<int> {
-  void operator()(const tock_tree<int>::Node&) {
+struct NotifyParentChanged {
+  void operator()(const std::pair<tock_range, int>& n, const std::pair<tock_range, int>* p) {
   }
 };
 
@@ -14,12 +13,12 @@ TEST(TockTest, NumericLimit) {
 }
 
 TEST(TockTreeTest, ReversedOrder) {
-  tock_tree<int> tt;
+  tock_tree<int, NotifyParentChanged> tt;
   tt.put({2,6}, 1);
   tt.put({1,10}, 2);
   tt.check_invariant();
-  EXPECT_EQ(tt.get(5), 1);
-  EXPECT_EQ(tt.get(6), 2);
+  EXPECT_EQ(tt.get_node(5).second, 1);
+  EXPECT_EQ(tt.get_node(6).second, 2);
 }
 
 TEST(LargestValueLeTest, LVTTest) {

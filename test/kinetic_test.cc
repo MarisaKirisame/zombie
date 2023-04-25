@@ -1,16 +1,17 @@
 #include "zombie/kinetic.hpp"
+#include "zombie/bag.hpp"
 #include "common.hpp"
 
 #include <gtest/gtest.h>
 
-template<bool hanger, bool is_unique>
+template<typename Heap, bool is_unique>
 void KineticHeapTest() {
   std::vector<std::pair<int, int>> v0 = {{5, 20}, {1, 7}, {2, 19}, {11, 12}, {10, 16}, {14, 13}, {9, 3}, {4, 15}, {18, 17}, {8, 6}};
   std::vector<std::pair<int, int>> v1 = {{17, 8}, {6, 13}, {10, 12}, {7, 7}, {3, 9}, {20, 14}, {18, 15}, {19, 2}, {1, 16}, {11, 5}};
   int numbering = 0;
 
   using E = Element<is_unique>;
-  KineticMinHeap<E, hanger> h(0);
+  Heap h(0);
   FakeKineticMinHeap<E> fake_h(0);
   for (const auto& p: v0) {
     h.push(E { numbering }, AffFunction(p.first, p.second));
@@ -47,11 +48,13 @@ void KineticHeapTest() {
 }
 
 TEST(KineticHeapTest, Kinetic) {
-  KineticHeapTest<true , false>();
-  KineticHeapTest<false, false>();
+  KineticHeapTest<Bag<Element<false>, NotifyIndexChanged<false>>, false>();
+  KineticHeapTest<KineticMinHeap<Element<false>, true , NotifyIndexChanged<false>>, false>();
+  KineticHeapTest<KineticMinHeap<Element<false>, false, NotifyIndexChanged<false>>, false>();
 }
 
 TEST(KineticHeapTest, UniqueElement) {
-  KineticHeapTest<true , true>();
-  KineticHeapTest<false, true>();
+  KineticHeapTest<Bag<Element<true>, NotifyIndexChanged<true>>, true>();
+  KineticHeapTest<KineticMinHeap<Element<true>, true , NotifyIndexChanged<true>>, true>();
+  KineticHeapTest<KineticMinHeap<Element<true>, false, NotifyIndexChanged<true>>, true>();
 }

@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+IMPORT_ZOMBIE(default_config)
+
 template<>
 struct GetSize<int> {
   Space operator()(const int&) {
@@ -16,7 +18,7 @@ TEST(ZombieTest, Create) {
 
 TEST(ZombieTest, Bind) {
   Zombie<int> x(6), y(7);
-  Zombie<int> z = bindZombie([](int x, int y) { return Zombie(x * y); }, x, y);
+  Zombie<int> z = bindZombie([](int x, int y) { return Zombie<int>(x * y); }, x, y);
   EXPECT_EQ(z.get_value(), 42);
 }
 
@@ -70,7 +72,7 @@ TEST(ZombieTest, SourceNoEvict) {
 
 TEST(ZombieTest, Recompute) {
   Zombie<int> x(3);
-  auto y = bindZombie([](const int& x) { return Zombie(x * 2); }, x);
+  auto y = bindZombie([](const int& x) { return Zombie<int>(x * 2); }, x);
   EXPECT_FALSE(y.evicted());
   y.force_unique_evict();
   EXPECT_TRUE(y.evicted());
@@ -82,8 +84,8 @@ TEST(ZombieTest, Recompute) {
 
 TEST(ZombieTest, ChainRecompute) {
   Zombie<int> x(1);
-  Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
-  Zombie<int> z = bindZombie([](int y) { return Zombie(y * 2); }, y);
+  Zombie<int> y = bindZombie([](int x) { return Zombie<int>(x * 2); }, x);
+  Zombie<int> z = bindZombie([](int y) { return Zombie<int>(y * 2); }, y);
   y.force_unique_evict();
   z.force_unique_evict();
   EXPECT_EQ(z.get_value(), 4);
@@ -92,8 +94,8 @@ TEST(ZombieTest, ChainRecompute) {
 TEST(ZombieTest, ChainRecomputeDestructed) {
   Zombie<int> x(1);
   Zombie<int> z = [&](){
-    Zombie<int> y = bindZombie([](int x) { return Zombie(x * 2); }, x);
-    return bindZombie([](int y) { return Zombie(y * 2); }, y);
+    Zombie<int> y = bindZombie([](int x) { return Zombie<int>(x * 2); }, x);
+    return bindZombie([](int y) { return Zombie<int>(y * 2); }, y);
   }();
   z.force_unique_evict();
   EXPECT_EQ(z.get_value(), 4);
@@ -104,11 +106,11 @@ TEST(ZombieTest, DiamondRecompute) {
   size_t executed_time = 0;
   Zombie<int> b = bindZombie([&](int x) {
     ++executed_time;
-    return Zombie(x * 2);
+    return Zombie<int>(x * 2);
   }, a);
-  Zombie<int> c = bindZombie([](int x) { return Zombie(x * 2); }, b);
-  Zombie<int> d = bindZombie([](int x) { return Zombie(x * 2); }, b);
-  Zombie<int> e = bindZombie([](int x, int y) { return Zombie(x + y); }, c, d);
+  Zombie<int> c = bindZombie([](int x) { return Zombie<int>(x * 2); }, b);
+  Zombie<int> d = bindZombie([](int x) { return Zombie<int>(x * 2); }, b);
+  Zombie<int> e = bindZombie([](int x, int y) { return Zombie<int>(x + y); }, c, d);
   EXPECT_EQ(executed_time, 1);
   b.force_unique_evict();
   c.force_unique_evict();
@@ -140,17 +142,17 @@ TEST(ZombieTest, RecursiveEvictedRecompute) {
   // but we know what we are doing.
   Zombie<int> b = bindZombie([&](int x) {
     ++executed_time;
-    return Zombie(x * 2);
+    return Zombie<int>(x * 2);
   }, a);
   Zombie<int> c = bindZombie([&](int x) {
-    return Zombie(x * 2);
+    return Zombie<int>(x * 2);
   }, b);
   Zombie<int> d = bindZombie([&](int x) {
     b.force_unique_evict();
-    return Zombie(x * 2);
+    return Zombie<int>(x * 2);
   }, c);
-  Zombie<int> e = bindZombie([](int x) { return Zombie(x * 2); }, b);
-  Zombie<int> f = bindZombie([](int x, int y) { return Zombie(x + y); }, d, e);
+  Zombie<int> e = bindZombie([](int x) { return Zombie<int>(x * 2); }, b);
+  Zombie<int> f = bindZombie([](int x, int y) { return Zombie<int>(x + y); }, d, e);
   executed_time = 0;
   assert(b.evictable());
   b.force_unique_evict();
@@ -175,7 +177,7 @@ TEST(ZombieTest, ZombieRematWithSmallestFunction) {
       return bindZombie(
         []() {
 	  ++inner_executed_time;
-	  return Zombie(42);
+	  return Zombie<int>(42);
 	});
     });
   EXPECT_EQ(outer_executed_time, 1);
@@ -200,9 +202,9 @@ TEST(ZombieTest, SkipZombieAliveRecursiveFunction) {
       ++z_executed_time;
       Zombie<int> y = bindZombie([=]() {
         ++y_executed_time;
-        return Zombie(2);
+        return Zombie<int>(2);
       });
-      return Zombie(3);
+      return Zombie<int>(3);
     }, x);
   EXPECT_EQ(z.get_value(), 3);
   EXPECT_EQ(y_executed_time, 1);
@@ -261,7 +263,7 @@ TEST(ZombieTest, Reaper) {
   }, a);
   Trailokya::get_trailokya().zc.fast_forward(1s);
   b.get_value();
-  Trailokya::get_trailokya().reaper->murder();
+  Trailokya::get_trailokya().reaper.murder();
   EXPECT_FALSE(a.evicted());
   EXPECT_FALSE(b.evicted());
   EXPECT_TRUE(c.evicted());

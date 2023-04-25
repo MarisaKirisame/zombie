@@ -2,6 +2,9 @@
 #include "zombie/kinetic.hpp"
 #include "zombie/time.hpp"
 
+
+IMPORT_ZOMBIE(default_config)
+
 struct Block {
   size_t size;
   Block(size_t size) : size(size) { }
@@ -32,7 +35,7 @@ int main() {
   }, a);
   Trailokya::get_trailokya().zc.fast_forward(1s);
   b.get_value();
-  Trailokya::get_trailokya().reaper->murder();
+  Trailokya::get_trailokya().reaper.murder();
   assert(!a.evicted());
   assert(!b.evicted());
   assert(c.evicted());
