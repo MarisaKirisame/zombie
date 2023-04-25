@@ -4,7 +4,7 @@
 #include <vector>
 #include <functional>
 
-#include "tock.hpp"
+#include "tock/tock.hpp"
 #include "config.hpp"
 
 

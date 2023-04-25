@@ -1,7 +1,7 @@
-#include "zombie/kinetic.hpp"
-#include "common.hpp"
-
 #include <gtest/gtest.h>
+
+#include "zombie/heap/heap.hpp"
+#include "common.hpp"
 
 
 TEST(AffTest, Kinetic) {

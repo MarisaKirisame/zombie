@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "tock.hpp"
+#include "tock/tock.hpp"
 #include "time.hpp"
 #include "config.hpp"
 #include "zombie_types.hpp"
@@ -36,15 +36,14 @@ public:
   >;
 
   struct NotifyParentChanged {
-    using Data = std::pair<tock_range, TockTreeElem>;
-    void operator()(const Data& n, const Data* parent) {
-      if (n.second.index() == TockTreeElemKind::ZombieNode) {
-        std::shared_ptr<EZombieNode<cfg>> ptr = std::get<TockTreeElemKind::ZombieNode>(n.second);
-        if (parent != nullptr && parent->second.index() == TockTreeElemKind::MicroWave) {
-          const MicroWave<cfg> &pobj = std::get<TockTreeElemKind::MicroWave>(parent->second);
-          assert(n.first.first + 1 == n.first.second);
+    void operator()(const TockTreeData<TockTreeElem>& n, const TockTreeData<TockTreeElem>* parent) {
+      if (n.value.index() == TockTreeElemKind::ZombieNode) {
+        std::shared_ptr<EZombieNode<cfg>> ptr = std::get<TockTreeElemKind::ZombieNode>(n.value);
+        if (parent != nullptr && parent->value.index() == TockTreeElemKind::MicroWave) {
+          const MicroWave<cfg> &pobj = std::get<TockTreeElemKind::MicroWave>(parent->value);
+          assert(n.range.beg + 1 == n.range.end);
           AffFunction aff = cfg.metric(ptr->last_accessed, pobj.time_taken, ptr->get_size());
-          Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.first.first, ptr), std::move(aff));
+          Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
         }
       }
     };
@@ -62,8 +61,8 @@ public:
 
 public:
   // Hold MicroWave and GraveYard.
-  TockTree<cfg, TockTreeElem, NotifyParentChanged> akasha;
-  Book<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
+  TockTree<cfg.tree, TockTreeElem, NotifyParentChanged> akasha;
+  KineticHeap<cfg.heap, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
   Tardis tardis;
   Tock current_tock = 1;
   ZombieClock zc;

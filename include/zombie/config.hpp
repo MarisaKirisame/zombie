@@ -2,49 +2,19 @@
 
 #include <variant>
 
-#include "bag.hpp"
-#include "kinetic.hpp"
-#include "tock.hpp"
+#include "heap/heap.hpp"
+#include "tock/tock.hpp"
 
-enum class BookDS {
-  Bag = 0,
-  KineticHeap,
-  KineticHanger
-};
+#include "common.hpp"
 
-enum class TockTreeDS {
-  PlainTree = 0
-};
 
 using AffMetric = AffFunction(*)(Time, Time, Space);
 
 struct ZombieConfig {
-  BookDS     book;
-  TockTreeDS tree;
-  AffMetric  metric;
+  KineticHeapImpl heap;
+  TockTreeImpl tree;
+  AffMetric metric;
 };
-
-
-
-template<ZombieConfig const &cfg, typename T, typename NotifyIndexChanged>
-using Book = std::variant_alternative_t<
-  (size_t)cfg.book,
-  std::variant<
-    Bag<T, NotifyIndexChanged>,
-    KineticMinHeap<T, false, NotifyIndexChanged>,
-    KineticMinHeap<T, true , NotifyIndexChanged>
-  >
->;
-
-
-template<ZombieConfig const &cfg, typename T, typename NotifyParentChanged>
-using TockTree = std::variant_alternative_t<
-  (size_t)cfg.tree,
-  std::variant<
-    tock_tree<T, NotifyParentChanged>
-  >
->;
-
 
 
 
@@ -57,4 +27,4 @@ AffFunction default_metric(Time last_accessed, Time cost, Space size) {
   };
 }
 
-constexpr ZombieConfig default_config = ZombieConfig { BookDS::Bag, TockTreeDS::PlainTree, &default_metric };
+constexpr ZombieConfig default_config = ZombieConfig { KineticHeapImpl::Bag, TockTreeImpl::Tree, &default_metric };

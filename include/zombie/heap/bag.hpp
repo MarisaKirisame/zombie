@@ -9,6 +9,8 @@
 
 
 
+namespace HeapImpls {
+
 // an unordered container of T.
 // allow constant time insert, remove, and lookup.
 template<typename T, typename NotifyIndexChanged>
@@ -124,3 +126,5 @@ private:
     NotifyIndexChanged()(n.t, idx);
   }
 };
+
+}; // end of namespace HeapImpls

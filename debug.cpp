@@ -1,6 +1,4 @@
 #include "zombie/zombie.hpp"
-#include "zombie/kinetic.hpp"
-#include "zombie/time.hpp"
 
 
 IMPORT_ZOMBIE(default_config)

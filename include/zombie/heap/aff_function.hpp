@@ -1,10 +1,10 @@
 #pragma once
 
-#include "common.hpp"
-
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <iostream>
+#include <cassert>
 
 template<typename T>
 T div_ceiling(T x, T y) {
@@ -18,6 +18,10 @@ T div_ceiling(T x, T y) {
     return x / y;
   }
 }
+
+
+static_assert(sizeof(__int128) == 16);
+using int128_t = __int128;
 
 using slope_t = int128_t;
 using shift_t = int64_t;

@@ -59,7 +59,7 @@ std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
   if (ptr_cache.expired()) {
     Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
     if (t.akasha.has_precise(created_time)) {
-      ptr_cache = std::get<TockTreeElemKind::ZombieNode>(t.akasha.get_precise_node(created_time).second);
+      ptr_cache = std::get<TockTreeElemKind::ZombieNode>(t.akasha.get_precise_node(created_time).value);
     }
   }
   return ptr_cache;
@@ -95,12 +95,12 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
       std::shared_ptr<EZombieNode<cfg>> strong;
       typename Trailokya<cfg>::Tardis tardis = t.tardis;
       bracket([&]() { t.tardis = typename Trailokya<cfg>::Tardis { this->created_time, &strong }; },
-              [&]() { std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(created_time).second).replay(); },
+              [&]() { std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(created_time).value).replay(); },
               [&]() { t.tardis = tardis; });
       ret = non_null(strong);
     } else {
       auto& n = t.akasha.get_precise_node(created_time);
-      ret = std::get<TockTreeElemKind::ZombieNode>(n.second);
+      ret = std::get<TockTreeElemKind::ZombieNode>(n.value);
     }
     ptr_cache = ret;
     return ret;
@@ -159,10 +159,10 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
     t.akasha.put({start_time, end_time}, { MicroWave<cfg>(std::move(func), in, out, start_time, end_time, Time(time_taken)) });
     return ret;
   } else {
-    const std::pair<tock_range, typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
-    t.current_tock = n.first.second;
+    const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
+    t.current_tock = n.range.end;
     static_assert(IsZombie<cfg, ret_type>::value, "should be zombie");
-    const MicroWave<cfg> &mv = std::get<TockTreeElemKind::MicroWave>(n.second);
+    const MicroWave<cfg> &mv = std::get<TockTreeElemKind::MicroWave>(n.value);
     ret_type ret(mv.output);
     // we choose call-by-value because
     // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
