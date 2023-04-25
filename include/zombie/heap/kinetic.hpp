@@ -298,4 +298,4 @@ private:
   }
 };
 
-}; // end of namespace HeapImpls
+} // end of namespace HeapImpls
