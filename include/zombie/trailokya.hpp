@@ -12,12 +12,12 @@
 namespace ZombieInternal {
 
 
-class TockTreeElemKind {
-public:
+namespace TockTreeElemKind {
   static constexpr size_t Nothing = 0; /* should only occur at root */
   static constexpr size_t MicroWave = 1;
   static constexpr size_t ZombieNode = 2;
 };
+
 
 
 template<const ZombieConfig& cfg>
@@ -110,4 +110,4 @@ public:
   };
 };
 
-}
+} // end of namespace ZombieInternal

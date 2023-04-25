@@ -139,15 +139,15 @@ auto gen_tuple(F func) {
 
 
 
-template<const ZombieConfig& cfg, typename T>
+template<typename T>
 struct IsZombie : std::false_type { };
 
 template<const ZombieConfig& cfg, typename T>
-struct IsZombie<cfg, Zombie<cfg, T>> : std::true_type { };
+struct IsZombie<Zombie<cfg, T>> : std::true_type { };
 
 template<const ZombieConfig& cfg, typename ret_type>
 ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
-  static_assert(IsZombie<cfg, ret_type>::value, "should be zombie");
+  static_assert(IsZombie<ret_type>::value, "should be zombie");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   if (!t.akasha.has_precise(t.current_tock)) {
     Tock start_time = t.current_tock++;
@@ -161,7 +161,7 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
   } else {
     const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
     t.current_tock = n.range.end;
-    static_assert(IsZombie<cfg, ret_type>::value, "should be zombie");
+    static_assert(IsZombie<ret_type>::value, "should be zombie");
     const MicroWave<cfg> &mv = std::get<TockTreeElemKind::MicroWave>(n.value);
     ret_type ret(mv.output);
     // we choose call-by-value because
@@ -212,4 +212,4 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
   return bindZombieRaw<cfg, ret_type>(std::move(func), std::move(in));
 }
 
-}
+} // end of namespace ZombieInternal

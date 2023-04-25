@@ -219,4 +219,4 @@ struct Zombie : EZombie<cfg> {
   }
 };
 
-}
+} // end of namespace ZombieInternal
