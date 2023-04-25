@@ -1,25 +1,15 @@
-#include "zombie/tock.hpp"
+#include "zombie/tock/tock.hpp"
 
 #include <gtest/gtest.h>
 
-template<>
-struct NotifyParentChanged<int> {
-  void operator()(const tock_tree<int>::Node&) {
+struct NotifyParentChanged {
+  void operator()(const TockTreeData<int>& n, const TockTreeData<int>* p) {
   }
 };
 
 TEST(TockTest, NumericLimit) {
   assert(std::numeric_limits<Tock>::min().tock == std::numeric_limits<decltype(std::declval<Tock>().tock)>::min());
   assert(std::numeric_limits<Tock>::max().tock == std::numeric_limits<decltype(std::declval<Tock>().tock)>::max());
-}
-
-TEST(TockTreeTest, ReversedOrder) {
-  tock_tree<int> tt;
-  tt.put({2,6}, 1);
-  tt.put({1,10}, 2);
-  tt.check_invariant();
-  EXPECT_EQ(tt.get(5), 1);
-  EXPECT_EQ(tt.get(6), 2);
 }
 
 TEST(LargestValueLeTest, LVTTest) {
@@ -34,4 +24,18 @@ TEST(LargestValueLeTest, LVTTest) {
   EXPECT_EQ(largest_value_le(m, 7)->second, 5);
   EXPECT_EQ(largest_value_le(m, 9)->second, 9);
   EXPECT_EQ(largest_value_le(m, 10)->second, 9);
+}
+
+template<TockTreeImpl impl>
+void TockTreeTestReverseOrder() {
+  TockTree<impl, int, NotifyParentChanged> tt;
+  tt.put({2,6}, 1);
+  tt.put({1,10}, 2);
+  tt.check_invariant();
+  EXPECT_EQ(tt.get_node(5).value, 1);
+  EXPECT_EQ(tt.get_node(6).value, 2);
+}
+
+TEST(TockTreeTest, ReversedOrder) {
+  TockTreeTestReverseOrder<TockTreeImpl::Tree>();
 }

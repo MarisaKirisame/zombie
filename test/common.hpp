@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+
+#include "zombie/heap/heap.hpp"
+
 template<bool is_unique>
 struct Element;
 
@@ -35,7 +39,9 @@ struct NotifyHeapElementRemoved<Element<is_unique>> {
   void operator()(const Element<is_unique>& i) { }
 };
 
+
 template<bool is_unique>
-struct NotifyIndexChanged<Element<is_unique>> {
-  void operator()(const Element<is_unique>&, const size_t &) { }
+struct NotifyIndexChanged {
+  void operator()(const Element<is_unique>&, const size_t&) {
+  }
 };

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <chrono>
+#include <cassert>
 
 template<typename A, typename B, typename C>
 decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
@@ -69,3 +70,9 @@ struct Space {
     return bytes / plank_space_in_bytes;
   }
 };
+
+
+template<typename T>
+struct GetSize; // {
+//   Space operator()(const T&);
+// };

@@ -8,12 +8,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(zombie)
 
-file(GLOB_RECURSE ALL_SRCS "src/*.cpp")
-add_library(zombie_lib ${ALL_SRCS})
-target_include_directories(zombie_lib PUBLIC
+add_library(zombie_lib INTERFACE)
+target_include_directories(zombie_lib INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>)
 
-target_compile_features(zombie_lib PUBLIC cxx_std_17)
+target_compile_features(zombie_lib INTERFACE cxx_std_17)
 
 install(TARGETS zombie_lib EXPORT zombie)
 install(DIRECTORY include DESTINATION ./)
