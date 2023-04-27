@@ -160,11 +160,11 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
     T ret = std::move(arr[idx]);
     swap(idx, arr.size() - 1);
     arr.pop_back();
-    this->notify_removed(ret);
     if (idx < arr.size()) {
       this->rebalance(idx, true);
       this->notify_changed(idx);
     }
+    this->notify_removed(ret);
     return ret;
   }
 
