@@ -6,7 +6,7 @@ IMPORT_ZOMBIE(default_config)
 
 template<>
 struct GetSize<int> {
-  Space operator()(const int&) {
+  size_t operator()(const int&) {
     return sizeof(int);
   }
 };
@@ -42,7 +42,7 @@ struct Resource {
 };
 template<>
 struct GetSize<Resource> {
-  Space operator()(const Resource&) {
+  size_t operator()(const Resource&) {
     return 1;
   }
 };
@@ -250,22 +250,58 @@ TEST(ZombieTest, Reaper) {
 
   Zombie<Block> a(MB_in_bytes);
   Zombie<Block> b = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().zc.fast_forward(1s);
+    Trailokya::get_trailokya().meter.fast_forward(1s);
     return Zombie<Block>(MB_in_bytes);
   }, a);
   Zombie<Block> c = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().zc.fast_forward(1s);
+    Trailokya::get_trailokya().meter.fast_forward(1s);
     return Zombie<Block>(MB_in_bytes);
   }, a);
   Zombie<Block> d = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().zc.fast_forward(1s);
+    Trailokya::get_trailokya().meter.fast_forward(1s);
     return Zombie<Block>(MB_in_bytes);
   }, a);
-  Trailokya::get_trailokya().zc.fast_forward(1s);
+  Trailokya::get_trailokya().meter.fast_forward(1s);
   b.get_value();
   Trailokya::get_trailokya().reaper.murder();
   EXPECT_FALSE(a.evicted());
   EXPECT_FALSE(b.evicted());
   EXPECT_TRUE(c.evicted());
   EXPECT_FALSE(d.evicted());
+}
+
+
+TEST(ZombieTest, MeasureSpace) {
+  {
+    Zombie<int> z = bindZombie([&]() {
+      Zombie<int> za(1);
+      return bindZombie([&](int a) {
+        Zombie<int> b(a + 1);
+        return za;
+      }, za);
+    });
+
+
+    z.evict();
+    EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
+    auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
+    EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
+    auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
+    EXPECT_EQ(m.space_taken.count(), Space(sizeof(int)).count());
+  }
+
+  {
+    Zombie<int> z = bindZombie([&]() {
+      Zombie<int> za(1);
+      Zombie<int> zb(2);
+      return zb;
+    });
+
+    z.evict();
+    EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
+    auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
+    EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
+    auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
+    EXPECT_EQ(m.space_taken.count(), Space(2 * sizeof(int)).count());
+  }
 }

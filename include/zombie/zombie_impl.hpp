@@ -27,7 +27,7 @@ template<const ZombieConfig& cfg>
 void MicroWave<cfg>::replay() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   Tock tock = t.current_tock;
-  t.zc.block([&]() {
+  t.meter.block([&]() {
     bracket([&]() { t.current_tock = start_time; },
             [&]() { ++t.current_tock; play(f, inputs); },
             [&]() { t.current_tock = tock; });
@@ -38,12 +38,12 @@ void MicroWave<cfg>::replay() {
 
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
-  : created_time(created_time), last_accessed(Trailokya<cfg>::get_trailokya().zc.time()) { }
+  : created_time(created_time), last_accessed(Trailokya<cfg>::get_trailokya().meter.time()) { }
 
 template<const ZombieConfig& cfg>
 void EZombieNode<cfg>::accessed() const {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  last_accessed = Time(t.zc.time());
+  last_accessed = Time(t.meter.time());
   if (pool_index != -1) {
     assert(pool_index >= 0);
     t.book.update_aff(pool_index, [&](const AffFunction& f) {
@@ -52,6 +52,13 @@ void EZombieNode<cfg>::accessed() const {
   }
 }
 
+
+
+template<const ZombieConfig& cfg, typename T>
+template<typename... Args>
+ZombieNode<cfg, T>::ZombieNode(Tock created_time, Args&&... args) : EZombieNode<cfg>(created_time), t(std::forward<Args>(args)...) {
+  Trailokya<cfg>::get_trailokya().meter.add_space(GetSize<T>()(t));
+}
 
 
 template<const ZombieConfig& cfg>
@@ -151,12 +158,13 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   if (!t.akasha.has_precise(t.current_tock)) {
     Tock start_time = t.current_tock++;
-    std::pair<Tock, ns> p = t.zc.timed([&](){ return MicroWave<cfg>::play(func, in); });
-    Tock out = p.first;
-    ns time_taken = p.second;
+    std::tuple<Tock, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
+    Tock out = std::get<0>(p);
+    ns time_taken = std::get<1>(p);
+    size_t space_taken = std::get<2>(p);
     Tock end_time = t.current_tock;
     ret_type ret(out);
-    t.akasha.put({start_time, end_time}, { MicroWave<cfg>(std::move(func), in, out, start_time, end_time, Time(time_taken)) });
+    t.akasha.put({start_time, end_time}, { MicroWave<cfg>(std::move(func), in, out, start_time, end_time, Space(space_taken), Time(time_taken)) });
     return ret;
   } else {
     const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);

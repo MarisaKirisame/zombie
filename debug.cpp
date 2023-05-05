@@ -20,18 +20,18 @@ int main() {
 
   Zombie<Block> a(MB_in_bytes);
   Zombie<Block> b = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().zc.fast_forward(1s);
+    Trailokya::get_trailokya().meter.fast_forward(1s);
     return Zombie<Block>(MB_in_bytes);
   }, a);
   Zombie<Block> c = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().zc.fast_forward(1s);
+    Trailokya::get_trailokya().meter.fast_forward(1s);
     return Zombie<Block>(MB_in_bytes);
   }, a);
   Zombie<Block> d = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().zc.fast_forward(1s);
+    Trailokya::get_trailokya().meter.fast_forward(1s);
     return Zombie<Block>(MB_in_bytes);
   }, a);
-  Trailokya::get_trailokya().zc.fast_forward(1s);
+  Trailokya::get_trailokya().meter.fast_forward(1s);
   b.get_value();
   Trailokya::get_trailokya().reaper.murder();
   assert(!a.evicted());

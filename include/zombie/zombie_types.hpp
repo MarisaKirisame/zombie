@@ -28,6 +28,7 @@ public:
   Tock end_time;
 
   Time time_taken;
+  Space space_taken;
 
 public:
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
@@ -35,12 +36,14 @@ public:
             const Tock& output,
             const Tock& start_time,
             const Tock& end_time,
+            const Space& space,
             const Time& time_taken):
     f(std::move(f)),
     inputs(inputs),
     output(output),
     start_time(start_time),
     end_time(end_time),
+    space_taken(space),
     time_taken(time_taken) { }
 
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
@@ -64,7 +67,7 @@ public:
   EZombieNode(Tock create_time);
   void accessed() const;
 
-  virtual Space get_size() const = 0;
+  virtual size_t get_size() const = 0;
 
   virtual ~EZombieNode() { }
 
@@ -77,7 +80,7 @@ template<const ZombieConfig &cfg, typename T>
 struct ZombieNode : EZombieNode<cfg> {
   T t;
 
-  Space get_size() const override {
+  size_t get_size() const override {
     return GetSize<T>()(t);
   }
 
@@ -94,7 +97,7 @@ struct ZombieNode : EZombieNode<cfg> {
   ZombieNode(ZombieNode<cfg, T>&& t) = delete;
 
   template<typename... Args>
-  ZombieNode(Tock created_time, Args&&... args) : EZombieNode<cfg>(created_time), t(std::forward<Args>(args)...) { }
+  ZombieNode(Tock created_time, Args&&... args);
 };
 
 

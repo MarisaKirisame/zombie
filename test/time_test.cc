@@ -1,9 +1,9 @@
-#include "zombie/time.hpp"
+#include "zombie/meter.hpp"
 
 #include <gtest/gtest.h>
 
 TEST(ZombieRawClockTest, Time) {
-  ZombieRawClock& zc = ZombieRawClock::singleton();
+  ZombieClock& zc = ZombieClock::singleton();
   auto a = zc.time();
   auto b = zc.time();
   EXPECT_GT(b, a);
@@ -16,20 +16,21 @@ TEST(ZombieRawClockTest, Time) {
 
 TEST(ZombieClockTest, Time) {
   struct Unit { };
-  ZombieClock zc;
+  ZombieMeter zc;
 
   struct RecurBlocked {
-    ZombieClock& zc;
+    ZombieMeter& zc;
     void operator()(size_t i) {
       if (i > 0) {
-        auto t = zc.timed([&]() {
+        auto p = zc.measured([&]() {
           zc.fast_forward(1s);
           zc.block([&]() {
             (*this)(i - 1);
           });
           zc.fast_forward(1s);
           return Unit();
-        }).second;
+        });
+        auto t = std::get<1>(p);
         EXPECT_GE(t, 2s);
         EXPECT_LT(t, 3s);
       }
@@ -38,15 +39,16 @@ TEST(ZombieClockTest, Time) {
   RecurBlocked({zc})(10);
 
   struct RecurNoBlocked {
-    ZombieClock& zc;
+    ZombieMeter& zc;
     void operator()(size_t i) {
       if (i > 0) {
-        auto t = zc.timed([&]() {
+        auto p = zc.measured([&]() {
           zc.fast_forward(1s);
           (*this)(i - 1);
           zc.fast_forward(1s);
           return Unit();
-        }).second;
+        });
+        auto t = std::get<1>(p);
         EXPECT_GE(t, i * 2s);
         EXPECT_LT(t, i * 2s + 1s);
       }

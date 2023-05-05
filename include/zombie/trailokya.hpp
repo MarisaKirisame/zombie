@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "tock/tock.hpp"
-#include "time.hpp"
+#include "meter.hpp"
 #include "config.hpp"
 #include "zombie_types.hpp"
 
@@ -65,7 +65,7 @@ public:
   KineticHeap<cfg.heap, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
   Tardis tardis;
   Tock current_tock = 1;
-  ZombieClock zc;
+  ZombieMeter meter;
   Reaper reaper = Reaper(*this);
 
 public:
@@ -89,7 +89,7 @@ public:
     }
 
     void advance() {
-      t.book.advance_to(Time(t.zc.time()).count());
+      t.book.advance_to(Time(t.meter.time()).count());
     }
 
     void murder() {

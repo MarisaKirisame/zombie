@@ -74,5 +74,5 @@ struct Space {
 
 template<typename T>
 struct GetSize; // {
-//   Space operator()(const T&);
+//   size_t operator()(const T&);
 // };
