@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <functional>
 
 #include "common.hpp"
 
@@ -69,6 +70,17 @@ private:
       }
       parent->children.erase(data.range.beg);
     }
+
+
+    void delete_leaf_children() {
+      for (auto it = children.begin(); it != children.end();) {
+        if (it->second.children.empty())
+          it = children.erase(it);
+        else
+          ++it;
+      }
+    }
+
 
     void check_invariant() const {
       std::optional<TockRange> prev_range;
@@ -150,6 +162,11 @@ public:
   void remove_precise(const Tock& t) {
     assert(has_precise(t));
     n.get_node(t).delete_node();
+  }
+
+  void remove_leaf_children(const Tock& t) {
+    assert(has_precise(t));
+    n.get_node(t).delete_leaf_children();
   }
 };
 

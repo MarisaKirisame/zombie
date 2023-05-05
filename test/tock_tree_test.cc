@@ -39,3 +39,41 @@ void TockTreeTestReverseOrder() {
 TEST(TockTreeTest, ReversedOrder) {
   TockTreeTestReverseOrder<TockTreeImpl::Tree>();
 }
+
+
+
+template<TockTreeImpl impl>
+void TockTreeTestDeleteLeafChildren() {
+  TockTree<impl, int, NotifyParentChanged> tt;
+  tt.put({1, 10}, 1);
+  tt.put({2, 3}, 2);
+  tt.put({3, 4}, 3);
+  tt.put({4, 10}, 4);
+  tt.put({5, 6}, 5);
+  tt.put({6, 7}, 6);
+  tt.check_invariant();
+
+  EXPECT_EQ(tt.get_precise_node(2).value, 2);
+  EXPECT_EQ(tt.get_precise_node(3).value, 3);
+  EXPECT_EQ(tt.get_precise_node(4).value, 4);
+  EXPECT_EQ(tt.get_precise_node(5).value, 5);
+  EXPECT_EQ(tt.get_precise_node(6).value, 6);
+
+  EXPECT_FALSE(tt.has_precise(7));
+  EXPECT_EQ(tt.get_node(7).value, 4);
+
+  tt.remove_leaf_children(1);
+
+  EXPECT_FALSE(tt.has_precise(2));
+  EXPECT_EQ(tt.get_node(2).value, 1);
+  EXPECT_FALSE(tt.has_precise(3));
+  EXPECT_EQ(tt.get_node(3).value, 1);
+
+  EXPECT_EQ(tt.get_precise_node(4).value, 4);
+  EXPECT_EQ(tt.get_precise_node(5).value, 5);
+  EXPECT_EQ(tt.get_precise_node(6).value, 6);
+}
+
+TEST(TockTreeTest, DeleteLeafChildren) {
+  TockTreeTestDeleteLeafChildren<TockTreeImpl::Tree>();
+}
