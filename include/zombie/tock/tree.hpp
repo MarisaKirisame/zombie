@@ -130,6 +130,17 @@ public:
   }
 
 
+  TockTreeData<V>* get_parent(const Tock& t) {
+    auto& node = n.get_node(t);
+    if (! has_precise(t))
+      return &node.data;
+    else if (node.parent)
+      return &node.parent->data;
+    else
+      return nullptr;
+  }
+
+
   void check_invariant() const {
     n.check_invariant();
   }

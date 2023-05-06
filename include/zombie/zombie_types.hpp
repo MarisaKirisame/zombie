@@ -37,14 +37,7 @@ public:
             const Tock& start_time,
             const Tock& end_time,
             const Space& space,
-            const Time& time_taken):
-    f(std::move(f)),
-    inputs(inputs),
-    output(output),
-    start_time(start_time),
-    end_time(end_time),
-    space_taken(space),
-    time_taken(time_taken) { }
+            const Time& time_taken);
 
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
@@ -62,6 +55,7 @@ public:
   Tock created_time;
   ptrdiff_t pool_index = -1;
   mutable Time last_accessed;
+  mutable std::weak_ptr<MicroWave<cfg>> parent_cache;
 
 public:
   EZombieNode(Tock create_time);
@@ -72,6 +66,8 @@ public:
   virtual ~EZombieNode() { }
 
   virtual const void* get_ptr() const = 0;
+
+  std::shared_ptr<MicroWave<cfg>> get_parent() const;
 };
 
 

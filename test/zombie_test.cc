@@ -287,7 +287,7 @@ TEST(ZombieTest, MeasureSpace) {
     auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
     EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
     auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
-    EXPECT_EQ(m.space_taken.count(), Space(sizeof(int)).count());
+    EXPECT_EQ(m->space_taken.count(), Space(sizeof(int)).count());
   }
 
   {
@@ -302,6 +302,6 @@ TEST(ZombieTest, MeasureSpace) {
     auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
     EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
     auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
-    EXPECT_EQ(m.space_taken.count(), Space(2 * sizeof(int)).count());
+    EXPECT_EQ(m->space_taken.count(), Space(2 * sizeof(int)).count());
   }
 }

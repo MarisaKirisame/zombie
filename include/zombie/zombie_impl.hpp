@@ -10,6 +10,25 @@
 namespace ZombieInternal {
 
 template<const ZombieConfig& cfg>
+MicroWave<cfg>::MicroWave(
+  std::function<Tock(const std::vector<const void*>& in)>&& f,
+  const std::vector<Tock>& inputs,
+  const Tock& output,
+  const Tock& start_time,
+  const Tock& end_time,
+  const Space& space,
+  const Time& time_taken
+) : f(std::move(f)),
+  inputs(inputs),
+  output(output),
+  start_time(start_time),
+  end_time(end_time),
+  space_taken(space),
+  time_taken(time_taken) {
+
+}
+
+template<const ZombieConfig& cfg>
 Tock MicroWave<cfg>::play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                      const std::vector<Tock>& inputs) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
@@ -40,6 +59,7 @@ template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
   : created_time(created_time), last_accessed(Trailokya<cfg>::get_trailokya().meter.time()) { }
 
+
 template<const ZombieConfig& cfg>
 void EZombieNode<cfg>::accessed() const {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
@@ -52,6 +72,24 @@ void EZombieNode<cfg>::accessed() const {
   }
 }
 
+
+template<const ZombieConfig& cfg>
+std::shared_ptr<MicroWave<cfg>> EZombieNode<cfg>::get_parent() const {
+  auto ret = parent_cache.lock();
+  if (ret)
+    return ret;
+
+  auto& t = Trailokya<cfg>::get_trailokya();
+  auto parent = t.akasha.get_parent(created_time);
+  if (!parent || parent->value.index() == TockTreeElemKind::Nothing) {
+    parent_cache = nullptr;
+    return nullptr;
+  }
+
+  ret = std::get<TockTreeElemKind::MicroWave>(parent->value);
+  parent_cache = ret;
+  return ret;
+}
 
 
 template<const ZombieConfig& cfg, typename T>
@@ -81,6 +119,7 @@ void RecomputeLater<cfg>::evict() {
 }
 
 
+
 template<const ZombieConfig& cfg>
 void EZombie<cfg>::evict() {
   if (evictable()) {
@@ -102,7 +141,7 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
       std::shared_ptr<EZombieNode<cfg>> strong;
       typename Trailokya<cfg>::Tardis tardis = t.tardis;
       bracket([&]() { t.tardis = typename Trailokya<cfg>::Tardis { this->created_time, &strong }; },
-              [&]() { std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(created_time).value).replay(); },
+              [&]() { std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(created_time).value)->replay(); },
               [&]() { t.tardis = tardis; });
       ret = non_null(strong);
     } else {
@@ -164,14 +203,14 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
     size_t space_taken = std::get<2>(p);
     Tock end_time = t.current_tock;
     ret_type ret(out);
-    t.akasha.put({start_time, end_time}, { MicroWave<cfg>(std::move(func), in, out, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    t.akasha.put({start_time, end_time}, { std::make_shared<MicroWave<cfg>>(std::move(func), in, out, start_time, end_time, Space(space_taken), Time(time_taken)) });
     return ret;
   } else {
     const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
     t.current_tock = n.range.end;
     static_assert(IsZombie<ret_type>::value, "should be zombie");
-    const MicroWave<cfg> &mv = std::get<TockTreeElemKind::MicroWave>(n.value);
-    ret_type ret(mv.output);
+    std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(n.value);
+    ret_type ret(mv->output);
     // we choose call-by-value because
     // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
     // 1: calculating ret will force it's dependency, and call-by-value should provide better locality:
