@@ -144,7 +144,7 @@ struct EZombie {
   }
   bool evictable() const {
     auto ptr = this->ptr().lock();
-    return ptr && ptr->pool_index != -1;
+    return ptr && ptr->get_parent() != nullptr;
   }
   bool unique() const {
     return ptr().use_count() ==  1;

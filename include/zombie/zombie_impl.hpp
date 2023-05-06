@@ -82,7 +82,7 @@ std::shared_ptr<MicroWave<cfg>> EZombieNode<cfg>::get_parent() const {
   auto& t = Trailokya<cfg>::get_trailokya();
   auto parent = t.akasha.get_parent(created_time);
   if (!parent || parent->value.index() == TockTreeElemKind::Nothing) {
-    parent_cache = nullptr;
+    parent_cache = std::weak_ptr<MicroWave<cfg>>();
     return nullptr;
   }
 
@@ -123,8 +123,7 @@ void RecomputeLater<cfg>::evict() {
 template<const ZombieConfig& cfg>
 void EZombie<cfg>::evict() {
   if (evictable()) {
-    auto ptr = non_null(this->ptr().lock());
-    Trailokya<cfg>::get_trailokya().book.remove(ptr->pool_index)->evict();
+    Trailokya<cfg>::get_trailokya().akasha.remove_precise(created_time);
   }
 }
 
