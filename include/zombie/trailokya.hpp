@@ -37,6 +37,7 @@ public:
 
   struct NotifyParentChanged {
     void operator()(const TockTreeData<TockTreeElem>& n, const TockTreeData<TockTreeElem>* parent) {
+      /*
       if (n.value.index() == TockTreeElemKind::ZombieNode) {
         std::shared_ptr<EZombieNode<cfg>> ptr = std::get<TockTreeElemKind::ZombieNode>(n.value);
         if (parent != nullptr && parent->value.index() == TockTreeElemKind::MicroWave) {
@@ -45,6 +46,12 @@ public:
           AffFunction aff = cfg.metric(ptr->last_accessed, pobj->time_taken, ptr->get_size());
           Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
         }
+      }
+      */
+      if (n.value.index() == TockTreeElemKind::MicroWave) {
+        std::shared_ptr<MicroWave<cfg>> ptr = std::get<TockTreeElemKind::MicroWave>(n.value);
+        AffFunction aff = cfg.metric(ptr->last_accessed, ptr->time_taken, ptr->space_taken);
+        Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
       }
     };
   };

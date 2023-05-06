@@ -29,6 +29,9 @@ public:
 
   Time time_taken;
   Space space_taken;
+  mutable Time last_accessed;
+
+  mutable ptrdiff_t pool_index = -1;
 
 public:
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
@@ -42,6 +45,8 @@ public:
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
   void replay();
+
+  void accessed() const;
 };
 
 
@@ -53,8 +58,6 @@ template<const ZombieConfig &cfg>
 struct EZombieNode {
 public:
   Tock created_time;
-  ptrdiff_t pool_index = -1;
-  mutable Time last_accessed;
   mutable std::weak_ptr<MicroWave<cfg>> parent_cache;
 
 public:
@@ -111,9 +114,9 @@ public:
 template<const ZombieConfig& cfg>
 struct RecomputeLater : Phantom {
   Tock created_time;
-  std::weak_ptr<EZombieNode<cfg>> weak_ptr;
+  std::weak_ptr<MicroWave<cfg>> weak_ptr;
 
-  RecomputeLater(const Tock& created_time, const std::shared_ptr<EZombieNode<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
+  RecomputeLater(const Tock& created_time, const std::shared_ptr<MicroWave<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
 
   void evict() override;
   void notify_index_changed(size_t idx) override {

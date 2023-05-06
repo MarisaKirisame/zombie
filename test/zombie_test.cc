@@ -271,6 +271,40 @@ TEST(ZombieTest, Reaper) {
 }
 
 
+
+template<typename T, typename U>
+struct GetSize<std::pair<T, U>> {
+  size_t operator()(const std::pair<T, U>& p) {
+    return GetSize<T>()(p.first) + GetSize<U>()(p.second);
+  };
+};
+
+template<typename T>
+struct GetSize<Zombie<T>> {
+  size_t operator()(const Zombie<T>&) {
+    return sizeof(Zombie<T>);
+  };
+};
+
+TEST(ZombieTest, EvictByMicroWave) {
+  size_t MB_in_bytes = 1 >> 19;
+
+  auto z = bindZombie([&]() {
+    Zombie<Block> a(MB_in_bytes);
+    Zombie<Block> b(MB_in_bytes);
+    return Zombie<std::pair<Zombie<Block>, Zombie<Block>>>{ a, b };
+  });
+  Zombie<Block> a = z.get_value().first;
+  Zombie<Block> b = z.get_value().second;
+
+  Trailokya::get_trailokya().meter.fast_forward(1s);
+  Trailokya::get_trailokya().reaper.murder();
+
+  EXPECT_TRUE(a.evicted());
+  EXPECT_TRUE(b.evicted());
+}
+
+
 TEST(ZombieTest, MeasureSpace) {
   {
     Zombie<int> z = bindZombie([&]() {

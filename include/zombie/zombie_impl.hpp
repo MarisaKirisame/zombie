@@ -24,9 +24,11 @@ MicroWave<cfg>::MicroWave(
   start_time(start_time),
   end_time(end_time),
   space_taken(space),
-  time_taken(time_taken) {
+  time_taken(time_taken),
+  last_accessed(Trailokya<cfg>::get_trailokya().meter.time()) {
 
 }
+
 
 template<const ZombieConfig& cfg>
 Tock MicroWave<cfg>::play(const std::function<Tock(const std::vector<const void*>& in)>& f,
@@ -54,23 +56,30 @@ void MicroWave<cfg>::replay() {
 }
 
 
-
 template<const ZombieConfig& cfg>
-EZombieNode<cfg>::EZombieNode(Tock created_time)
-  : created_time(created_time), last_accessed(Trailokya<cfg>::get_trailokya().meter.time()) { }
-
-
-template<const ZombieConfig& cfg>
-void EZombieNode<cfg>::accessed() const {
+void MicroWave<cfg>::accessed() const {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   last_accessed = Time(t.meter.time());
   if (pool_index != -1) {
     assert(pool_index >= 0);
-    t.book.update_aff(pool_index, [&](const AffFunction& f) {
-      return AffFunction(f.slope, -last_accessed.count());
-    });
+    t.book.set_aff(pool_index, cfg.metric(last_accessed, time_taken, space_taken));
   }
 }
+
+
+
+template<const ZombieConfig& cfg>
+EZombieNode<cfg>::EZombieNode(Tock created_time)
+  : created_time(created_time) { }
+
+
+template<const ZombieConfig& cfg>
+void EZombieNode<cfg>::accessed() const {
+  auto parent = get_parent();
+  if (parent)
+    parent->accessed();
+}
+
 
 
 template<const ZombieConfig& cfg>
@@ -115,7 +124,7 @@ std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
 template<const ZombieConfig& cfg>
 void RecomputeLater<cfg>::evict() {
   auto& t = Trailokya<cfg>::get_trailokya();
-  t.akasha.remove_precise(created_time);
+  t.akasha.remove_leaf_children(created_time);
 }
 
 
