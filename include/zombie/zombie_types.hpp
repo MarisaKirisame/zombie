@@ -22,16 +22,25 @@ struct MicroWave {
 public:
   // we dont really use the Tock return type, but this allow one less boxing.
   std::function<Tock(const std::vector<const void*>& in)> f;
-  std::vector<Tock> inputs;
   Tock output;
   Tock start_time;
   Tock end_time;
+
+  std::vector<Tock> inputs;
+  mutable std::vector<Tock> used_by;
 
   Time time_taken;
   Space space_taken;
   mutable Time last_accessed;
 
+  mutable bool evicted = false;
   mutable ptrdiff_t pool_index = -1;
+
+  // [_set_parent == start_time] when [*this] is a UF root
+  mutable Tock _set_parent;
+  // the total cost of the UF class of [*this].
+  // meaningful only when [*this] is a UF root.
+  mutable Time _set_cost;
 
 public:
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
@@ -47,6 +56,16 @@ public:
   void replay();
 
   void accessed() const;
+
+  void evict();
+
+  Tock root_of_set() const;
+  Time cost_of_set() const;
+
+private:
+  std::pair<Tock, Time> info_of_set() const;
+
+  void merge_with(Tock);
 };
 
 

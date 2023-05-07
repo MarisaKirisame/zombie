@@ -50,7 +50,7 @@ public:
       */
       if (n.value.index() == TockTreeElemKind::MicroWave) {
         std::shared_ptr<MicroWave<cfg>> ptr = std::get<TockTreeElemKind::MicroWave>(n.value);
-        AffFunction aff = cfg.metric(ptr->last_accessed, ptr->time_taken, ptr->space_taken);
+        AffFunction aff = cfg.metric(ptr->last_accessed, ptr->time_taken, ptr->cost_of_set(), ptr->space_taken);
         Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
       }
     };
@@ -82,6 +82,21 @@ public:
   static Trailokya& get_trailokya() {
     static Trailokya t;
     return t;
+  }
+
+
+  // return the closest MicroWave holding [t]
+  std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {
+    TockTreeElem elem = akasha.get_node(t).value;
+    if (elem.index() == TockTreeElemKind::MicroWave)
+      return std::get<TockTreeElemKind::MicroWave>(elem);
+
+    auto parent = akasha.get_parent(t);
+    if (! parent || parent->value.index() == TockTreeElemKind::Nothing)
+      return nullptr;
+
+    assert (parent->value.index() == TockTreeElemKind::MicroWave);
+    return std::get<TockTreeElemKind::MicroWave>(parent->value);
   }
 
 

@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <type_traits>
+#include <set>
 
 #include "zombie/zombie.hpp"
 #include "zombie/common.hpp"
@@ -25,8 +26,17 @@ MicroWave<cfg>::MicroWave(
   end_time(end_time),
   space_taken(space),
   time_taken(time_taken),
-  last_accessed(Trailokya<cfg>::get_trailokya().meter.time()) {
+  last_accessed(Trailokya<cfg>::get_trailokya().meter.time()),
+  _set_parent(start_time),
+  _set_cost(time_taken) {
 
+  auto& t = Trailokya<cfg>::get_trailokya();
+  for (const Tock& in : inputs) {
+    auto input = std::get<TockTreeElemKind::ZombieNode>(t.akasha.get_precise_node(in).value);
+    auto input_m = input->get_parent();
+    if (input_m)
+      input_m->used_by.push_back(start_time);
+  }
 }
 
 
@@ -53,6 +63,16 @@ void MicroWave<cfg>::replay() {
             [&]() { ++t.current_tock; play(f, inputs); },
             [&]() { t.current_tock = tock; });
   });
+
+  evicted = false;
+
+  if (_set_parent != start_time) {
+    Tock root = root_of_set();
+    auto& t = Trailokya<cfg>::get_trailokya();
+    auto root_m = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(root).value);
+    root_m->_set_cost = root_m->_set_cost - time_taken;
+    _set_parent = start_time;
+  }
 }
 
 
@@ -62,9 +82,95 @@ void MicroWave<cfg>::accessed() const {
   last_accessed = Time(t.meter.time());
   if (pool_index != -1) {
     assert(pool_index >= 0);
-    t.book.set_aff(pool_index, cfg.metric(last_accessed, time_taken, space_taken));
+    t.book.set_aff(pool_index, cfg.metric(last_accessed, time_taken, cost_of_set(), space_taken));
   }
 }
+
+
+template<const ZombieConfig& cfg>
+void MicroWave<cfg>::evict() {
+  for (const Tock& t : inputs)
+    merge_with(t);
+
+  for (const Tock& t : used_by)
+    merge_with(t);
+
+  evicted = true;
+}
+
+
+
+template<const ZombieConfig& cfg>
+Tock MicroWave<cfg>::root_of_set() const {
+  return info_of_set().first;
+}
+
+
+template<const ZombieConfig& cfg>
+Time MicroWave<cfg>::cost_of_set() const {
+  // already evicted
+  if (evicted)
+    return info_of_set().second;
+
+  // [*this] is not evicted. calculate the cost of UF class after we evict it
+  auto& t = Trailokya<cfg>::get_trailokya();
+  std::set<Tock> roots;
+  Time cost = time_taken;
+
+  auto add_neighbor = [&](const Tock& tock) {
+    auto m = t.get_microwave(tock);
+    if (m && m->evicted) {
+      auto root = m->info_of_set();
+      if (roots.find(root.first) == roots.end()) {
+        roots.insert(root.first);
+        cost = cost + root.second;
+      }
+    }
+  };
+  for (const Tock& in : inputs)
+    add_neighbor(in);
+  for (const Tock& out : used_by)
+    add_neighbor(out);
+
+  return cost;
+}
+
+
+template<const ZombieConfig& cfg>
+std::pair<Tock, Time> MicroWave<cfg>::info_of_set() const {
+  if (_set_parent == start_time)
+    return { start_time, _set_cost };
+
+  auto& t = Trailokya<cfg>::get_trailokya();
+  auto parent = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(_set_parent).value);
+  auto root_info = parent->info_of_set();
+  _set_parent = root_info.first;
+
+  return root_info;
+}
+
+
+template<const ZombieConfig& cfg>
+void MicroWave<cfg>::merge_with(Tock other_tock) {
+  auto& t = Trailokya<cfg>::get_trailokya();
+
+  auto m = t.get_microwave(other_tock);
+
+  if (! m || ! m->evicted)
+    return;
+
+  auto root_info1 = info_of_set();
+  auto root_info2 = m->info_of_set();
+
+  if (root_info1.first == root_info2.first)
+    return;
+
+  auto root1 = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(root_info1.first).value);
+  auto root2 = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(root_info2.first).value);
+  root1->_set_parent = root_info2.first;
+  root2->_set_cost = root1->_set_cost + root2->_set_cost;
+}
+
 
 
 
@@ -124,6 +230,7 @@ std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
 template<const ZombieConfig& cfg>
 void RecomputeLater<cfg>::evict() {
   auto& t = Trailokya<cfg>::get_trailokya();
+  non_null(weak_ptr.lock())->evict();
   t.akasha.remove_leaf_children(created_time);
 }
 
