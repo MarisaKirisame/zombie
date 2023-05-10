@@ -72,9 +72,9 @@ private:
     }
 
 
-    void delete_leaf_children() {
+    void filter_children(std::function<bool(const TockTreeData<V>)> f) {
       for (auto it = children.begin(); it != children.end();) {
-        if (it->second.children.empty())
+        if (f(it->second.data))
           it = children.erase(it);
         else
           ++it;
@@ -175,9 +175,9 @@ public:
     n.get_node(t).delete_node();
   }
 
-  void remove_leaf_children(const Tock& t) {
+  void filter_children(std::function<bool(const TockTreeData<V>&)> f, const Tock& t) {
     assert(has_precise(t));
-    n.get_node(t).delete_leaf_children();
+    n.get_node(t).filter_children(std::move(f));
   }
 };
 

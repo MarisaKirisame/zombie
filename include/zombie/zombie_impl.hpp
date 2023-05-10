@@ -231,7 +231,9 @@ template<const ZombieConfig& cfg>
 void RecomputeLater<cfg>::evict() {
   auto& t = Trailokya<cfg>::get_trailokya();
   non_null(weak_ptr.lock())->evict();
-  t.akasha.remove_leaf_children(created_time);
+  t.akasha.filter_children([](const auto& d) {
+    return d.value.index() == TockTreeElemKind::ZombieNode;
+  }, created_time);
 }
 
 

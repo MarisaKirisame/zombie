@@ -43,7 +43,7 @@ TEST(TockTreeTest, ReversedOrder) {
 
 
 template<TockTreeImpl impl>
-void TockTreeTestDeleteLeafChildren() {
+void TockTreeTestFilterChildren() {
   TockTree<impl, int, NotifyParentChanged> tt;
   tt.put({1, 10}, 1);
   tt.put({2, 3}, 2);
@@ -62,7 +62,9 @@ void TockTreeTestDeleteLeafChildren() {
   EXPECT_FALSE(tt.has_precise(7));
   EXPECT_EQ(tt.get_node(7).value, 4);
 
-  tt.remove_leaf_children(1);
+  tt.filter_children([](const auto& d) {
+    return d.value == 2 || d.value == 3;
+  }, 1);
 
   EXPECT_FALSE(tt.has_precise(2));
   EXPECT_EQ(tt.get_node(2).value, 1);
@@ -74,6 +76,6 @@ void TockTreeTestDeleteLeafChildren() {
   EXPECT_EQ(tt.get_precise_node(6).value, 6);
 }
 
-TEST(TockTreeTest, DeleteLeafChildren) {
-  TockTreeTestDeleteLeafChildren<TockTreeImpl::Tree>();
+TEST(TockTreeTest, FilterChildren) {
+  TockTreeTestFilterChildren<TockTreeImpl::Tree>();
 }
