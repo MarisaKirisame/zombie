@@ -22,12 +22,25 @@ struct MicroWave {
 public:
   // we dont really use the Tock return type, but this allow one less boxing.
   std::function<Tock(const std::vector<const void*>& in)> f;
-  std::vector<Tock> inputs;
   Tock output;
   Tock start_time;
   Tock end_time;
 
+  std::vector<Tock> inputs;
+  mutable std::vector<Tock> used_by;
+
   Time time_taken;
+  Space space_taken;
+  mutable Time last_accessed;
+
+  mutable bool evicted = false;
+  mutable ptrdiff_t pool_index = -1;
+
+  // [_set_parent == start_time] when [*this] is a UF root
+  mutable Tock _set_parent;
+  // the total cost of the UF class of [*this].
+  // meaningful only when [*this] is a UF root.
+  mutable Time _set_cost;
 
 public:
   MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
@@ -35,17 +48,24 @@ public:
             const Tock& output,
             const Tock& start_time,
             const Tock& end_time,
-            const Time& time_taken):
-    f(std::move(f)),
-    inputs(inputs),
-    output(output),
-    start_time(start_time),
-    end_time(end_time),
-    time_taken(time_taken) { }
+            const Space& space,
+            const Time& time_taken);
 
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
   void replay();
+
+  void accessed() const;
+
+  void evict();
+
+  Tock root_of_set() const;
+  Time cost_of_set() const;
+
+private:
+  std::pair<Tock, Time> info_of_set() const;
+
+  void merge_with(Tock);
 };
 
 
@@ -57,18 +77,19 @@ template<const ZombieConfig &cfg>
 struct EZombieNode {
 public:
   Tock created_time;
-  ptrdiff_t pool_index = -1;
-  mutable Time last_accessed;
+  mutable std::weak_ptr<MicroWave<cfg>> parent_cache;
 
 public:
   EZombieNode(Tock create_time);
   void accessed() const;
 
-  virtual Space get_size() const = 0;
+  virtual size_t get_size() const = 0;
 
   virtual ~EZombieNode() { }
 
   virtual const void* get_ptr() const = 0;
+
+  std::shared_ptr<MicroWave<cfg>> get_parent() const;
 };
 
 
@@ -77,7 +98,7 @@ template<const ZombieConfig &cfg, typename T>
 struct ZombieNode : EZombieNode<cfg> {
   T t;
 
-  Space get_size() const override {
+  size_t get_size() const override {
     return GetSize<T>()(t);
   }
 
@@ -94,7 +115,7 @@ struct ZombieNode : EZombieNode<cfg> {
   ZombieNode(ZombieNode<cfg, T>&& t) = delete;
 
   template<typename... Args>
-  ZombieNode(Tock created_time, Args&&... args) : EZombieNode<cfg>(created_time), t(std::forward<Args>(args)...) { }
+  ZombieNode(Tock created_time, Args&&... args);
 };
 
 
@@ -112,9 +133,9 @@ public:
 template<const ZombieConfig& cfg>
 struct RecomputeLater : Phantom {
   Tock created_time;
-  std::weak_ptr<EZombieNode<cfg>> weak_ptr;
+  std::weak_ptr<MicroWave<cfg>> weak_ptr;
 
-  RecomputeLater(const Tock& created_time, const std::shared_ptr<EZombieNode<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
+  RecomputeLater(const Tock& created_time, const std::shared_ptr<MicroWave<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
 
   void evict() override;
   void notify_index_changed(size_t idx) override {
@@ -145,7 +166,7 @@ struct EZombie {
   }
   bool evictable() const {
     auto ptr = this->ptr().lock();
-    return ptr && ptr->pool_index != -1;
+    return ptr && ptr->get_parent() != nullptr;
   }
   bool unique() const {
     return ptr().use_count() ==  1;

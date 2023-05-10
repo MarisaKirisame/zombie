@@ -55,6 +55,14 @@ struct Time {
     assert(time.count() >= plank_time_in_nanoseconds);
     return time.count() / plank_time_in_nanoseconds;
   }
+
+  Time operator+(const Time& other) const {
+    return Time(time + other.time);
+  }
+
+  Time operator-(const Time& other) const {
+    return Time(time - other.time);
+  }
 };
 
 struct Space {
@@ -74,5 +82,5 @@ struct Space {
 
 template<typename T>
 struct GetSize; // {
-//   Space operator()(const T&);
+//   size_t operator()(const T&);
 // };

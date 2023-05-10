@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "tock/tock.hpp"
-#include "time.hpp"
+#include "meter.hpp"
 #include "config.hpp"
 #include "zombie_types.hpp"
 
@@ -31,20 +31,16 @@ public:
 
   using TockTreeElem = std::variant<
     std::monostate,
-    MicroWave<cfg>,
+    std::shared_ptr<MicroWave<cfg>>,
     std::shared_ptr<EZombieNode<cfg>>
   >;
 
   struct NotifyParentChanged {
     void operator()(const TockTreeData<TockTreeElem>& n, const TockTreeData<TockTreeElem>* parent) {
-      if (n.value.index() == TockTreeElemKind::ZombieNode) {
-        std::shared_ptr<EZombieNode<cfg>> ptr = std::get<TockTreeElemKind::ZombieNode>(n.value);
-        if (parent != nullptr && parent->value.index() == TockTreeElemKind::MicroWave) {
-          const MicroWave<cfg> &pobj = std::get<TockTreeElemKind::MicroWave>(parent->value);
-          assert(n.range.beg + 1 == n.range.end);
-          AffFunction aff = cfg.metric(ptr->last_accessed, pobj.time_taken, ptr->get_size());
-          Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
-        }
+      if (n.value.index() == TockTreeElemKind::MicroWave) {
+        std::shared_ptr<MicroWave<cfg>> ptr = std::get<TockTreeElemKind::MicroWave>(n.value);
+        AffFunction aff = cfg.metric(ptr->last_accessed, ptr->time_taken, ptr->cost_of_set(), ptr->space_taken);
+        Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
       }
     };
   };
@@ -65,7 +61,7 @@ public:
   KineticHeap<cfg.heap, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
   Tardis tardis;
   Tock current_tock = 1;
-  ZombieClock zc;
+  ZombieMeter meter;
   Reaper reaper = Reaper(*this);
 
 public:
@@ -75,6 +71,21 @@ public:
   static Trailokya& get_trailokya() {
     static Trailokya t;
     return t;
+  }
+
+
+  // return the closest MicroWave holding [t]
+  std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {
+    TockTreeElem elem = akasha.get_node(t).value;
+    if (elem.index() == TockTreeElemKind::MicroWave)
+      return std::get<TockTreeElemKind::MicroWave>(elem);
+
+    auto parent = akasha.get_parent(t);
+    if (! parent || parent->value.index() == TockTreeElemKind::Nothing)
+      return nullptr;
+
+    assert (parent->value.index() == TockTreeElemKind::MicroWave);
+    return std::get<TockTreeElemKind::MicroWave>(parent->value);
   }
 
 
@@ -89,7 +100,7 @@ public:
     }
 
     void advance() {
-      t.book.advance_to(Time(t.zc.time()).count());
+      t.book.advance_to(Time(t.meter.time()).count());
     }
 
     void murder() {

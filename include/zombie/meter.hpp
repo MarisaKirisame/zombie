@@ -3,6 +3,7 @@
 #include <chrono>
 #include <utility>
 #include <vector>
+#include <tuple>
 #include <functional>
 #include <iostream>
 #include <cassert>
@@ -14,7 +15,7 @@
 // Useful for testing, and for including additional time uncaptured in bindZombie,
 //   e.g. Zombie's use in gegl.
 // TODO: the right way is to add configurability to Zombie, not via such an adhoc patch.
-struct ZombieRawClock {
+struct ZombieClock {
   using time_t = decltype(std::chrono::steady_clock::now());
 
   time_t begin_time = std::chrono::steady_clock::now();
@@ -30,42 +31,52 @@ struct ZombieRawClock {
     forwarded += n;
   }
 
-  static ZombieRawClock& singleton() {
-    static ZombieRawClock zc;
+  static ZombieClock& singleton() {
+    static ZombieClock zc;
     return zc;
   }
 };
 
+
 // In zombie, we want the time or bindZombie to not include that of recursive remat.
 // This class take care of that.
-struct ZombieClock {
+struct ZombieMeter {
   struct Node {
-    ns constructed_time = ZombieRawClock::singleton().time();
+    ns constructed_time = ZombieClock::singleton().time();
     ns skipping_time = ns(0);
+    size_t space = 0;
+
     ns time() {
-      return ZombieRawClock::singleton().time() - skipping_time;
+      return ZombieClock::singleton().time() - skipping_time;
     }
   };
 
   std::vector<Node> stack { Node() };
 
   ns time() {
-    return ZombieRawClock::singleton().time();
+    return ZombieClock::singleton().time();
   }
 
   void fast_forward(ns n) {
-    ZombieRawClock::singleton().fast_forward(n);
+    ZombieClock::singleton().fast_forward(n);
   }
 
+  void add_space(size_t extra) {
+    stack.back().space += extra;
+  }
+
+
   template<typename F>
-  std::pair<decltype(std::declval<F>()()), ns> timed(const F& f) {
+  std::tuple<decltype(std::declval<F>()()), ns, size_t> measured(const F& f) {
     assert(!stack.empty());
     size_t ss = stack.size();
-    ns before = stack.back().time();
+    ns time_before = stack.back().time();
+    size_t space_before = stack.back().space;
     auto t = f();
     assert(ss == stack.size());
-    ns after = stack.back().time();
-    return {std::move(t), after - before};
+    ns time_after = stack.back().time();
+    size_t space_after = stack.back().space;
+    return {std::move(t), time_after - time_before, space_after - space_before};
   }
 
   template<typename F>

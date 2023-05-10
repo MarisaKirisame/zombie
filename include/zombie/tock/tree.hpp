@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cassert>
+#include <functional>
 
 #include "common.hpp"
 
@@ -70,6 +71,17 @@ private:
       parent->children.erase(data.range.beg);
     }
 
+
+    void filter_children(std::function<bool(const TockTreeData<V>)> f) {
+      for (auto it = children.begin(); it != children.end();) {
+        if (f(it->second.data))
+          it = children.erase(it);
+        else
+          ++it;
+      }
+    }
+
+
     void check_invariant() const {
       std::optional<TockRange> prev_range;
       for (auto p : children) {
@@ -118,6 +130,17 @@ public:
   }
 
 
+  TockTreeData<V>* get_parent(const Tock& t) {
+    auto& node = n.get_node(t);
+    if (! has_precise(t))
+      return &node.data;
+    else if (node.parent)
+      return &node.parent->data;
+    else
+      return nullptr;
+  }
+
+
   void check_invariant() const {
     n.check_invariant();
   }
@@ -150,6 +173,11 @@ public:
   void remove_precise(const Tock& t) {
     assert(has_precise(t));
     n.get_node(t).delete_node();
+  }
+
+  void filter_children(std::function<bool(const TockTreeData<V>&)> f, const Tock& t) {
+    assert(has_precise(t));
+    n.get_node(t).filter_children(std::move(f));
   }
 };
 
