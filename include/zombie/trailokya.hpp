@@ -31,17 +31,12 @@ public:
 
   using TockTreeElem = std::variant<
     std::monostate,
-    std::shared_ptr<MicroWave<cfg>>,
+    MicroWavePtr<cfg>,
     std::shared_ptr<EZombieNode<cfg>>
   >;
 
   struct NotifyParentChanged {
     void operator()(const TockTreeData<TockTreeElem>& n, const TockTreeData<TockTreeElem>* parent) {
-      if (n.value.index() == TockTreeElemKind::MicroWave) {
-        std::shared_ptr<MicroWave<cfg>> ptr = std::get<TockTreeElemKind::MicroWave>(n.value);
-        AffFunction aff = cfg.metric(ptr->last_accessed, ptr->time_taken, ptr->cost_of_set(), ptr->space_taken);
-        Trailokya<cfg>::get_trailokya().book.push(std::make_unique<RecomputeLater<cfg>>(n.range.beg, ptr), std::move(aff));
-      }
     };
   };
 
@@ -105,7 +100,25 @@ public:
 
     void murder() {
       advance();
-      t.book.pop()->evict();
+
+      assert (t.book.size() > 0);
+
+      AffFunction old_aff = t.book.get_aff(t.book.min_idx());
+      auto phantom = t.book.pop();
+      AffFunction new_aff = phantom->get_aff();
+      auto old_val = old_aff(t.book.time());
+      auto new_val = new_aff(t.book.time());
+      if (new_val < 0) {
+        new_val = - new_val;
+        old_val = - old_val;
+      }
+      if (old_val / cfg.approx_factor.first <= new_val / cfg.approx_factor.second
+       && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second)
+        phantom->evict();
+      else {
+        t.book.push(std::move(phantom), new_aff);
+        murder();
+      }
     }
 
     aff_t score() {
