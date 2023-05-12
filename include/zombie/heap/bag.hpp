@@ -51,6 +51,7 @@ public:
       if (min_idx >= vec.size() || vec[i].f(time_) <= vec[min_idx].f(time_))
         min_idx = i;
 
+    assert(min_idx < vec.size());
     return min_idx;
   }
 
@@ -68,6 +69,11 @@ public:
   }
 
   T remove(size_t i) {
+    if (i == 0 && vec.size() == 1) {
+      T t = std::move(vec.back().t);
+      vec.pop_back();
+      return t;
+    }
     std::swap(vec[i], vec.back());
     notify(vec[i], i);
     T t = std::move(vec.back().t);

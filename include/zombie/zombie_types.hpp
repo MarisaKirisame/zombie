@@ -53,6 +53,9 @@ public:
 
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
+
+  AffFunction get_aff() const;
+
   void replay();
 
   void accessed() const;
@@ -66,6 +69,23 @@ private:
   std::pair<Tock, Time> info_of_set() const;
 
   void merge_with(Tock);
+};
+
+
+
+template<const ZombieConfig& cfg>
+struct MicroWavePtr : public std::shared_ptr<MicroWave<cfg>> {
+  MicroWavePtr(
+    std::function<Tock(const std::vector<const void*>& in)>&& f,
+    const std::vector<Tock>& inputs,
+    const Tock& output,
+    const Tock& start_time,
+    const Tock& end_time,
+    const Space& space,
+    const Time& time_taken
+  );
+
+  void replay();
 };
 
 
@@ -124,6 +144,7 @@ struct ZombieNode : EZombieNode<cfg> {
 class Phantom {
 public:
   virtual ~Phantom() {}
+  virtual AffFunction get_aff() const = 0;
   virtual void evict() = 0;
   virtual void notify_index_changed(size_t new_index) = 0;
 };
@@ -137,9 +158,10 @@ struct RecomputeLater : Phantom {
 
   RecomputeLater(const Tock& created_time, const std::shared_ptr<MicroWave<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
 
+  AffFunction get_aff() const override;
   void evict() override;
   void notify_index_changed(size_t idx) override {
-      non_null(weak_ptr.lock())->pool_index = idx;
+    non_null(weak_ptr.lock())->pool_index = idx;
   }
 };
 
