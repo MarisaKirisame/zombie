@@ -1,15 +1,9 @@
 #include "zombie/zombie.hpp"
+#include "common.hpp"
 
 #include <gtest/gtest.h>
 
 IMPORT_ZOMBIE(default_config)
-
-template<>
-struct GetSize<int> {
-  size_t operator()(const int&) {
-    return sizeof(int);
-  }
-};
 
 TEST(ZombieTest, Create) {
   Zombie<int> x(42);
@@ -30,36 +24,26 @@ TEST(ZombieTest, BindUnTyped) {
   EXPECT_EQ(z.get_value(), 42);
 }
 
-static int destructor_count = 0;
-int last_destructor_count = 0;
-struct Resource {
-  Resource() = default;
-  Resource(Resource&& r) = delete;
-  Resource(const Resource& r) = delete;
-  ~Resource() {
-    ++destructor_count;
-  }
-};
-template<>
-struct GetSize<Resource> {
-  size_t operator()(const Resource&) {
-    return 1;
-  }
-};
 
 TEST(ZombieTest, Resource) {
-  Zombie<Resource> x;
-  EXPECT_EQ(destructor_count, 0);
+  struct Test {};
+  using Resource = Resource<Test>;
+
+  EXPECT_EQ(Resource::count, 0);
+  EXPECT_EQ(Resource::destructor_count, 0);
+  unsigned int last_destructor_count;
+
+  Zombie<Resource> x(0);
   {
-    last_destructor_count = destructor_count;
-    Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie<Resource>(); }, x);
-    assert(destructor_count == last_destructor_count);
-    last_destructor_count = destructor_count;
+    last_destructor_count = Resource::destructor_count;
+    Zombie<Resource> y = bindZombie([](const Resource& x) { return Zombie<Resource>(x.value + 1); }, x);
+    assert(Resource::destructor_count == last_destructor_count);
+    last_destructor_count = Resource::destructor_count;
     y.force_unique_evict();
-    EXPECT_EQ(destructor_count, last_destructor_count+1) << "evict does not release resource";
-    last_destructor_count = destructor_count;
+    EXPECT_EQ(Resource::destructor_count, last_destructor_count+1) << "evict does not release resource";
+    last_destructor_count = Resource::destructor_count;
   }
-  EXPECT_EQ(destructor_count, last_destructor_count) << "evicted value does not get destructed again";
+  EXPECT_EQ(Resource::destructor_count, last_destructor_count) << "evicted value does not get destructed again";
 }
 
 // TODO: test for eagereviction
