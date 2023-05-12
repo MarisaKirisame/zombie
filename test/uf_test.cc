@@ -1,4 +1,5 @@
 #include "zombie/zombie.hpp"
+#include "common.hpp"
 
 #include <gtest/gtest.h>
 
@@ -18,12 +19,6 @@ namespace UF {
 }
 
 
-template<>
-struct GetSize<int> {
-  size_t operator()(const int&) {
-    return sizeof(int);
-  }
-};
 
 template<typename T, typename U>
 struct GetSize<std::pair<T, U>> {
@@ -160,25 +155,6 @@ TEST(ZombieUFTest, CompareWithLocal) {
 
 
 
-template<typename test_id>
-struct Resource {
-  static unsigned int count;
-
-  int value;
-  Resource(int value) : value(value) { ++count; }
-  Resource(const Resource&) = delete;
-  ~Resource() { --count; }
-};
-
-template<typename test_id>
-unsigned int Resource<test_id>::count = 0;
-
-template<typename test_id>
-struct GetSize<Resource<test_id>> {
-  size_t operator()(const Resource<test_id>&) {
-    return 1 << 16;
-  };
-};
 
 // access a list of zombies with linear dependency, first from beginning to end,
 // then from end to beginning.
