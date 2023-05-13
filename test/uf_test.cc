@@ -160,9 +160,9 @@ TEST(ZombieUFTest, CompareWithLocal) {
 // then from end to beginning.
 // - total_size: total number of zombies
 // - memory_limit: number of zombies alive
-// - return value: the list of not evicted zombies after the test
+// - return value: the total count of computations, including rematerialization
 template<typename test_id>
-ns LinearDependencyForwardBackwardTest(unsigned int total_size, unsigned int memory_limit) {
+unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsigned int memory_limit) {
   assert(total_size > 1);
   assert(0 < memory_limit && memory_limit <= total_size);
 
@@ -179,10 +179,11 @@ ns LinearDependencyForwardBackwardTest(unsigned int total_size, unsigned int mem
   };
 
 
-  ns t0 = t.meter.time();
+  unsigned int work_done = 0;
   zs.push_back(bindZombie([&]() {
     allocate_memory();
     t.meter.fast_forward(100s);
+    ++work_done;
     return Zombie<Resource>(0);
   }));
 
@@ -191,6 +192,7 @@ ns LinearDependencyForwardBackwardTest(unsigned int total_size, unsigned int mem
     zs.push_back(bindZombie([&](const Resource& x) {
       allocate_memory();
       t.meter.fast_forward(100s);
+      ++work_done;
       return Zombie<Resource>(x.value + 1);
     }, zs[i - 1]));
   }
@@ -203,12 +205,11 @@ ns LinearDependencyForwardBackwardTest(unsigned int total_size, unsigned int mem
     EXPECT_EQ(z.shared_ptr()->get_ref().value, i);
     EXPECT_FALSE(z.evicted());
   }
-  ns t1 = t.meter.time();
 
   while (t.reaper.have_soul())
     t.reaper.murder();
 
-  return t1 - t0;
+  return work_done;
 }
 
 
@@ -241,11 +242,11 @@ double r_square(const std::vector<double>& data, std::function<double(unsigned i
 TEST(ZombieUFTest, SqrtSpaceLinearTime) {
   struct Test {};
 
-  std::vector<double> times;
+  std::vector<double> work;
   for (int i = 8; i < 20; ++i)
-    times.push_back(LinearDependencyForwardBackwardTest<Test>(i * i, 2 * i) / 100s);
+    work.push_back(LinearDependencyForwardBackwardTest<Test>(i * i, 2 * i));
 
-  double r2 = r_square(times, [](unsigned int x) { return x; });
+  double r2 = r_square(work, [](unsigned int x) { return 8 + x; });
   EXPECT_LT(0.9, r2);
   EXPECT_LT(r2, 1.0);
 }
@@ -255,14 +256,13 @@ TEST(ZombieUFTest, SqrtSpaceLinearTime) {
 TEST(ZombieUFTest, LogSpaceNLogNTime) {
   struct Test {};
 
-  std::vector<double> times;
+  std::vector<double> work;
   for (int i = 8; i < 20; ++i)
-    times.push_back(LinearDependencyForwardBackwardTest<Test>(pow(2, 0.5 * i), 2 * i) / 100s);
+    work.push_back(LinearDependencyForwardBackwardTest<Test>(pow(2, 0.5 * i), 2 * i));
 
-  // FIXME: currently the actual outcome is exponetial time
-  double r2 = r_square(times, [](unsigned int x) {
-    double size = 0.5 * (8 + x);
-    return pow(2, size);
+  double r2 = r_square(work, [](unsigned int x) {
+    double size = pow(2, 0.5 * (8 + x));
+    return size * log(size);
   });
   EXPECT_LT(0.9, r2);
   EXPECT_LT(r2, 1.0);
