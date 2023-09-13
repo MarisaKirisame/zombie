@@ -91,7 +91,7 @@ public:
     Reaper(Trailokya& t) : t(t) { }
 
     bool have_soul() {
-      return t.book.empty();
+      return !t.book.empty();
     }
 
     void advance() {
