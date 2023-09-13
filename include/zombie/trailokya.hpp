@@ -113,8 +113,10 @@ public:
         old_val = - old_val;
       }
       if (old_val / cfg.approx_factor.first <= new_val / cfg.approx_factor.second
-       && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second)
+       && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second) {
         phantom->evict();
+        puts("evict!");
+       }
       else {
         t.book.push(std::move(phantom), new_aff);
         murder();
