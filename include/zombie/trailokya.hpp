@@ -127,7 +127,11 @@ public:
     }
 
     void mass_extinction(aff_t threshold) {
+      if (have_soul()) {
+        std::cout << "Score: " << score() << std::endl;
+      }
       while(have_soul() && score() < threshold) {
+        puts("Murder!");
         murder();
       }
     }
