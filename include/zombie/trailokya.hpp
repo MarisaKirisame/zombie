@@ -115,7 +115,7 @@ public:
       if (old_val / cfg.approx_factor.first <= new_val / cfg.approx_factor.second
        && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second) {
         phantom->evict();
-        puts("evict!");
+        // puts("evict!");
        }
       else {
         t.book.push(std::move(phantom), new_aff);
@@ -129,11 +129,11 @@ public:
     }
 
     void mass_extinction(aff_t threshold) {
-      if (have_soul()) {
+      /* if (have_soul()) {
         std::cout << "Score: " << score() << std::endl;
-      }
+      } */
       while(have_soul() && score() < threshold) {
-        puts("Murder!");
+        // puts("Murder!");
         murder();
       }
     }
