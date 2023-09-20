@@ -20,6 +20,8 @@ struct ZombieConfig {
   // we ignore the difference
   // [approx_factor] is stored as a rational number here. it must be greater than 1.
   std::pair<unsigned int, unsigned int> approx_factor;
+
+  bool if_count_eviction;
 };
 
 
@@ -45,4 +47,10 @@ inline AffFunction uf_metric(Time last_accessed, Time cost, Time neighbor_cost, 
   };
 }
 
-constexpr ZombieConfig default_config = ZombieConfig { KineticHeapImpl::Bag, TockTreeImpl::Tree, &local_metric, {1, 1} };
+constexpr ZombieConfig default_config = ZombieConfig { 
+  KineticHeapImpl::Bag, 
+  TockTreeImpl::Tree, 
+  &local_metric, 
+  {1, 1},
+  true,
+ };

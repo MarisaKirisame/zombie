@@ -58,10 +58,15 @@ public:
   Tock current_tock = 1;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
+  int32_t eviction_count = 0;
 
 public:
   Trailokya() : book(0) {}
-  ~Trailokya() {}
+  ~Trailokya() {
+    if constexpr (cfg.if_count_eviction) {
+      printf("evction_count: %d\n", eviction_count);
+    }
+  }
 
   static Trailokya& get_trailokya() {
     static Trailokya t;
@@ -115,7 +120,13 @@ public:
       if (old_val / cfg.approx_factor.first <= new_val / cfg.approx_factor.second
        && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second) {
         phantom->evict();
-        // puts("evict!");
+
+        std::cout << t.book.time() << std::endl; 
+        std::cout << "Old: " << old_aff.slope << "    " << old_aff.x_shift << std::endl;
+        std::cout << "New: " << new_aff.slope << "    " << new_aff.x_shift << std::endl;
+        if constexpr (cfg.if_count_eviction) {
+          Trailokya::get_trailokya().eviction_count++;
+        }
        }
       else {
         t.book.push(std::move(phantom), new_aff);
@@ -129,11 +140,7 @@ public:
     }
 
     void mass_extinction(aff_t threshold) {
-      /* if (have_soul()) {
-        std::cout << "Score: " << score() << std::endl;
-      } */
       while(have_soul() && score() < threshold) {
-        // puts("Murder!");
         murder();
       }
     }
