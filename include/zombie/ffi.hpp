@@ -23,7 +23,7 @@ extern "C"
 
     bool kinetic_hanger_empty(const KineticHanger *hanger);
 
-    void kinetic_hanger_insert(KineticHanger *hanger, const void *t, const AffFunction *aff);
+    void kinetic_hanger_insert(KineticHanger *hanger, void *t, const AffFunction *aff);
 
     void *kinetic_hanger_peek(KineticHanger *hanger);
 

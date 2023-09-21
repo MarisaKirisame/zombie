@@ -58,10 +58,9 @@ bool kinetic_hanger_empty(const KineticHanger *hanger)
     return hanger->empty();
 }
 
-void kinetic_hanger_insert(KineticHanger *hanger, const void *t, const AffFunction *aff)
+void kinetic_hanger_insert(KineticHanger *hanger, void *t, const AffFunction *aff)
 {
-    const void *&tmp = t;
-    hanger->insert(tmp, *aff);
+    hanger->insert(t, *aff);
 }
 
 void *kinetic_hanger_peek(KineticHanger *hanger)
