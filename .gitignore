@@ -37,3 +37,6 @@ compile_commands.json
 
 _build/
 *~
+
+.vscode
+build
