@@ -65,8 +65,8 @@ private:
       for (auto it = children.begin(); it != children.end();) {
         auto nh = children.extract(it++);
         nh.mapped().parent = parent;
-        notify(nh.mapped());
-        insert_to.insert(std::move(nh));
+        auto new_it = insert_to.insert(std::move(nh));
+        notify(new_it.position->second);
       }
       parent->children.erase(data.range.beg);
     }
@@ -163,8 +163,8 @@ public:
     while (it != inserted->end() && range_dominate(r, it->second.data.range)) {
       auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
-      inserted_node.children.insert(std::move(nh));
-      notify(nh.mapped());
+      auto new_it = inserted_node.children.insert(std::move(nh));
+      notify(new_it.position->second);
     }
     return inserted_node.data;
   }
