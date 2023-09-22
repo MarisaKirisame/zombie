@@ -13,6 +13,8 @@ extern "C"
 
     aff_t *aff_function_le_until(const AffFunction *aff_function, const AffFunction *rhs);
 
+    void aff_function_delete(AffFunction *aff_function);
+
     struct EmptyNotifyHeapIndexChanged;
 
     using KineticHanger = HeapImpls::KineticMinHeap<void *, true, EmptyNotifyHeapIndexChanged>;
@@ -23,7 +25,7 @@ extern "C"
 
     bool kinetic_hanger_empty(const KineticHanger *hanger);
 
-    void kinetic_hanger_insert(KineticHanger *hanger, void *t, const AffFunction *aff);
+    void kinetic_hanger_push(KineticHanger *hanger, void *t, const AffFunction *aff);
 
     void *kinetic_hanger_peek(KineticHanger *hanger);
 
@@ -36,4 +38,6 @@ extern "C"
     int64_t kinetic_hanger_time(const KineticHanger *hanger);
 
     void kinetic_hanger_advance_to(KineticHanger *hanger, int64_t new_time);
+
+    void kinetic_hanger_delete(KineticHanger *hanger);
 }
