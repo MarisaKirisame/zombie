@@ -1,41 +1,18 @@
-#include "zombie/zombie.hpp"
+#include "zombie/tock/tock.hpp"
 
-
-IMPORT_ZOMBIE(default_config)
-
-struct Block {
-  size_t size;
-  Block(size_t size) : size(size) { }
-};
-
-template<>
-struct GetSize<Block> {
-  size_t operator()(const Block& b) {
-    return b.size;
+struct NotifyParentChanged
+{
+  void operator()(const TockTreeData<int> &n, const TockTreeData<int> *p)
+  {
   }
 };
 
-int main() {
-  size_t MB_in_bytes = 1 >> 19;
-
-  Zombie<Block> a(MB_in_bytes);
-  Zombie<Block> b = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().meter.fast_forward(1s);
-    return Zombie<Block>(MB_in_bytes);
-  }, a);
-  Zombie<Block> c = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().meter.fast_forward(1s);
-    return Zombie<Block>(MB_in_bytes);
-  }, a);
-  Zombie<Block> d = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().meter.fast_forward(1s);
-    return Zombie<Block>(MB_in_bytes);
-  }, a);
-  Trailokya::get_trailokya().meter.fast_forward(1s);
-  b.get_value();
-  Trailokya::get_trailokya().reaper.murder();
-  assert(!a.evicted());
-  assert(!b.evicted());
-  assert(c.evicted());
-  assert(!d.evicted());
+int main()
+{
+  TockTree<TockTreeImpl::Tree, int, NotifyParentChanged> tt;
+  tt.put({2, 6}, 1);
+  tt.put({1, 10}, 2);
+  tt.check_invariant();
+  tt.get_node(5).value;
+  tt.get_node(6).value;
 }
