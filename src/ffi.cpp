@@ -38,6 +38,11 @@ aff_t *aff_function_le_until(const AffFunction *aff_function, const AffFunction 
     }
 }
 
+void aff_function_delete(AffFunction *aff_function)
+{
+    delete aff_function;
+}
+
 struct EmptyNotifyHeapIndexChanged
 {
     void operator()(void *n, size_t idx) {}
@@ -58,9 +63,9 @@ bool kinetic_hanger_empty(const KineticHanger *hanger)
     return hanger->empty();
 }
 
-void kinetic_hanger_insert(KineticHanger *hanger, void *t, const AffFunction *aff)
+void kinetic_hanger_push(KineticHanger *hanger, void *t, const AffFunction *aff)
 {
-    hanger->insert(t, *aff);
+    hanger->push(t, *aff);
 }
 
 void *kinetic_hanger_peek(KineticHanger *hanger)
@@ -91,4 +96,9 @@ int64_t kinetic_hanger_time(const KineticHanger *hanger)
 void kinetic_hanger_advance_to(KineticHanger *hanger, int64_t new_time)
 {
     return hanger->advance_to(new_time);
+}
+
+void kinetic_hanger_delete(KineticHanger *hanger)
+{
+    delete hanger;
 }
