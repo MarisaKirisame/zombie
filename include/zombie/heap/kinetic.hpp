@@ -257,6 +257,10 @@ private:
         assert(heap.has_value(pidx));
         const Node& p = heap[pidx];
         std::optional<int64_t> break_time = n.f.ge_until(p.f);
+        if (break_time <= time_) {
+          fix(idx);
+          return;
+        }
         if (cert_idx != -1 && break_time) {
           Certificate& cert = cert_queue[cert_idx];
           assert(cert.heap_idx == idx);
@@ -282,11 +286,14 @@ private:
 
   void recert() {
     cert_invariant();
-    for (size_t idx: pending_recert) {
-      recert(idx);
-      cert_invariant();
+    while (!pending_recert.empty()) {
+      auto copy = pending_recert;
+      pending_recert.clear();
+      for (size_t idx: copy) {
+        recert(idx);
+        cert_invariant();
+      }
     }
-    pending_recert.clear();
   }
 
 
