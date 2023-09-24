@@ -257,11 +257,9 @@ private:
         assert(heap.has_value(pidx));
         const Node& p = heap[pidx];
         std::optional<int64_t> break_time = n.f.ge_until(p.f);
-        if (break_time <= time_) {
+        if (break_time && break_time.value() <= time_) {
           fix(idx);
-          return;
-        }
-        if (cert_idx != -1 && break_time) {
+        } else if (cert_idx != -1 && break_time) {
           Certificate& cert = cert_queue[cert_idx];
           assert(cert.heap_idx == idx);
           if (cert.break_time != break_time.value()) {
