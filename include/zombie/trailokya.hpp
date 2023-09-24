@@ -65,6 +65,9 @@ public:
   ~Trailokya() {
     if constexpr (cfg.if_count_eviction) {
       printf("evction_count: %d\n", eviction_count);
+      FILE* f = fopen("evction_count.log", "w");
+      fprintf(f, "%d\n", eviction_count);
+      fclose(f);
     }
   }
 
@@ -121,9 +124,11 @@ public:
        && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second) {
         phantom->evict();
 
+        /*
         std::cout << t.book.time() << std::endl; 
         std::cout << "Old: " << old_aff.slope << "    " << old_aff.x_shift << std::endl;
         std::cout << "New: " << new_aff.slope << "    " << new_aff.x_shift << std::endl;
+        */
         if constexpr (cfg.if_count_eviction) {
           Trailokya::get_trailokya().eviction_count++;
         }
