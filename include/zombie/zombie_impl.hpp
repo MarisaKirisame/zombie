@@ -264,6 +264,11 @@ AffFunction RecomputeLater<cfg>::get_aff() const {
 }
 
 template<const ZombieConfig& cfg>
+Space RecomputeLater<cfg>::get_space() const {
+  return non_null(weak_ptr.lock())->space_taken;
+}
+
+template<const ZombieConfig& cfg>
 void RecomputeLater<cfg>::evict() {
   auto& t = Trailokya<cfg>::get_trailokya();
   non_null(weak_ptr.lock())->evict();
