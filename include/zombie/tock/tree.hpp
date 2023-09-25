@@ -59,14 +59,14 @@ private:
 
     Space get_space() {
       switch (data.value.index()) {
-      case 0:
+      case 0: // Nothing
         return Space(0);
       
-      case 1:
-        return std::get<TockTreeElemKind::MicroWave>(data.value)->space_taken;
+      case 1: // MicroWave
+        return std::get<1>(data.value)->space_taken;
 
-      case 2:
-        return Space(std::get<TockTreeElemKind::ZombieNode>(data.value)->get_size);
+      case 2: // ZombieNode
+        return Space(std::get<2>(data.value)->get_size);
       }
     }
 
