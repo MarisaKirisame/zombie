@@ -170,9 +170,9 @@ public:
     assert(range_dominate(n.data.range, r));
 
     auto* inserted = &n.children;
-    Node cur_node = {r.beg, Node(&n, r, std::move(v))};
-    this->total_space += cur_node.get_space;
-    auto it = inserted->insert(cur_node).first;
+    auto cur_node = Node(&n, r, std::move(v));
+    this->total_space += cur_node.get_space();
+    auto it = inserted->insert({r.beg, std::move(cur_node)}).first;
     Node& inserted_node = it->second;
     notify(inserted_node);
     ++it;
