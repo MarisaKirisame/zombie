@@ -171,7 +171,7 @@ public:
 
     auto* inserted = &n.children;
     auto cur_node = Node(&n, r, std::move(v));
-    this->total_space = this->total_space + cur_node.get_space();
+    total_space = total_space + cur_node.get_space();
     auto it = inserted->insert({r.beg, std::move(cur_node)}).first;
     Node& inserted_node = it->second;
     notify(inserted_node);
@@ -194,7 +194,7 @@ public:
   void remove_precise(const Tock& t) {
     assert(has_precise(t));
     auto& nd = n.get_node(t);
-    this->total_space = this->total_space - nd.get_space();
+    total_space = total_space - nd.get_space();
     nd.delete_node();
   }
 
