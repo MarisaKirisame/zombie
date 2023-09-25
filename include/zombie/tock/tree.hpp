@@ -66,7 +66,7 @@ private:
         return std::get<1>(data.value)->space_taken;
 
       case 2: // ZombieNode
-        return Space(std::get<2>(data.value)->get_size);
+        return Space(std::get<2>(data.value)->get_size());
       }
     }
 
