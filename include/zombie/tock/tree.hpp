@@ -172,7 +172,7 @@ public:
     auto* inserted = &n.children;
     Node cur_node = {r.beg, Node(&n, r, std::move(v))};
     this->total_space += cur_node.get_space;
-    auto it = inserted->insert(std::move(cur_node)).first;
+    auto it = inserted->insert(cur_node).first;
     Node& inserted_node = it->second;
     notify(inserted_node);
     ++it;
