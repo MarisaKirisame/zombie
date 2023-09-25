@@ -119,7 +119,7 @@ private:
 public:
   Node n = Node(nullptr, TockRange{std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()}, V());
 
-  Space total_space = Space(0);
+  ::Space total_space = Space(0);
 
   TockTreeData<V>& get_node(const Tock& t) {
     return n.get_node(t).data;
