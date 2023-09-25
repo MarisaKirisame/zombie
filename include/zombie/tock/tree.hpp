@@ -63,10 +63,10 @@ private:
         return Space(0);
       
       case TockTreeElemKind::MicroWave:
-        return data.value.get<TockTreeElemKind::MicroWave>()->space_taken;
+        return std::get<TockTreeElemKind::MicroWave>(data.value)->space_taken;
 
       case TockTreeElemKind::ZombieNode:
-        return Space(data.value.get<TockTreeElemKind::ZombieNode>()->get_size);
+        return Space(std::get<TockTreeElemKind::ZombieNode>(data.value)->get_size);
       }
     }
 
