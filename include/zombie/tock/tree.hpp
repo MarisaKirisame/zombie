@@ -58,19 +58,6 @@ private:
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
 
-    Space get_space() {
-      switch (data.value.index()) {
-      case 0: // Nothing
-        return Space(0);
-      
-      case 1: // MicroWave
-        return std::get<1>(data.value)->space_taken;
-
-      case 2: // ZombieNode
-        return Space(std::get<2>(data.value)->get_size());
-      }
-    }
-
 
     void delete_node() {
       // the root node is not for deletion.
@@ -119,8 +106,6 @@ private:
 
 public:
   Node n = Node(nullptr, TockRange{std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()}, V());
-
-  Space total_space = Space(0);
 
   TockTreeData<V>& get_node(const Tock& t) {
     return n.get_node(t).data;
@@ -171,9 +156,7 @@ public:
     assert(range_dominate(n.data.range, r));
 
     auto* inserted = &n.children;
-    auto cur_node = Node(&n, r, std::move(v));
-    total_space = total_space + cur_node.get_space();
-    auto it = inserted->insert({r.beg, std::move(cur_node)}).first;
+    auto it = inserted->insert({r.beg, Node(&n, r, std::move(v))}).first;
     Node& inserted_node = it->second;
     notify(inserted_node);
     ++it;
@@ -194,9 +177,7 @@ public:
 
   void remove_precise(const Tock& t) {
     assert(has_precise(t));
-    auto& nd = n.get_node(t);
-    total_space = total_space - nd.get_space();
-    nd.delete_node();
+    n.get_node(t).delete_node();
   }
 
   void filter_children(std::function<bool(const TockTreeData<V>&)> f, const Tock& t) {
