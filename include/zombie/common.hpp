@@ -81,6 +81,10 @@ struct Space {
   Space operator + (const Space s) const {
     return bytes + s.bytes;
   }
+
+  Space operator - (const Space s) const {
+    return bytes - s.bytes;
+  }
 };
 
 

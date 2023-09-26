@@ -59,7 +59,7 @@ public:
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
   int32_t eviction_count = 0;
-  size_t memory_used = 0;
+  Space space_used = Space(0);
 
 public:
   Trailokya() : book(0) {}
