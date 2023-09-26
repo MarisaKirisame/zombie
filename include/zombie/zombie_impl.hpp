@@ -237,29 +237,24 @@ std::shared_ptr<MicroWave<cfg>> EZombieNode<cfg>::get_parent() const {
   parent_cache = ret;
   return ret;
 }
-/*
-template<const ZombieConfig& cfg, typename T>
-template<typename... Args>
-ZombieNode<cfg, T>::ZombieNode(Tock created_time, Args&&... args) : EZombieNode<cfg>(created_time), t(std::forward<Args>(args)...) {
-  Trailokya<cfg>::get_trailokya().meter.add_space(GetSize<T>()(t));
-}
-*/
+
+
 template<const ZombieConfig& cfg, typename T>
 template<typename... Args>
 ZombieNode<cfg, T>::ZombieNode(Tock created_time, Args&&... args) : EZombieNode<cfg>(created_time), t(std::forward<Args>(args)...) {
   auto size = GetSize<T>()(t);
   auto& t = Trailokya<cfg>::get_trailokya();
   t.meter.add_space(size);
-  // t.space_used = t.space_used + Space(size);
+  t.space_used = t.space_used + Space(size);
 }
-/*
+
 template<const ZombieConfig& cfg, typename T>
 ZombieNode<cfg, T>::~ZombieNode() {
   auto space = Space(this->get_size());
-  auto t = Trailokya<cfg>::get_trailokya();
+  auto& t = Trailokya<cfg>::get_trailokya();
   t.space_used = t.space_used - space;
 }
-*/
+
 
 template<const ZombieConfig& cfg>
 std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
