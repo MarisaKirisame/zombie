@@ -137,7 +137,7 @@ struct ZombieNode : EZombieNode<cfg> {
   template<typename... Args>
   ZombieNode(Tock created_time, Args&&... args);
 
-  // ~ZombieNode();
+  ~ZombieNode();
 };
 
 
