@@ -248,7 +248,7 @@ template<const ZombieConfig& cfg, typename T>
 template<typename... Args>
 ZombieNode<cfg, T>::ZombieNode(Tock created_time, Args&&... args) : EZombieNode<cfg>(created_time), t(std::forward<Args>(args)...) {
   auto size = GetSize<T>()(t);
-  auto t = Trailokya<cfg>::get_trailokya();
+  auto& t = Trailokya<cfg>::get_trailokya();
   t.meter.add_space(size);
   // t.space_used = t.space_used + Space(size);
 }
