@@ -1,3 +1,4 @@
+#include "common.hpp"
 #include "zombie/tock/tock.hpp"
 
 #include <gtest/gtest.h>

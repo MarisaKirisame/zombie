@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "zombie/heap/heap.hpp"
 #include "common.hpp"
-
+#include "zombie/heap/heap.hpp"
 
 TEST(AffTest, Kinetic) {
   std::vector<AffFunction> v {{5,5}, {6,6}, {7,6}};

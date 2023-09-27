@@ -1,3 +1,4 @@
+#include "common.hpp"
 #include "zombie/meter.hpp"
 
 #include <gtest/gtest.h>
