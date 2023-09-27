@@ -152,7 +152,7 @@ public:
     }
 
     void mass_extinction_by_memory(size_t size) {
-      while (have_soul() && space_used.bytes > size) {
+      while (have_soul() && t.space_used.bytes > size) {
         murder();
       }
     }
