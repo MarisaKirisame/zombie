@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#define ZOMBIE_KINETIC_VERIFY_INVARIANT
+
 #include "zombie/zombie.hpp"
 #include "zombie/heap/heap.hpp"
 

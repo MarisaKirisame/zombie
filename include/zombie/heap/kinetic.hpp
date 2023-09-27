@@ -233,11 +233,13 @@ private:
 
   // should be maintained even when heap break due to time advancement.
   void cert_invariant() {
+#ifdef ZOMBIE_KINETIC_VERIFY_INVARIANT
     cert_invariant_no_dup();
     cert_invariant_heap_cert_id();
     if (!cert_queue.empty()) {
       assert(cert_queue.peek().break_time > time_);
     }
+#endif
   }
 
   void invariant() {
