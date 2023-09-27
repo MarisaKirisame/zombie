@@ -150,6 +150,12 @@ public:
         murder();
       }
     }
+
+    void mass_extinction_by_memory(size_t size) {
+      while (have_soul() && space_used > Space(size)) {
+        murder();
+      }
+    }
   };
 };
 
