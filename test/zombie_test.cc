@@ -1,5 +1,5 @@
-#include "zombie/zombie.hpp"
 #include "common.hpp"
+#include "zombie/zombie.hpp"
 
 #include <gtest/gtest.h>
 
