@@ -161,7 +161,6 @@ struct RecomputeLater : Phantom {
   RecomputeLater(const Tock& created_time, const std::shared_ptr<MicroWave<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
 
   AffFunction get_aff() const override;
-  Space get_space() const override;
   void evict() override;
   void notify_index_changed(size_t idx) override {
     non_null(weak_ptr.lock())->pool_index = idx;
