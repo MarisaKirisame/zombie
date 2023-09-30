@@ -147,7 +147,6 @@ class Phantom {
 public:
   virtual ~Phantom() {}
   virtual AffFunction get_aff() const = 0;
-  virtual Space get_space() const = 0;
   virtual void evict() = 0;
   virtual void notify_index_changed(size_t new_index) = 0;
 };

@@ -250,7 +250,7 @@ ZombieNode<cfg, T>::ZombieNode(Tock created_time, Args&&... args) : EZombieNode<
 
 template<const ZombieConfig& cfg, typename T>
 ZombieNode<cfg, T>::~ZombieNode() {
-  auto space = Space(this->get_size());
+  auto space = Space(GetSize<T>()(t));
   auto& t = Trailokya<cfg>::get_trailokya();
   t.space_used = t.space_used - space;
 }
@@ -271,11 +271,6 @@ std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
 template<const ZombieConfig& cfg>
 AffFunction RecomputeLater<cfg>::get_aff() const {
   return non_null(weak_ptr.lock())->get_aff();
-}
-
-template<const ZombieConfig& cfg>
-Space RecomputeLater<cfg>::get_space() const {
-  return non_null(weak_ptr.lock())->space_taken;
 }
 
 template<const ZombieConfig& cfg>
