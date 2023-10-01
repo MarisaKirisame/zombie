@@ -527,7 +527,6 @@ private:
 #ifdef ZOMBIE_KINETIC_VERIFY_INVARIANT
     cert_invariant_no_dup();
     cert_invariant_heap_cert_id();
-    return;
     if (!cert_queue.empty()) {
       assert(cert_queue.peek().break_time > time_);
     }
