@@ -163,13 +163,8 @@ public:
     while (it != inserted->end() && range_dominate(r, it->second.data.range)) {
       auto nh = inserted->extract(it++);
       nh.mapped().parent = &inserted_node;
-<<<<<<< HEAD
       auto new_it = inserted_node.children.insert(std::move(nh));
       notify(new_it.position->second);
-=======
-      inserted_node.children.insert(std::move(nh));
-      notify(nh.mapped());
->>>>>>> 8943513 (save)
     }
     return inserted_node.data;
   }
