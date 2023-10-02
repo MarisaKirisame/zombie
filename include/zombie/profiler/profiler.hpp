@@ -53,6 +53,7 @@ struct TimeCounter {
     }
 
     ~TimeCounter() {
+        puts("TIME COUNTER: DELETE!");
         auto t = std::chrono::steady_clock::now();
         auto pf = Profiler::singleton();
 
