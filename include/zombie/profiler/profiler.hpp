@@ -57,7 +57,11 @@ struct TimeCounter {
         auto pf = Profiler::singleton();
 
         if (pf.stack.empty() || pf.stack.top() != this->name) {
-            puts("!!!!!!!!!!!!!");
+            if (pf.stack.empty()) {
+                puts("!!!!!!!");
+            } else {
+                std::cout << pf.stack.top() << " " << this->name << std::endl;
+            }
         }
         // assert(pf.stack.top() == this->name);
 
