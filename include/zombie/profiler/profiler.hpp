@@ -29,7 +29,7 @@ struct Profiler {
     }
 
     static void count(std::string s, ns t) {
-        auto pf = singleton();
+        auto& pf = singleton();
         pf.counts[s] += t;
     }
 };
