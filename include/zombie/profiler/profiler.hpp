@@ -28,7 +28,7 @@ struct Profiler {
 struct TimeCounter {
     using time_t = decltype(std::chrono::steady_clock::now());
 
-    static std::stack<std::string> stack;
+    static std::stack<std::string> stk;
     static time_t last_time;
 
     std::string name;
@@ -36,11 +36,11 @@ struct TimeCounter {
     TimeCounter(std::string name) : name(name) {
         auto t = std::chrono::steady_clock::now();
 
-        if (!stack.empty()) {
-            Profiler::count(stack.top(), ns(t - last_time));
+        if (!stk.empty()) {
+            Profiler::count(stk.top(), ns(t - last_time));
         }
 
-        stack.push(name);
+        stk.push(name);
         last_time = std::chrono::steady_clock::now();
         // get now time again so that we can ignore the cost of Profiler
     }
@@ -48,11 +48,11 @@ struct TimeCounter {
     ~TimeCounter() {
         auto t = std::chrono::steady_clock::now();
 
-        assert(stack.top() == this->name);
+        assert(stk.top() == this->name);
 
-        Profiler::count(stack.top(), ns(t - last_time));
+        Profiler::count(stk.top(), ns(t - last_time));
         
-        stack.pop();
+        stk.pop();
         last_time = std::chrono::steady_clock::now();
     }
 };
