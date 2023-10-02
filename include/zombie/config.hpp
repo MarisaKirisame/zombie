@@ -48,7 +48,7 @@ inline AffFunction uf_metric(Time last_accessed, Time cost, Time neighbor_cost, 
 }
 
 constexpr ZombieConfig default_config = ZombieConfig { 
-  KineticHeapImpl::Heap, 
+  KineticHeapImpl::Bag, 
   TockTreeImpl::Tree, 
   &local_metric, 
   {1, 1},
