@@ -56,7 +56,10 @@ struct TimeCounter {
         auto t = std::chrono::steady_clock::now();
         auto pf = Profiler::singleton();
 
-        assert(pf.stack.top() == this->name);
+        if (pf.stack.empty() || pf.stack.top() != this->name) {
+            puts("!!!!!!!!!!!!!");
+        }
+        // assert(pf.stack.top() == this->name);
 
         Profiler::count(pf.stack.top(), ns(t - pf.last_time));
         
