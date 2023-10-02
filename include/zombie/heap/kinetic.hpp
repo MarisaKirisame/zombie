@@ -3,6 +3,8 @@
 #include "basic.hpp"
 #include "aff_function.hpp"
 
+#include "../profiler/profiler.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <cassert>
@@ -91,6 +93,8 @@ public:
   }
 
   T pop() {
+    TimeCounter("Pop");
+    
     T ret = heap.pop().t;
     recert();
     return ret;

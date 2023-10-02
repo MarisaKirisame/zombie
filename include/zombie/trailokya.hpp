@@ -108,7 +108,7 @@ public:
     }
 
     void murder() {
-      // advance();
+      advance();
 
       assert (t.book.size() > 0);
 
