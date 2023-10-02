@@ -15,7 +15,7 @@ struct Profiler {
     ~Profiler() {
         std::cout << "Profiler Result: " << std::endl;
         for (auto [s, t] : counts) {
-            std::cout << s << ": " << t << std::endl;
+            std::cout << s << ": " << t.count() << std::endl;
         }
     }
 
