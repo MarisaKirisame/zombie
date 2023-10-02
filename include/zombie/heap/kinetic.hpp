@@ -93,6 +93,8 @@ public:
   }
 
   T pop() {
+    TimeCounter("Pop");
+    
     T ret = heap.pop().t;
     recert();
     return ret;
