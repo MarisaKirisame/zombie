@@ -41,7 +41,7 @@ struct TimeCounter {
         puts("TIME COUNTER: CREATE!");
 
         auto t = std::chrono::steady_clock::now();
-        auto pf = Profiler::singleton();
+        auto& pf = Profiler::singleton();
 
         if (!pf.stack.empty()) {
             Profiler::count(pf.stack.top(), ns(t - pf.last_time));
@@ -55,7 +55,7 @@ struct TimeCounter {
     ~TimeCounter() {
         puts("TIME COUNTER: DELETE!");
         auto t = std::chrono::steady_clock::now();
-        auto pf = Profiler::singleton();
+        auto& pf = Profiler::singleton();
 
         if (pf.stack.empty() || pf.stack.top() != this->name) {
             if (pf.stack.empty()) {
