@@ -38,6 +38,8 @@ struct TimeCounter {
     std::string name;
 
     TimeCounter(std::string name) : name(name) {
+        puts("TIME COUNTER: CREATE!");
+
         auto t = std::chrono::steady_clock::now();
         auto pf = Profiler::singleton();
 
