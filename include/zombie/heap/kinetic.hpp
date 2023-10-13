@@ -87,6 +87,10 @@ public:
     return heap[i].t;
   }
 
+  bool has_value(size_t i) const {
+    return heap.has_value(i);
+  }
+
   size_t min_idx() const {
     return 0;
   }
