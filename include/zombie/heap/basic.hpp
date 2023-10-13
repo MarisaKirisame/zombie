@@ -53,6 +53,21 @@ struct MinHeapCRTP {
     return self().remove(0);
   }
 
+  template<typename F>
+  void remap(const F& f) {
+    remap_recurse(f, 0);
+  }
+
+  template<typename F>
+  void remap_recurse(const F& f, size_t idx) {
+    if (self().has_value(idx)) {
+      f(self()[idx]);
+      remap_recurse(f, heap_left_child(idx));
+      remap_recurse(f, heap_right_child(idx));
+      sink(idx, false);
+    }
+  }
+
   void flow(const size_t& idx, bool idx_notified) {
     assert(self().has_value(idx));
     if (!heap_is_root(idx)) {
