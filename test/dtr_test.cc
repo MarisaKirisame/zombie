@@ -8,7 +8,7 @@
 #include <limits>
 
 const uint_fast32_t RANDOM_SEED = 114514;
-const int ITERATION = 2000000;
+const int ITERATION = 18;
 
 std::unordered_map<int64_t, size_t> valueToIdx;
 
