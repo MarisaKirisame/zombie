@@ -202,6 +202,7 @@ private:
 private:
   int64_t time_;
   std::unordered_set<size_t> pending_recert;
+  std::unordered_set<size_t> tmp;
 
   MinHeap<Node, hanger, CompareNode, NodeIndexChanged, NodeElementRemoved> heap;
   // do not use hanger - hanger is only useful in kinetic setting.
@@ -287,9 +288,9 @@ private:
   void recert() {
     cert_invariant();
     while (!pending_recert.empty()) {
-      auto copy = pending_recert;
-      pending_recert.clear();
-      for (size_t idx: copy) {
+        tmp.clear();
+        tmp.swap(pending_recert);
+        for (size_t idx: tmp) {
         recert(idx);
         cert_invariant();
       }
