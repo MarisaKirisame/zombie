@@ -45,8 +45,7 @@ struct NotifyHeapElementRemoved<Element<is_unique>> {
 
 template<bool is_unique>
 struct NotifyIndexChanged {
-  void operator()(const Element<is_unique>&, const size_t&) {
-  }
+  void operator()(const Element<is_unique>&, const size_t&) { }
 };
 
 
