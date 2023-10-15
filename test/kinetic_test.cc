@@ -65,7 +65,16 @@ TEST(KineticHeapTest, UniqueElement) {
   KineticHeapTest<KineticHeapImpl::Hanger, true>(true);
 }
 
+struct NotifyKHInt {
+  void operator()(const int&, const size_t&) { }
+};
 
+TEST(KineticHeapTest, ConstRef) {
+  KineticHeap<KineticHeapImpl::Hanger, int, NotifyKHInt> h(0);
+  int i = 100;
+  h.push(i, AffFunction(0, 0));
+  EXPECT_EQ(h.pop(), i);
+}
 
 
 AffFunction aff_y_shift(slope_t k, shift_t y_shift) {

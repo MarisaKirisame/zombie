@@ -11,8 +11,13 @@
 #include <unordered_set>
 #include <functional>
 
+template<typename T>
+struct NotifyKineticHeapIndexChanged; //{
+//  void operator()(const T&, const size_t&);
+//};
 
 namespace HeapImpls {
+
 // Note: if this become a bottleneck,
 //   read the thesis and <Faster Kinetic Heaps and Their Use in Broadcast Scheduling> more carefully.
 
@@ -28,7 +33,7 @@ namespace HeapImpls {
 //   I am not sure if KineticHeater have this problem or not.
 // TODO: implement kinetic heater
 // TODO: implement kinetic tournament
-template<typename T, bool hanger, typename NotifyIndexChanged>
+template<typename T, bool hanger, typename NotifyIndexChanged=NotifyKineticHeapIndexChanged<T>>
 struct KineticMinHeap {
 public:
   size_t size() const {
@@ -40,7 +45,7 @@ public:
   }
 
   void push(const T& t, const AffFunction& f) {
-    T t_;
+    T t_(t);
     push(std::move(t_), f);
   }
 
@@ -114,17 +119,6 @@ public:
   void advance_to(int64_t new_time) {
     assert(new_time >= time_);
     time_ = new_time;
-    while (!cert_queue.empty()) {
-      break;
-      Certificate c = cert_queue.peek();
-      if (c.break_time <= time_) {
-        fix(c.heap_idx);
-        cert_queue.pop();
-      } else {
-        break;
-      }
-    }
-
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
       Certificate c = cert_queue.pop();
       fix(c.heap_idx);

@@ -32,6 +32,10 @@ install(
 add_executable(debug debug.cpp)
 target_link_libraries(debug zombie_lib)
 
+add_executable(benchmark benchmark.cpp)
+target_include_directories(benchmark PUBLIC ../json/include/)
+target_link_libraries(benchmark zombie_lib)
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
