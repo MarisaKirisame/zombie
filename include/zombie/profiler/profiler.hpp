@@ -38,8 +38,6 @@ struct TimeCounter {
     std::string name;
 
     TimeCounter(std::string name) : name(name) {
-        puts("TIME COUNTER: CREATE!");
-
         auto t = std::chrono::steady_clock::now();
         auto& pf = Profiler::singleton();
 
@@ -53,7 +51,6 @@ struct TimeCounter {
     }
 
     ~TimeCounter() {
-        puts("TIME COUNTER: DELETE!");
         auto t = std::chrono::steady_clock::now();
         auto& pf = Profiler::singleton();
 
