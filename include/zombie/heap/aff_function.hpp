@@ -164,7 +164,7 @@ struct AffFunction {
 
 inline std::ostream &operator<<(std::ostream &out, int128_t val) {
   assert(val <= std::numeric_limits<int64_t>::max());
-  return out << static_cast<uint64_t>(val);
+  return out << static_cast<int64_t>(val);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const AffFunction& f) {
