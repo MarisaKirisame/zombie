@@ -10,6 +10,7 @@
 #include <iostream>
 #include <unordered_set>
 #include <functional>
+#include <list>
 
 template<typename T>
 struct NotifyKineticHeapIndexChanged; //{
@@ -36,12 +37,14 @@ namespace HeapImpls {
 template<typename T, bool hanger, typename NotifyIndexChanged=NotifyKineticHeapIndexChanged<T>>
 struct KineticMinHeap {
 public:
+  size_t total_recert = 0;
+
   size_t size() const {
-    return heap.size() + nursery.size();
+    return heap.size() + train.size();
   }
 
   bool empty() const {
-    return heap.empty() && nursery.empty();
+    return heap.empty() && train.empty();
   }
 
   void push(const T& t, const AffFunction& f) {
@@ -49,11 +52,19 @@ public:
     push(std::move(t_), f);
   }
 
+  bool should_add_to_train(const AffFunction& f) const {
+    return Train::use_train && (!heap.empty()) && f.slope < 0 && f(time()) >= bigger_mag(heap.peek().f(time()), Train::threshold_factor);
+  }
+
+  void push_no_recert(T&& t, const AffFunction& f) {
+    heap.push(Node{std::move(t), f});
+  }
+
   void push(T&& t, const AffFunction& f) {
-    if ((!heap.empty()) && f(time()) >= threshold && f.slope < 0) {
-      nursery.push(Young(std::move(t), f, threshold));
+    if (should_add_to_train(f)) {
+      train.push(time(), std::move(t), f);
     } else {
-      heap.push(Node{std::move(t), f});
+      push_no_recert(std::move(t), f);
       recert();
       invariant();
     }
@@ -122,8 +133,10 @@ public:
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
       Certificate c = cert_queue.pop();
       fix(c.heap_idx);
+      total_recert += 1;
     }
-    promote();
+    // does not need to recert because we are recerting it at the next line.
+    train.time_changed_no_recert(*this);
     recert();
     invariant();
   }
@@ -227,47 +240,197 @@ public:
   // it may be good to have multiple generation.
   // note that we can demote a value from old gen to young gen... super weird.
 
-  struct Young {
-    T t;
-    AffFunction aff;
-    shift_t promote_time;
-    // todo: handle the case where ge_until return None
-    Young(T&& t, const AffFunction& aff, aff_t threshold) : t(std::move(t)), aff(aff), promote_time(aff.ge_until(threshold).value()) { }
-  };
+  // the train algorithm.
+  // we have a list of car, with each one having a promotion threshold threshold_factor x larger then the front one.
+  // each car manage a heap specifying when should each element promote.
+  // when the front car's threshold is smaller then the current min value,
+  // we have to promote all element in the front car to the kinetic heap, and remove it.
+  // when the front car's threshold is much larger then the current min value,
+  // we will insert a smaller car, and readjust value from the old car to track promotion correctly.
+  // when we have too much car, we will remove the last one, promoting all value.
+  // when we dont have enough car and an element is far away from the last car, we will insert another car.
+  struct Car {
+    struct Young {
+      T t;
+      AffFunction aff;
+      shift_t promote_time;
+      // todo: handle the case where ge_until return None
+      Young(T&& t, const AffFunction& aff, aff_t threshold) : t(std::move(t)), aff(aff), promote_time(aff.ge_until(threshold).value()) { }
+    };
 
-  struct CompareYoung {
-    bool operator()(const Young& l, const Young& r) {
-      return l.promote_time < r.promote_time;
+    struct CompareYoung {
+      bool operator()(const Young& l, const Young& r) {
+        return l.promote_time < r.promote_time;
+      }
+    };
+
+    struct YoungIndexChanged {
+      void operator()(const Young& y, const size_t& idx) { }
+    };
+
+    struct YoungElementRemoved {
+      void operator()(const Young& y) { }
+
+    };
+
+    // promote when said value is reached
+    aff_t promotion_threshold;
+
+    MinHeap<Young, false, CompareYoung, YoungIndexChanged, YoungElementRemoved> nursery;
+
+    void invariant(shift_t time) {
+#ifdef ZOMBIE_KINETIC_VERIFY_INVARIANT
+      for (size_t i = 0; i < nursery.size(); ++i) {
+        assert(nursery[i].promote_time > time);
+        assert(nursery[i].aff(time) > promotion_threshold);
+      }
+#endif
+    }
+
+    bool empty() const {
+      return nursery.empty();
+    }
+
+    size_t size() const {
+      return nursery.size();
+    }
+
+    void push(T&& t, const AffFunction& f) {
+      
+    }
+
+    template<typename F>
+    void promote(aff_t time, const F& output_to) {
+      
+    }
+
+    template<typename F>
+    void promote_all(const F& output_to) {
+      /*static void promote(self& kh) {
+        while ((!nursery.empty()) && nursery.peek().promote_time <= time()) {
+        Young yg = nursery.pop();
+        heap.push(Node{std::move(yg.t), yg.aff});
+        recert();
+        }
+        }
+      */
     }
   };
 
-  struct YoungIndexChanged {
-    void operator()(const Young& y, const size_t& idx) { }
-  };
+  struct Train {
+    constexpr static bool use_train = true;
+    constexpr static double threshold_factor = 2;
+    constexpr static size_t enough_car = 3;
+    constexpr static size_t max_car = 10;
 
-  struct YoungElementRemoved {
-    void operator()(const Young& y) { }
+    std::list<Car> cars;
 
-  };
+    static void pop_head_no_recert(self_t& kh) {
+    }
 
-  MinHeap<Young, false, CompareYoung, YoungIndexChanged, YoungElementRemoved> nursery;
+    static void pop_tail_no_recert(self_t& kh) {
+    }
 
-  // when heap is empty threshold is invalid.
-  aff_t threshold;
+    static void push_head_no_recert(self_t& kh) {
+    }
 
-  template<typename I>
-  static I biggerMag(I num, double factor) {
-    return num > 0 ? num * factor : num / factor;
-  }
+    static void push_tail_no_recert(self_t& kh) {
+    }
 
-  template<typename I>
-  static I smallerMag(I num, double factor) {
-    return num > 0 ? num / factor : num * factor;
-  }
+    static void invariant(self_t& kh) {
+#ifdef ZOMBIE_KINETIC_VERIFY_INVARIANT
+      assert(kh.train.cars.size() <= max_car);
+      if (kh.heap.empty()) {
+        assert(kh.train.empty());
+      } else {
+        aff_t no_smaller_then = kh.cur_min_value();
+        for (Car& c : kh.train.cars) {
+          // note: an element in a car might be smaller then an element in a front car.
+          assert(!(c.promotion_threshold < promotion_threshold));
+          no_smaller_then = c.promotion_threshold;
+          c.invariant(kh.time());
+        }
+      }
+#endif
+    }
 
-  constexpr static double threshold_factor = 4;
+    size_t size() const {
+      size_t size = 0;
+      for (const Car& c : cars) {
+        size += c.size();
+      }
+      return size;
+    }
+
+    bool empty() const {
+      for (const Car& c : cars) {
+        if (!c.empty()) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    void debug() const { }
+
+    void push(aff_t time, T&& t, const AffFunction& aff) {
+      /**/
+      if (cars.empty()) {
+        
+      }
+      while (cars.size() < enough_car) {
+        
+      }
+      for (auto it = cars.rbegin(); it != cars.rend(); ++it) {
+        
+      }
+      assert(false); // cannot insert into any car - it should be insert into the main heap.
+    }
+
+    static void time_changed_no_recert(self_t& kh) {
+      // let's remove/add new cars, which might cause batch promotion, before we do individual promotion.
+      min_value_changed_no_recert(kh);
+      // we have to start at the last value, promoting them up, as a value might get promoted multiple time.
+      for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
+        auto front_it = it;
+        ++front_it;
+        if (front_it != kh.train.cars.rend()) {
+          it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+            front_it->push(std::move(t), aff);
+          });
+        } else {
+          it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+            kh.push_no_recert(std::move(t), aff);
+          });
+        }
+      }
+    }
+
+    static void min_value_changed_no_recert(self_t& kh) {
+      if (!kh.train.cars.empty()) {
+        Car& c = kh.train.cars.front();
+        assert(!kh.heap.empty());
+        auto cur_min_value = kh.cur_min_value();
+        if (c.promotion_threshold < cur_min_value) {
+          pop_head_no_recert(kh);
+        } else if (c.promotion_threshold >= bigger_mag(cur_min_value, threshold_factor * threshold_factor)) {
+          push_head_no_recert(kh);
+        }
+      }
+    }
+
+    static void min_value_changed(self_t& kh) {
+      min_value_changed_no_recert(kh);
+      kh.recert();
+    }
+
+  } train;
 
 private:
+  aff_t cur_min_value() {
+    return heap.peek().f(time());
+  }
+
   void will_recert(const size_t& idx) {
     pending_recert.insert(idx);
     pending_recert.insert(heap_left_child(idx));
@@ -304,14 +467,7 @@ private:
   void invariant() {
 #ifdef ZOMBIE_KINETIC_VERIFY_INVARIANT
     cert_invariant();
-    if (!heap.empty()) {
-      aff_t current_value = heap.peek().f(time());
-      assert(current_value < threshold);
-      for (size_t i = 0; i < nursery.size(); ++i) {
-        assert(nursery[i].promote_time > time());
-        assert(nursery[i].aff(time()) > current_value);
-      }
-    }
+    train.invariant(*this);
 #endif
   }
 
@@ -356,52 +512,41 @@ private:
   void clear() {
     heap.clear();
     cert_queue.clear();
-    nursery.clear();
-  }
-
-  void promote() {
-    while ((!nursery.empty()) && nursery.peek().promote_time <= time()) {
-      Young yg = nursery.pop();
-      heap.push(Node{std::move(yg.t), yg.aff});
-      recert();
-    }
-  }
-
-  void reset_threshold(aff_t threshold) {
-    if (this->threshold != threshold) {
-      std::cout << "reset threshold!" << std::endl;
-      this->threshold = threshold;
-      nursery.remap([&](Young& y) { y.promote_time = y.aff.ge_until(threshold).value(); });
-      promote();
-    }
+    train.clear();
   }
 
   void recert() {
     cert_invariant();
+    // why a while here? wont all problem be done with a single fix?
+    // consider a kinetic heap with A < B < C.
+    // suppose we advance time such that A < B break, and we swap A with B.
+    // note that C might be < A!
+    // we do not have transitivity, because even though we have B < C, we no longer have A < B.
+    // this is a problem only because we did batch fix instead of the classical fix-at-a-time solution, as in that world we have A = B < C.
+    // that solution, while skipping this problem, might have multiple cert break at the same precise time-point,
+    // then it degrade to this batch-recert. So we only implemented batch-recert for simplicity and (probably) efficicency.
+    // this is correct because we reconsidered all elements with parent changed, and for those elements without change,
+    // the old certificate still work.
     while (!pending_recert.empty()) {
-        tmp.clear();
-        tmp.swap(pending_recert);
-        for (size_t idx: tmp) {
-          recert(idx);
-          cert_invariant();
+      tmp.clear();
+      tmp.swap(pending_recert);
+      for (size_t idx: tmp) {
+        recert(idx);
+        cert_invariant();
       }
+      tmp.clear();
     }
-    if (heap.empty()) {
-      if (!nursery.empty()) {
-        Young y = nursery.pop();
-        push(std::move(y.t), y.aff);
-      }
+    while (heap.empty() && (!train.empty())) {
+      train.pop_head_no_recert(*this);
     }
-    if (!heap.empty()) {
-      aff_t current_value = heap.peek().f(time());
-      if (heap.size() == 1 || // if it is nearly empty, try to get some value from the nursery
-          threshold < current_value || // the invariant is broken, have to reset it
-          threshold > biggerMag(current_value, threshold_factor * threshold_factor)) { // threshold too far, causing value to promote too early.
-        reset_threshold(biggerMag(current_value, threshold_factor));
-      }
-    }
+    train.min_value_changed(*this);
   }
 
+public:
+  void debug() {
+    std::cout << "heap size: " << heap.size() << " cert size: " << cert_queue.size() << std::endl;
+    train.debug();
+  }
 
   // note: others priority invariant are also broken when we fix(idx).
   //   it is fine, as we will call fix on them individually.

@@ -170,3 +170,13 @@ inline std::ostream &operator<<(std::ostream &out, int128_t val) {
 inline std::ostream& operator<<(std::ostream& os, const AffFunction& f) {
   return os << "(" << f.slope << "(x+" << f.x_shift << "))";
 }
+
+template<typename I>
+static I bigger_mag(I num, double factor) {
+  return num > 0 ? num * factor : num / factor;
+}
+
+template<typename I>
+static I smaller_mag(I num, double factor) {
+  return num > 0 ? num / factor : num * factor;
+}
