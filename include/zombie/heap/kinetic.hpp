@@ -56,7 +56,7 @@ public:
     return Train::use_train && (!heap.empty()) && f.slope < 0 && f(time()) >= bigger_mag(heap.peek().f(time()), Train::threshold_factor);
   }
 
-  void push_no_recert(T&& t, const AffFunction& f) {
+  void push_main_no_recert(T&& t, const AffFunction& f) {
     heap.push(Node{std::move(t), f});
   }
 
@@ -64,7 +64,7 @@ public:
     if (should_add_to_train(f)) {
       train.push(*this, std::move(t), f);
     } else {
-      push_no_recert(std::move(t), f);
+      push_main_no_recert(std::move(t), f);
       recert();
       invariant();
     }
@@ -298,24 +298,23 @@ public:
     }
 
     void push(T&& t, const AffFunction& f) {
-      
+      nursery.push(Young(std::move(t), f, promotion_threshold));
     }
 
     template<typename F>
     void promote(aff_t time, const F& output_to) {
-      
+      while ((!nursery.empty()) && nursery.peek().promote_time <= time) {
+        Young yg = nursery.pop();
+        output_to(std::move(yg.t), yg.aff);
+      }
     }
 
     template<typename F>
     void promote_all(const F& output_to) {
-      /*static void promote(self& kh) {
-        while ((!nursery.empty()) && nursery.peek().promote_time <= time()) {
+      while (!nursery.empty()) {
         Young yg = nursery.pop();
-        heap.push(Node{std::move(yg.t), yg.aff});
-        recert();
-        }
-        }
-      */
+        output_to(std::move(yg.t), yg.aff);
+      }
     }
   };
 
@@ -328,15 +327,31 @@ public:
     std::list<Car> cars;
 
     static void pop_head_no_recert(self_t& kh) {
+      assert(!kh.train.cars.empty());
+      kh.train.cars.front().promote_all([&](T&& t, const AffFunction& aff) { kh.push_main_no_recert(std::move(t), aff); });
+      kh.train.cars.pop_front();
     }
 
     static void pop_tail_no_recert(self_t& kh) {
+      assert(!kh.train.cars.empty());
+      if (kh.train.cars.size() >= 2) {
+        auto it = kh.train.cars.rbegin();
+        assert(it != kh.train.cars.rend());
+        ++it;
+        assert(it != kh.train.cars.rend());
+        kh.train.cars.back().promote_all([&](T&& t, const AffFunction& aff) { it->push(std::move(t), aff); });
+      } else {
+        assert(kh.train.cars.size() == 1);
+        pop_head_no_recert(kh);
+      }
     }
 
     static void push_head_no_recert(self_t& kh) {
-    }
-
-    static void push_tail_no_recert(self_t& kh) {
+      assert(!kh.train.cars.empty());
+      kh.train.cars.push_front(bigger_mag(kh.train.cars.front().promotion_threshold, threshold_factor));
+      while (kh.train.cars.size() > max_car) {
+        pop_tail_no_recert(kh);
+      }
     }
 
     static void invariant(self_t& kh) {
@@ -412,7 +427,7 @@ public:
           });
         } else {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
-            kh.push_no_recert(std::move(t), aff);
+            kh.push_main_no_recert(std::move(t), aff);
           });
         }
       }
