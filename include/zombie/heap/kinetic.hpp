@@ -253,8 +253,8 @@ public:
       T t;
       AffFunction aff;
       shift_t promote_time;
-      // todo: handle the case where ge_until return None
-      Young(T&& t, const AffFunction& aff, aff_t threshold) : t(std::move(t)), aff(aff), promote_time(aff.ge_until(threshold).value()) { }
+      // todo: handle the case where gt_until return None
+      Young(T&& t, const AffFunction& aff, aff_t threshold) : t(std::move(t)), aff(aff), promote_time(aff.gt_until(threshold).value()) { }
     };
 
     struct CompareYoung {
