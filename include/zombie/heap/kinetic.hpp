@@ -62,7 +62,7 @@ public:
 
   void push(T&& t, const AffFunction& f) {
     if (should_add_to_train(f)) {
-      train.push(time(), std::move(t), f);
+      train.push(*this, std::move(t), f);
     } else {
       push_no_recert(std::move(t), f);
       recert();
@@ -276,6 +276,8 @@ public:
     // promote when said value is reached
     aff_t promotion_threshold;
 
+    Car(aff_t promotion_threshold) : promotion_threshold(promotion_threshold) { }
+
     MinHeap<Young, false, CompareYoung, YoungIndexChanged, YoungElementRemoved> nursery;
 
     void invariant(shift_t time) {
@@ -373,18 +375,28 @@ public:
 
     void debug() const { }
 
-    void push(aff_t time, T&& t, const AffFunction& aff) {
-      /**/
-      if (cars.empty()) {
-        
+    static void push(self_t& kh, T&& t, const AffFunction& aff) {
+      auto cur_value = aff(kh.time());
+      if (kh.train.cars.empty()) {
+        assert(!kh.heap.empty());
+        kh.train.cars.push_back(bigger_mag(kh.cur_min_value(), threshold_factor));
       }
-      while (cars.size() < enough_car) {
-        
+      while (kh.train.cars.size() < enough_car) {
+        assert(!kh.train.cars.empty());
+        if (bigger_mag(kh.train.cars.back().promotion_threshold, threshold_factor) >= cur_value) {
+          kh.train.cars.push_back(bigger_mag(kh.train.cars.back().promotion_threshold, threshold_factor));
+        } else {
+          break;
+        }
       }
-      for (auto it = cars.rbegin(); it != cars.rend(); ++it) {
-        
+      for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
+        if (it->promotion_threshold < cur_value) {
+          it->push(std::move(t), aff);
+          return;
+        }
       }
-      assert(false); // cannot insert into any car - it should be insert into the main heap.
+      assert(!kh.train.cars.empty());
+      kh.train.cars.front().push(std::move(t), aff);
     }
 
     static void time_changed_no_recert(self_t& kh) {
