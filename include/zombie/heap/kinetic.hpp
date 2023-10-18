@@ -237,7 +237,6 @@ public:
   // the threshold could be set to e.g. 2x the minimum value (note: value might be negative. in fact for the use case of zombie it is negative.)
   // and when the threshold is smaller then the minimum value we have to reset it.
   // note that this is suprsingly similar with generational garbage collection.
-  // it may be good to have multiple generation.
   // note that we can demote a value from old gen to young gen... super weird.
 
   // the train algorithm.
