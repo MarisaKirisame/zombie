@@ -86,7 +86,7 @@ struct AffFunction {
       return std::optional<shift_t>(val);
     };
     if (slope <= 0) {
-      return std::optional<aff_t>();
+      return std::optional<shift_t>();
     } else {
       assert(slope > 0);
       return postcondition_check(-x_shift + div_ceiling(rhs + 1, slope));
