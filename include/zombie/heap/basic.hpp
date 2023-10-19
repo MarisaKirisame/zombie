@@ -174,17 +174,46 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
     return arr[idx];
   }
 
-  T remove(const size_t& idx) {
+  T remove_no_rebalance(const size_t& idx) {
     assert(has_value(idx));
     T ret = std::move(arr[idx]);
     swap(idx, arr.size() - 1);
     arr.pop_back();
+    this->notify_removed(ret);
+    return ret;
+  }
+
+  T remove(const size_t& idx) {
+    T ret = remove_no_rebalance(idx);
     if (idx < arr.size()) {
       this->rebalance(idx, true);
       this->notify_changed(idx);
     }
-    this->notify_removed(ret);
     return ret;
+  }
+
+  void heapify() {
+    heapify_recurse(0);
+  }
+
+  void heapify_recurse(size_t idx) {
+    if (has_value(idx)) {
+      heapify_recurse(heap_left_child(idx));
+      heapify_recurse(heap_right_child(idx));
+      this->sink(idx, false);
+    }
+  }
+  template<typename F, typename O>
+  void remove_if(const F& f, const O& o) {
+    size_t idx = 0;
+    while (idx < arr.size()) {
+      if (f(arr[idx])) {
+        o(remove_no_rebalance(idx));
+      } else {
+        ++idx;
+      }
+    }
+    heapify();
   }
 
   Compare cmp;
@@ -296,7 +325,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
         if (has_value(child_idx_a) && has_value(child_idx_b)) {
           return cmp(arr[child_idx_a].value(), arr[child_idx_b].value()) ? child_idx_a : child_idx_b;
         } else if (has_value(child_idx_a)) {
-          // !has_value(child_idx_b);
+          // has_value(child_idx_a) && !has_value(child_idx_b);
           return child_idx_a;
         } else {
           // has_value(child_idx_b) && !has_value(child_idx_a);
@@ -317,6 +346,22 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     --size_;
     this->notify_removed(ret);
     return ret;
+  }
+
+  template<typename F, typename O>
+  void remove_if(const F& f, const O& o) {
+    remove_if_recurse(f, o, 0);
+  }
+
+  template<typename F, typename O>
+  void remove_if_recurse(const F& f, const O& o, size_t idx) {
+    if (has_value(idx)) {
+      remove_if_recurse(f, o, heap_left_child(idx));
+      remove_if_recurse(f, o, heap_right_child(idx));
+      if (f(arr[idx].value())) {
+        o(remove(idx));
+      }
+    }
   }
 
   Compare cmp;

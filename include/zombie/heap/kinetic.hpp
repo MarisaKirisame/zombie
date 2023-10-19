@@ -52,30 +52,30 @@ public:
     push(std::move(t_), f);
   }
 
-  bool should_add_to_train(const AffFunction& f) const {
-    return Train::use_train && (!heap.empty()) && f.slope < 0 && f(time()) >= bigger_mag(heap.peek().f(time()), Train::threshold_factor);
+  bool should_add_to_train(const AffFunction& aff) const {
+    return Train::use_train && (!heap.empty()) && aff.slope < 0 && aff(time()) >= bigger_mag(heap.peek().aff(time()), Train::threshold_factor);
   }
 
-  void push_main_no_recert(T&& t, const AffFunction& f) {
-    heap.push(Node{std::move(t), f});
+  void push_main_no_recert(T&& t, const AffFunction& aff) {
+    heap.push(Node{std::move(t), aff});
   }
 
-  void push(T&& t, const AffFunction& f) {
-    if (should_add_to_train(f)) {
-      train.push(*this, std::move(t), f);
+  void push(T&& t, const AffFunction& aff) {
+    if (should_add_to_train(aff)) {
+      train.push(*this, std::move(t), aff);
     } else {
-      push_main_no_recert(std::move(t), f);
+      push_main_no_recert(std::move(t), aff);
       recert();
       invariant();
     }
   }
 
-  void insert(const T& t, const AffFunction &f) {
-    push(t, f);
+  void insert(const T& t, const AffFunction &aff) {
+    push(t, aff);
   }
 
-  void insert(T&& t, const AffFunction &f) {
-    push(std::forward<T>(t), f);
+  void insert(T&& t, const AffFunction &aff) {
+    push(std::forward<T>(t), aff);
   }
 
   T& peek() {
@@ -151,14 +151,14 @@ private:
 
   struct Node {
     T t;
-    AffFunction f;
+    AffFunction aff;
     ptrdiff_t cert_idx = -1;
   };
 
   struct CompareNode {
     self_t& h;
     bool operator()(const Node& l, const Node& r) {
-      return l.f(h.time_) < r.f(h.time_);
+      return l.aff(h.time_) < r.aff(h.time_);
     }
   };
 
@@ -275,7 +275,9 @@ public:
     // promote when said value is reached
     aff_t promotion_threshold;
 
-    Car(aff_t promotion_threshold) : promotion_threshold(promotion_threshold) { }
+    explicit Car(aff_t promotion_threshold) : promotion_threshold(promotion_threshold) {
+      assert(promotion_threshold != 0);
+    }
 
     MinHeap<Young, false, CompareYoung, YoungIndexChanged, YoungElementRemoved> nursery;
 
@@ -319,9 +321,9 @@ public:
 
   struct Train {
     constexpr static bool use_train = true;
-    constexpr static double threshold_factor = 2;
+    constexpr static double threshold_factor = 4;
     constexpr static size_t enough_car = 3;
-    constexpr static size_t max_car = 10;
+    constexpr static size_t max_car = 4;
 
     std::list<Car> cars;
 
@@ -339,6 +341,7 @@ public:
         ++it;
         assert(it != kh.train.cars.rend());
         kh.train.cars.back().promote_all([&](T&& t, const AffFunction& aff) { it->push(std::move(t), aff); });
+        kh.train.cars.pop_back();
       } else {
         assert(kh.train.cars.size() == 1);
         pop_head_no_recert(kh);
@@ -347,7 +350,23 @@ public:
 
     static void push_head_no_recert(self_t& kh) {
       assert(!kh.train.cars.empty());
-      kh.train.cars.push_front(bigger_mag(kh.train.cars.front().promotion_threshold, threshold_factor));
+      aff_t new_promotion_threshold = smaller_mag(kh.train.cars.front().promotion_threshold, threshold_factor);
+      kh.train.cars.push_front(Car(new_promotion_threshold));
+      // unlike classical generational garbage collection where object go from young generation to old generation only,
+      // when we have a new car, we put object from old generation to young generation as old generation maintainence is expensive.
+      size_t total_demote = 0;
+      std::cout << "size before demote: " << kh.heap.size() << std::endl;
+      kh.heap.remove_if(
+        [&](const Node& n) {
+          return n.aff(kh.time()) > new_promotion_threshold;
+        },
+        [&](Node&& n) {
+          ++total_demote;
+          // maybe we should push to the furthest car.
+          kh.train.cars.front().push(std::move(n.t), n.aff);
+        });
+      std::cout << "total_demote: " << total_demote << std::endl;
+      std::cout << "size after demote: " << kh.heap.size() << std::endl;
       while (kh.train.cars.size() > max_car) {
         pop_tail_no_recert(kh);
       }
@@ -362,7 +381,7 @@ public:
         aff_t no_smaller_then = kh.cur_min_value();
         for (Car& c : kh.train.cars) {
           // note: an element in a car might be smaller then an element in a front car.
-          assert(!(c.promotion_threshold < promotion_threshold));
+          assert(!(c.promotion_threshold < c.promotion_threshold));
           no_smaller_then = c.promotion_threshold;
           c.invariant(kh.time());
         }
@@ -387,18 +406,29 @@ public:
       return true;
     }
 
-    void debug() const { }
+    void debug() const {
+      std::cout << "car size: ";
+      for (const Car& c: cars) {
+        std::cout << c.size() << " ";
+      }
+      std::cout << std::endl;
+    }
 
     static void push(self_t& kh, T&& t, const AffFunction& aff) {
       auto cur_value = aff(kh.time());
       if (kh.train.cars.empty()) {
         assert(!kh.heap.empty());
-        kh.train.cars.push_back(bigger_mag(kh.cur_min_value(), threshold_factor));
+        auto threshold = bigger_mag(kh.cur_min_value(), threshold_factor);
+        if (threshold == 0) {
+          kh.train.cars.push_back(Car(-1));
+        } else {
+          kh.train.cars.push_back(Car(threshold));
+        }
       }
       while (kh.train.cars.size() < enough_car) {
         assert(!kh.train.cars.empty());
         if (bigger_mag(kh.train.cars.back().promotion_threshold, threshold_factor) >= cur_value) {
-          kh.train.cars.push_back(bigger_mag(kh.train.cars.back().promotion_threshold, threshold_factor));
+          kh.train.cars.push_back(Car(bigger_mag(kh.train.cars.back().promotion_threshold, threshold_factor)));
         } else {
           break;
         }
@@ -432,29 +462,42 @@ public:
       }
     }
 
-    static void min_value_changed_no_recert(self_t& kh) {
+    // return whether we need recert.
+    // note: this function may call pop/push_head_no_recert, returning true and causing another round of recert which call this function again.
+    // it will not infinite loop, as there is no sequence of infinite pop(we only have finite cars), no sequence of infinite push(the number will decrease).
+    // and no alternate push/pop(promotion_threshold will not overcorrect).
+    static bool min_value_changed_no_recert(self_t& kh) {
       if (!kh.train.cars.empty()) {
         Car& c = kh.train.cars.front();
         assert(!kh.heap.empty());
         auto cur_min_value = kh.cur_min_value();
         if (c.promotion_threshold < cur_min_value) {
           pop_head_no_recert(kh);
+          return true;
         } else if (c.promotion_threshold >= bigger_mag(cur_min_value, threshold_factor * threshold_factor)) {
+          std::cout << "c.promotion_threshold = " << c.promotion_threshold << std::endl;
           push_head_no_recert(kh);
+          return true;
+        } else {
+          return false;
         }
+      } else {
+        return false;
       }
     }
 
     static void min_value_changed(self_t& kh) {
-      min_value_changed_no_recert(kh);
-      kh.recert();
+      bool need_recert = min_value_changed_no_recert(kh);
+      if (need_recert) {
+        kh.recert();
+      }
     }
 
   } train;
 
 private:
   aff_t cur_min_value() {
-    return heap.peek().f(time());
+    return heap.peek().aff(time());
   }
 
   void will_recert(const size_t& idx) {
@@ -509,7 +552,7 @@ private:
         size_t pidx = heap_parent(idx);
         assert(heap.has_value(pidx));
         const Node& p = heap[pidx];
-        std::optional<int64_t> break_time = n.f.ge_until(p.f);
+        std::optional<int64_t> break_time = n.aff.ge_until(p.aff);
         if (break_time && break_time.value() <= time_) {
           fix(idx);
         } else if (cert_idx != -1 && break_time) {
