@@ -144,6 +144,10 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
     return arr.size();
   }
 
+  void clear() {
+    arr.clear();
+  }
+
   void push(const T& t) {
     arr.push_back(t);
     this->flow(arr.size() - 1, true);
@@ -202,7 +206,8 @@ template<typename T,
 	 typename NHIC = NotifyHeapIndexChanged<T>,
 	 typename NHER = NotifyHeapElementRemoved<T>>
 struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
-  std::random_device rd;
+  std::random_device seed;
+  std::mt19937 rd;
 
   bool coin() {
     std::uniform_int_distribution<> distrib(0, 1);
@@ -221,13 +226,17 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     return size_;
   }
 
+  void clear() {
+    arr.clear();
+  }
+
   bool empty() const {
     return size() == 0;
   }
 
   void hang(T&& t, const size_t& idx) {
     if (!(idx < arr.size())) {
-      arr.resize(idx * 2 + 1);
+      arr.resize(std::max(idx * 2 + 1, 2 * arr.size()));
     }
     if (arr[idx].has_value()) {
       // TODO: huh, is 'prioritizing an empty child' a worthwhile optimization?
@@ -316,7 +325,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
 
   MinHanger(const Compare& cmp = Compare(),
             const NHIC& nhic = NHIC(),
-            const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) { }
+            const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher), rd(seed()) { }
 
   std::vector<T> values() {
     std::vector<T> ret;
