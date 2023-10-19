@@ -321,9 +321,9 @@ public:
 
   struct Train {
     constexpr static bool use_train = true;
-    constexpr static double threshold_factor = 4;
-    constexpr static size_t enough_car = 3;
-    constexpr static size_t max_car = 4;
+    constexpr static double threshold_factor = 3;
+    constexpr static size_t enough_car = 2;
+    constexpr static size_t max_car = 3;
 
     std::list<Car> cars;
 
