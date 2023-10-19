@@ -207,7 +207,7 @@ template<typename T,
 	 typename NHER = NotifyHeapElementRemoved<T>>
 struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
   std::random_device seed;
-  std::mt19937 rd;
+  std::minstd_rand rd;
 
   bool coin() {
     std::uniform_int_distribution<> distrib(0, 1);
