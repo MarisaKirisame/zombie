@@ -31,7 +31,7 @@ public:
     };
 
     void push_back(T&& item) {
-        if (segemnts.size() == 0 || segments.back().size() == SegmentSize) {
+        if (segments.size() == 0 || segments.back().size() == SegmentSize) {
             segments.push_back(std::vector());
             segments.back().reserve(SegmentSize);
         }
