@@ -1,5 +1,7 @@
 #pragma once
 
+#include "segmented_array.hpp"
+
 #include <random>
 #include <optional>
 #include <cassert>
@@ -130,7 +132,7 @@ template<typename T,
 	 typename NHER = NotifyHeapElementRemoved<T>>
 struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   // maybe we should use a rootish array?
-  std::vector<T> arr;
+  SegmentedArray<T> arr;
 
   void swap(const size_t& l, const size_t& r) {
     std::swap(arr[l], arr[r]);
@@ -224,7 +226,7 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
                 const NHIC& nhic = NHIC(),
                 const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) { }
 
-  std::vector<T> values() const {
+  SegmentedArray<T> values() const {
     return arr;
   }
 };
@@ -243,7 +245,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     return distrib(rd) == 0;
   }
 
-  std::vector<std::optional<T>> arr;
+  SegmentedArray<std::optional<T>> arr;
 
   void swap(const size_t& l, const size_t& r) {
     std::swap(arr[l], arr[r]);
@@ -372,8 +374,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
             const NHIC& nhic = NHIC(),
             const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher), rd(seed()) { }
 
-  std::vector<T> values() {
-    std::vector<T> ret;
+  SegmentedArray<T> values() {
     for (const std::optional<T>& ot : arr) {
       if (ot) {
         ret.push_back(ot.value());
