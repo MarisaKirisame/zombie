@@ -2,8 +2,6 @@
 
 #include <vector>
 
-namespace SegmentedImpl {
-
 const size_t SegmentSize = 128;
 
 template<typename T>
@@ -72,6 +70,4 @@ public:
             return {segments.size() - 1, segments.back().size()};
         }
     }
-};
-
 };
