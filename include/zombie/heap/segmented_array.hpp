@@ -46,7 +46,7 @@ public:
         return segments[index / 128][index % 128];
     }
 
-    const &T operator[] (size_t index) const {
+    const T& operator[] (size_t index) const {
         return segments[index / 128][index % 128];
     }
 
