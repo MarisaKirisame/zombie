@@ -41,8 +41,8 @@ public:
     }
 
     void push_back(const T& item) {
-        T t_(t);
-        push_back(std::move(t_));
+        T t(item);
+        push_back(std::move(t));
     }
 
     T& operator[] (size_t index) {
