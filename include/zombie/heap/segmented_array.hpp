@@ -11,7 +11,6 @@ private:
 
 public:
     struct iterator {
-        std::vector<std::vector<T>> &sg;
         size_t i, j;
 
         iterator& operator++ () {
@@ -25,7 +24,7 @@ public:
         }
 
         T& operator*() {
-            return sg[i][j];
+            return segments[i][j];
         }
     };
 
@@ -55,7 +54,7 @@ public:
         return segments[index / SegmentSize][index % SegmentSize];
     }
 
-    const T operator[] (size_t index) const {
+    const T& operator[] (size_t index) const {
         return segments[index / SegmentSize][index % SegmentSize];
     }
 
@@ -67,19 +66,19 @@ public:
         }
     }
 
-    bool empty() const {
+    bool empty() {
         return segments.empty();
     }
 
     iterator begin() {
-        return {segments, 0, 0};
+        return {0, 0};
     }
 
     iterator end() {
         if (segments.empty()) {
             return {0, 0};
         } else {
-            return {segments, segments.size() - 1, segments.back().size()};
+            return {segments.size() - 1, segments.back().size()};
         }
     }
 };
