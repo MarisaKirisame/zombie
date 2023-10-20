@@ -375,6 +375,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
             const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher), rd(seed()) { }
 
   SegmentedArray<T> values() {
+    SegmentedArray<T> ret;
     for (const std::optional<T>& ot : arr) {
       if (ot) {
         ret.push_back(ot.value());

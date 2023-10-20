@@ -38,6 +38,13 @@ public:
         segments.back().push_back(item);
     }
 
+    void pop_back() {
+        segments.back().pop_back();
+        if (segments.back().empty()) {
+            segments.pop_back();
+        }
+    }
+
     void push_back(const T& item) {
         T t(item);
         push_back(std::move(t));
