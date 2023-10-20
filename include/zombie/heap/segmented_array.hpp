@@ -66,6 +66,10 @@ public:
         }
     }
 
+    bool empty() {
+        return segments.empty();
+    }
+
     iterator begin() {
         return {0, 0};
     }
