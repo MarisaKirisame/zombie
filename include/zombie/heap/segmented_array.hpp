@@ -28,6 +28,16 @@ public:
         }
     };
 
+    void resize(size_t size) {
+        size_t seg_size = (size + SegmentSize - 1) / SegmentSize;
+
+        while (segments.size() < seg_size) {
+            std::vector<T> _v;
+            segments.push_back(std::move(_v));
+            segments.back().reserve(SegmentSize);
+        }
+    }
+
     void push_back(T&& item) {
         if (segments.size() == 0 || segments.back().size() == SegmentSize) {
             std::vector<T> _v;
