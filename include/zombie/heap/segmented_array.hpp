@@ -31,7 +31,7 @@ public:
     void push_back(T&& item) {
         if (segments.size() == 0 || segments.back().size() == SegmentSize) {
             std::vector<T> _v;
-            segments.push_back(_v);
+            segments.push_back(std::move(_v));
             segments.back().reserve(SegmentSize);
         }
 
