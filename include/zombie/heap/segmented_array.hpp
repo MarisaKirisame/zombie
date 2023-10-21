@@ -6,7 +6,7 @@ const size_t SegmentSize = 128;
 
 template<typename T>
 struct SegmentedArray {
-private:
+public:
     std::vector<std::vector<T>> segments;
 
 public:
