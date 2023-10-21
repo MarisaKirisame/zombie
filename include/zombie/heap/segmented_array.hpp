@@ -11,6 +11,7 @@ private:
 
 public:
     struct iterator {
+        std::vector<std::vector<T>>& segments;
         size_t i, j;
 
         bool operator!=(const iterator &rhs) const {
@@ -85,14 +86,14 @@ public:
     }
 
     iterator begin() const {
-        return {0, 0};
+        return {segemnts, 0, 0};
     }
 
     iterator end() const {
         if (segments.empty()) {
-            return {0, 0};
+            return {segments, 0, 0};
         } else {
-            return {segments.size() - 1, segments.back().size()};
+            return {segments, segments.size() - 1, segments.back().size()};
         }
     }
 };
