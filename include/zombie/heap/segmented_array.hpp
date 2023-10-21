@@ -11,10 +11,10 @@ private:
 
 public:
     struct iterator {
-        std::vector<std::vector<T>>& segments;
+        std::vector<std::vector<T>>* segments;
         size_t i, j;
 
-        iterator(std::vector<std::vector<T>>& seg, size_t i, size_t j) :
+        iterator(std::vector<std::vector<T>>* seg, size_t i, size_t j) :
             segments(seg), i(i), j(j) {}
 
         bool operator!=(const iterator &rhs) const {
@@ -32,7 +32,7 @@ public:
         }
 
         T& operator*() {
-            return segments[i][j];
+            return &segments[i][j];
         }
     };
 
@@ -89,14 +89,14 @@ public:
     }
 
     iterator begin() const {
-        return iterator(segments, 0, 0);
+        return iterator(&segments, 0, 0);
     }
 
     iterator end() const {
         if (segments.empty()) {
-            return iterator(segments, 0, 0);
+            return iterator(&segments, 0, 0);
         } else {
-            return iterator(segments, segments.size() - 1, segments.back().size());
+            return iterator(&segments, segments.size() - 1, segments.back().size());
         }
     }
 };
