@@ -70,11 +70,11 @@ public:
         return segments.empty();
     }
 
-    iterator begin() {
+    iterator begin() const {
         return {0, 0};
     }
 
-    iterator end() {
+    iterator end() const {
         if (segments.empty()) {
             return {0, 0};
         } else {
