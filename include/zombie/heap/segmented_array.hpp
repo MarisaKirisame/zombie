@@ -86,14 +86,14 @@ public:
     }
 
     iterator begin() const {
-        return {segments, 0, 0};
+        return {static_cast<std::vector<std::vector<T>>>(segments), 0, 0};
     }
 
     iterator end() const {
         if (segments.empty()) {
-            return {segments, 0, 0};
+            return {static_cast<std::vector<std::vector<T>>>(segments), 0, 0};
         } else {
-            return {segments, segments.size() - 1, segments.back().size()};
+            return {static_cast<std::vector<std::vector<T>>>(segments), segments.size() - 1, segments.back().size()};
         }
     }
 };
