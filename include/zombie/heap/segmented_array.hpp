@@ -86,7 +86,7 @@ public:
     }
 
     iterator begin() const {
-        return {segemnts, 0, 0};
+        return {segments, 0, 0};
     }
 
     iterator end() const {
