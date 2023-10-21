@@ -21,7 +21,7 @@ public:
             return i != rhs.i || j != rhs.j;
         }
 
-        iterator& operator++ () {
+        iterator& operator++() {
             if (j + 1 == SegmentSize) {
                 i++; j = 0;
             } else {
@@ -32,7 +32,7 @@ public:
         }
 
         T& operator*() {
-            return (&segments)[i][j];
+            return (*segments)[i][j];
         }
     };
 
@@ -42,7 +42,9 @@ public:
         while (segments.size() < seg_size) {
             std::vector<T> _v;
             segments.push_back(std::move(_v));
-            segments.back().reserve(SegmentSize);
+            segments.back().reserve(
+                seg_size == segments.size() ? size % SegmentSize : SegmentSize
+            );
         }
     }
 
