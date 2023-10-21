@@ -6,7 +6,7 @@ const size_t SegmentSize = 128;
 
 template<typename T>
 struct SegmentedArray {
-public:
+private:
     std::vector<std::vector<T>> segments;
 
 public:
@@ -90,11 +90,11 @@ public:
         return segments.empty();
     }
 
-    iterator begin() const {
+    iterator begin() {
         return iterator(&segments, 0, 0);
     }
 
-    iterator end() const {
+    iterator end() {
         if (segments.empty()) {
             return iterator(&segments, 0, 0);
         } else {
