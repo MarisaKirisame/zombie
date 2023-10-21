@@ -13,8 +13,8 @@ public:
     struct iterator {
         size_t i, j;
 
-        bool operator==(const iterator &rhs) const {
-            return i == rhs.i && j == rhs.j;
+        bool operator!=(const iterator &rhs) const {
+            return i != rhs.i || j != rhs.j;
         }
 
         iterator& operator++ () {
