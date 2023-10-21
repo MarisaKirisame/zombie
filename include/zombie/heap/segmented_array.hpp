@@ -32,7 +32,7 @@ public:
         }
 
         T& operator*() {
-            return &segments[i][j];
+            return (&segments)[i][j];
         }
     };
 
@@ -88,11 +88,11 @@ public:
         return segments.empty();
     }
 
-    iterator begin() {
+    iterator begin() const {
         return iterator(&segments, 0, 0);
     }
 
-    iterator end() {
+    iterator end() const {
         if (segments.empty()) {
             return iterator(&segments, 0, 0);
         } else {
