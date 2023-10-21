@@ -88,11 +88,11 @@ public:
         return segments.empty();
     }
 
-    iterator begin() const {
+    iterator begin() {
         return iterator(&segments, 0, 0);
     }
 
-    iterator end() const {
+    iterator end() {
         if (segments.empty()) {
             return iterator(&segments, 0, 0);
         } else {
