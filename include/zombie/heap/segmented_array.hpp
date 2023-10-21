@@ -14,6 +14,9 @@ public:
         std::vector<std::vector<T>>& segments;
         size_t i, j;
 
+        iterator(std::vector<std::vector<T>>& seg, size_t i, size_t j) :
+            segments(seg), i(i), j(j) {}
+
         bool operator!=(const iterator &rhs) const {
             return i != rhs.i || j != rhs.j;
         }
@@ -86,14 +89,14 @@ public:
     }
 
     iterator begin() const {
-        return {static_cast<std::vector<std::vector<T>>>(segments), 0, 0};
+        return iterator(segments, 0, 0);
     }
 
     iterator end() const {
         if (segments.empty()) {
-            return {static_cast<std::vector<std::vector<T>>>(segments), 0, 0};
+            return iterator(segments, 0, 0);
         } else {
-            return {static_cast<std::vector<std::vector<T>>>(segments), segments.size() - 1, segments.back().size()};
+            return iterator(segments, segments.size() - 1, segments.back().size());
         }
     }
 };
