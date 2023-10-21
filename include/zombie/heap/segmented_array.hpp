@@ -35,7 +35,7 @@ public:
             segments.back().reserve(SegmentSize);
         }
 
-        segments.back().push_back(item);
+        segments.back().push_back(std::move(item));
     }
 
     void pop_back() {
