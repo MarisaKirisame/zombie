@@ -44,6 +44,13 @@ struct AffFunction {
   aff_t operator()(shift_t x) const {
     auto ret = slope * (x + x_shift);
     // technically speaking I cant check overflow like this as overflow is UB.
+    if (!((slope == 0) || (ret / slope == (x + x_shift)))) {
+      puts("!!!!!!!!!!!!!!!!!");
+      printf("Zombie max memory: ");
+      puts(getenv("ZOMBIE_MAX_MEMORY"));
+      printf("slope ret: ");
+      std::cout << slope << " " << ret << std::endl;
+    }
     assert((slope == 0) || (ret / slope == (x + x_shift)));
     return ret;
   }
