@@ -117,11 +117,11 @@ public:
   }
 
   AffFunction get_aff(size_t i) const {
-    return heap[i].f;
+    return heap[i].aff;
   }
 
   void set_aff(size_t i, const AffFunction& f) {
-    heap[i].f = f;
+    heap[i].aff = f;
     heap.rebalance(i, false);
   }
 
