@@ -1,5 +1,5 @@
 #define NDEBUG
-
+/*
 #include <iostream>
 #include <fstream>
 #include "zombie/heap/heap.hpp"
@@ -109,3 +109,4 @@ void dtr() {
 int main() {
   dtr();
 }
+*/
