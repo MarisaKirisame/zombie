@@ -105,8 +105,8 @@ void dtr() {
   CALLGRIND_TOGGLE_COLLECT;
   CALLGRIND_STOP_INSTRUMENTATION;
 }
+*/
 
 int main() {
-  dtr();
+  // dtr();
 }
-*/
