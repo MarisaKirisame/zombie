@@ -78,6 +78,10 @@ public:
     push(std::forward<T>(t), aff);
   }
 
+  aff_t cur_min_value() const {
+    return heap.peek().aff(time());
+  }
+
   T& peek() {
     return heap[0].t;
   }
@@ -496,10 +500,6 @@ public:
   } train;
 
 private:
-  aff_t cur_min_value() {
-    return heap.peek().aff(time());
-  }
-
   void will_recert(const size_t& idx) {
     pending_recert.insert(idx);
     pending_recert.insert(heap_left_child(idx));
