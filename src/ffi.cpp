@@ -42,7 +42,7 @@ KineticHanger *kinetic_hanger_new(int64_t time) {
   return new KineticHanger(time);
 }
 
-aff_t kinetic_hanger_cur_min_v(const KineticHanger* hanger) {
+aff_t kinetic_hanger_cur_min_value(const KineticHanger* hanger) {
   return hanger->cur_min_value();
 }
 
