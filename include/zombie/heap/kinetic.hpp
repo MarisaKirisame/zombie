@@ -67,9 +67,9 @@ public:
       train.push(*this, std::move(t), aff);
     } else {
       push_main_no_recert(std::move(t), aff);
-      recert();
-      invariant();
     }
+    recert();
+    invariant();
   }
 
   void insert(const T& t, const AffFunction &aff) {
@@ -290,6 +290,10 @@ public:
     void invariant(shift_t time) {
 #ifdef ZOMBIE_KINETIC_VERIFY_INVARIANT
       for (size_t i = 0; i < nursery.size(); ++i) {
+        if (nursery[i].promote_time <= time) {
+          std::cout << nursery[i].promote_time << " " << time << std::endl;
+          assert(nursery[i].aff(time) > promotion_threshold);
+        }
         assert(nursery[i].promote_time > time);
         assert(nursery[i].aff(time) > promotion_threshold);
       }
@@ -304,7 +308,8 @@ public:
       return nursery.size();
     }
 
-    void push(T&& t, const AffFunction& f) {
+    void push(T&& t, const AffFunction& f, shift_t time) {
+      assert(f(time) > promotion_threshold);
       nursery.push(Young(std::move(t), f, promotion_threshold));
     }
 
@@ -346,7 +351,7 @@ public:
         assert(it != kh.train.cars.rend());
         ++it;
         assert(it != kh.train.cars.rend());
-        kh.train.cars.back().promote_all([&](T&& t, const AffFunction& aff) { it->push(std::move(t), aff); });
+        kh.train.cars.back().promote_all([&](T&& t, const AffFunction& aff) { it->push(std::move(t), aff, kh.time()); });
         kh.train.cars.pop_back();
       } else {
         assert(kh.train.cars.size() == 1);
@@ -369,7 +374,7 @@ public:
         [&](Node&& n) {
           ++total_demote;
           // maybe we should push to the furthest car.
-          kh.train.cars.front().push(std::move(n.t), n.aff);
+          kh.train.cars.front().push(std::move(n.t), n.aff, kh.time());
         });
       std::cout << "total_demote: " << total_demote << std::endl;
       std::cout << "size after demote: " << kh.heap.size() << std::endl;
@@ -387,7 +392,7 @@ public:
         aff_t no_smaller_then = kh.cur_min_value();
         for (Car& c : kh.train.cars) {
           // note: an element in a car might be smaller then an element in a front car.
-          assert(!(c.promotion_threshold < c.promotion_threshold));
+          assert(!(c.promotion_threshold < no_smaller_then));
           no_smaller_then = c.promotion_threshold;
           c.invariant(kh.time());
         }
@@ -439,14 +444,17 @@ public:
           break;
         }
       }
+      assert(!kh.train.cars.empty());
+      while (!(kh.train.cars.front().promotion_threshold < cur_value)) {
+        push_head_no_recert(kh);
+      }
       for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
         if (it->promotion_threshold < cur_value) {
-          it->push(std::move(t), aff);
+          it->push(std::move(t), aff, kh.time());
           return;
         }
       }
-      assert(!kh.train.cars.empty());
-      kh.train.cars.front().push(std::move(t), aff);
+      assert(false);
     }
 
     static void time_changed_no_recert(self_t& kh) {
@@ -458,7 +466,7 @@ public:
         ++front_it;
         if (front_it != kh.train.cars.rend()) {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
-            front_it->push(std::move(t), aff);
+            front_it->push(std::move(t), aff, kh.time());
           });
         } else {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
