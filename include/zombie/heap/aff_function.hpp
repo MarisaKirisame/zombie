@@ -48,8 +48,6 @@ struct AffFunction {
       puts("!!!!!!!!!!!!!!!!!");
       printf("Zombie max memory: ");
       puts(getenv("ZOMBIE_MAX_MEMORY"));
-      printf("slope ret: ");
-      std::cout << slope << " " << ret << std::endl;
     }
     assert((slope == 0) || (ret / slope == (x + x_shift)));
     return ret;
