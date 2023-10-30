@@ -43,7 +43,8 @@ public:
         while (segments.size() < seg_size) {
             std::vector<T> _v;
             segments.push_back(std::move(_v));
-            segments.back().reserve(
+            segments.back().reserve(SegmentSize)
+            segments.back().resize(
                 seg_size == segments.size() ? size % SegmentSize : SegmentSize
             );
         }
