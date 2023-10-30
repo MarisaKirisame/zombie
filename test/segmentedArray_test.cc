@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-TEST(Segemnted, Basic) {
+TEST(SegmentedTest, Basic) {
     SegmentedArray<int> sa;
 
     EXPECT_EQ(sa.empty(), true);
