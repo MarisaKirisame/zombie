@@ -132,7 +132,7 @@ template<typename T,
 	 typename NHER = NotifyHeapElementRemoved<T>>
 struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   // maybe we should use a rootish array?
-  SegmentArray<T> arr;
+  SegmentedArray<T> arr;
 
   void swap(const size_t& l, const size_t& r) {
     std::swap(arr[l], arr[r]);
@@ -226,7 +226,7 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
                 const NHIC& nhic = NHIC(),
                 const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher) { }
 
-  SegmentArray<T> values() const {
+  SegmentedArray<T> values() const {
     return arr;
   }
 };
@@ -245,7 +245,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     return distrib(rd) == 0;
   }
 
-  SegmentArray<std::optional<T>> arr;
+  SegmentedArray<std::optional<T>> arr;
 
   void swap(const size_t& l, const size_t& r) {
     std::swap(arr[l], arr[r]);
@@ -374,8 +374,8 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
             const NHIC& nhic = NHIC(),
             const NHER& nher = NHER()) : cmp(cmp), nhic(nhic), nher(nher), rd(seed()) { }
 
-  SegmentArray<T> values() {
-    SegmentArray<T> ret;
+  SegmentedArray<T> values() {
+    SegmentedArray<T> ret;
     for (const std::optional<T>& ot : arr) {
       if (ot) {
         ret.push_back(ot.value());
