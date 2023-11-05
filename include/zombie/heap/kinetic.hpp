@@ -471,11 +471,15 @@ public:
         ++front_it;
         if (front_it != kh.train.cars.rend()) {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+            std::cout << "calling train.push..." << std::endl;
             front_it->push(std::move(t), aff, kh.time());
+            std::cout << "train.push ok!" << std::endl;
           });
         } else {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+            std::cout << "calling kh.push..." << std::endl;
             kh.push_main_no_recert(std::move(t), aff);
+            std::cout << "kh.push ok!" << std::endl;
           });
         }
       }
