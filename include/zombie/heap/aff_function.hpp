@@ -130,9 +130,7 @@ struct AffFunction {
   // note that I havent give much thought & test to the rounding mode,
   // therefore it is highly likely wrong.
   std::optional<shift_t> gt_until(const aff_t& rhs) const {
-    std::cout << "calling gt_until: slope = " << slope << ", x_shift = " << x_shift << ", rhs = " << rhs << std::endl;
     auto postcondition_check = [&](shift_t val) {
-      std::cout << "gt_until return: " << val << std::endl;
       assert((*this)(val - 1) > rhs);
       assert(!((*this)(val) > rhs));
       return std::optional<shift_t>(val);
