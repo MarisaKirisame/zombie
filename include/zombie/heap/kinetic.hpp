@@ -141,7 +141,9 @@ public:
       total_recert += 1;
     }
     // does not need to recert because we are recerting it at the next line.
+    std::cout << "calling time_changed_no_recert... " << this << std::endl;
     train.time_changed_no_recert(*this);
+    std::cout << "time_changed_no_recert ok! " << this << std::endl;
     recert();
     invariant();
     std::cout << "advance_to ok! " << this << std::endl;
