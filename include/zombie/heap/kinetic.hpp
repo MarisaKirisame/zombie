@@ -132,7 +132,6 @@ public:
   }
 
   void advance_to(int64_t new_time) {
-    std::cout << "calling advance_to... " << this << std::endl;
     assert(new_time >= time_);
     time_ = new_time;
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
@@ -144,7 +143,6 @@ public:
     train.time_changed_no_recert(*this);
     recert();
     invariant();
-    std::cout << "advance_to ok! " << this << std::endl;
   }
 
   KineticMinHeap(int64_t time) :
@@ -366,18 +364,15 @@ public:
       // unlike classical generational garbage collection where object go from young generation to old generation only,
       // when we have a new car, we put object from old generation to young generation as old generation maintainence is expensive.
       size_t total_demote = 0;
-      std::cout << "size before demote: " << kh.heap.size() << std::endl;
       kh.heap.remove_if(
         [&](const Node& n) {
-          return n.aff(kh.time()) > new_promotion_threshold;
+          return n.slope < 0 && n.aff(kh.time()) > new_promotion_threshold;
         },
         [&](Node&& n) {
           ++total_demote;
           // maybe we should push to the furthest car.
           kh.train.cars.front().push(std::move(n.t), n.aff, kh.time());
         });
-      std::cout << "total_demote: " << total_demote << std::endl;
-      std::cout << "size after demote: " << kh.heap.size() << std::endl;
       while (kh.train.cars.size() > max_car) {
         pop_tail_no_recert(kh);
       }
