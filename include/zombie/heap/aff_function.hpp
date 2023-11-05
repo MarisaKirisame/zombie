@@ -19,6 +19,10 @@ T div_ceiling(T x, T y) {
   }
 }
 
+inline std::ostream &operator<<(std::ostream &out, int128_t val) {
+  assert(val <= std::numeric_limits<int64_t>::max());
+  return out << static_cast<int64_t>(val);
+}
 
 static_assert(sizeof(__int128) == 16);
 using int128_t = __int128;
@@ -163,11 +167,6 @@ struct AffFunction {
     return rhs.le_until(*this);
   }
 };
-
-inline std::ostream &operator<<(std::ostream &out, int128_t val) {
-  assert(val <= std::numeric_limits<int64_t>::max());
-  return out << static_cast<int64_t>(val);
-}
 
 inline std::ostream& operator<<(std::ostream& os, const AffFunction& f) {
   return os << "(" << f.slope << "(x+" << f.x_shift << "))";
