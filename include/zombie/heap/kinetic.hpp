@@ -318,7 +318,9 @@ public:
       std::cout << "calling promote... " << this << std::endl;
       while ((!nursery.empty()) && nursery.peek().promote_time <= time) {
         Young yg = nursery.pop();
+        std::cout << "calling output..." << this << std::endl;
         output_to(std::move(yg.t), yg.aff);
+        std::cout << "output ok! " << this << std::endl;
       }
       std::cout << "promote ok! " << this << std::endl;
     }
