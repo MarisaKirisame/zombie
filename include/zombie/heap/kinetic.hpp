@@ -132,7 +132,6 @@ public:
   }
 
   void advance_to(int64_t new_time) {
-    std::cout << "calling advance_to... " << this << std::endl;
     assert(new_time >= time_);
     time_ = new_time;
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
@@ -141,12 +140,9 @@ public:
       total_recert += 1;
     }
     // does not need to recert because we are recerting it at the next line.
-    std::cout << "calling time_changed_no_recert... " << this << std::endl;
     train.time_changed_no_recert(*this);
-    std::cout << "calling recert... " << this << std::endl;
     recert();
     invariant();
-    std::cout << "advance_to ok! " << this << std::endl;
   }
 
   KineticMinHeap(int64_t time) :
@@ -460,10 +456,12 @@ public:
     }
 
     static void time_changed_no_recert(self_t& kh) {
+      std::cout << "min_value_changed_no_recert... " << &kh << std::endl;
       // let's remove/add new cars, which might cause batch promotion, before we do individual promotion.
       min_value_changed_no_recert(kh);
       // we have to start at the last value, promoting them up, as a value might get promoted multiple time.
       for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
+        std::cout << "looping... " << &kh << std::endl;
         auto front_it = it;
         ++front_it;
         if (front_it != kh.train.cars.rend()) {
@@ -476,6 +474,7 @@ public:
           });
         }
       }
+      std::cout << "time_changed_no_recert ok! " << &kh << std::endl;
     }
 
     // return whether we need recert.
