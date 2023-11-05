@@ -19,13 +19,13 @@ T div_ceiling(T x, T y) {
   }
 }
 
+static_assert(sizeof(__int128) == 16);
+using int128_t = __int128;
+
 inline std::ostream &operator<<(std::ostream &out, int128_t val) {
   assert(val <= std::numeric_limits<int64_t>::max());
   return out << static_cast<int64_t>(val);
 }
-
-static_assert(sizeof(__int128) == 16);
-using int128_t = __int128;
 
 using slope_t = int128_t;
 using shift_t = int64_t;
