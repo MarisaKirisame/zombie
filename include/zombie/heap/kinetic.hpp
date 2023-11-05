@@ -224,8 +224,6 @@ private:
     }
   };
 
-
-
 private:
   int64_t time_;
   std::unordered_set<size_t> pending_recert;
@@ -317,10 +315,12 @@ public:
 
     template<typename F>
     void promote(aff_t time, const F& output_to) {
+      std::cout << "calling promote... " << this << std::endl;
       while ((!nursery.empty()) && nursery.peek().promote_time <= time) {
         Young yg = nursery.pop();
         output_to(std::move(yg.t), yg.aff);
       }
+      std::cout << "promote ok! " << this << std::endl;
     }
 
     template<typename F>
@@ -462,6 +462,7 @@ public:
       // let's remove/add new cars, which might cause batch promotion, before we do individual promotion.
       std::cout << "calling min_value_changed_no_recert... " << &kh << std::endl;
       min_value_changed_no_recert(kh);
+      std::cout << "min_value_changed_no_recert ok! " << &kh << std::endl;
       // we have to start at the last value, promoting them up, as a value might get promoted multiple time.
       for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
         auto front_it = it;
@@ -476,7 +477,6 @@ public:
           });
         }
       }
-      std::cout << "min_value_changed_no_recert ok! " << &kh << std::endl;
     }
 
     // return whether we need recert.
