@@ -366,7 +366,7 @@ public:
       size_t total_demote = 0;
       kh.heap.remove_if(
         [&](const Node& n) {
-          return n.slope < 0 && n.aff(kh.time()) > new_promotion_threshold;
+          return n.aff.slope < 0 && n.aff(kh.time()) > new_promotion_threshold;
         },
         [&](Node&& n) {
           ++total_demote;
