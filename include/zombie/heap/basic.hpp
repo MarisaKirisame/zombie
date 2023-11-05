@@ -365,8 +365,11 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     if (has_value(idx)) {
       remove_if_recurse(f, o, heap_left_child(idx));
       remove_if_recurse(f, o, heap_right_child(idx));
+      assert(has_value(idx));
       if (f(arr[idx].value())) {
+        std::cout << "calling remove... " << idx << std::endl;
         o(remove(idx));
+        std::cout << "remove ok! " << idx << std::endl;
       }
     }
     std::cout << "remove_if_recurse ok! " << idx << std::endl;
