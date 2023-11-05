@@ -506,10 +506,12 @@ public:
     }
 
     static void min_value_changed(self_t& kh) {
+      std::cout << "calling min_value_changed... " << &kh << std::endl;
       bool need_recert = min_value_changed_no_recert(kh);
       if (need_recert) {
         kh.recert();
       }
+      std::cout << "min_value_changed ok! " << &kh << std::endl;
     }
 
   } train;
