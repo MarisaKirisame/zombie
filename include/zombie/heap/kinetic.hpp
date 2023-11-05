@@ -341,11 +341,9 @@ public:
     std::list<Car> cars;
 
     static void pop_head_no_recert(self_t& kh) {
-      std::cout << "calling pop_head_no_recert... " << &kh << std::endl;
       assert(!kh.train.cars.empty());
       kh.train.cars.front().promote_all([&](T&& t, const AffFunction& aff) { kh.push_main_no_recert(std::move(t), aff); });
       kh.train.cars.pop_front();
-      std::cout << "pop_head_no_recert ok! " << &kh << std::endl;
     }
 
     static void pop_tail_no_recert(self_t& kh) {
@@ -364,6 +362,7 @@ public:
     }
 
     static void push_head_no_recert(self_t& kh) {
+      std::cout << "calling push_head_no_recert... " << &kh << std::endl;
       assert(!kh.train.cars.empty());
       aff_t new_promotion_threshold = smaller_mag(kh.train.cars.front().promotion_threshold, threshold_factor);
       kh.train.cars.push_front(Car(new_promotion_threshold));
@@ -382,6 +381,7 @@ public:
       while (kh.train.cars.size() > max_car) {
         pop_tail_no_recert(kh);
       }
+      std::cout << "push_head_no_recert ok! " << &kh << std::endl;
     }
 
     static void invariant(self_t& kh) {
