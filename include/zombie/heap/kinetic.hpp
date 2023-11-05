@@ -456,12 +456,10 @@ public:
     }
 
     static void time_changed_no_recert(self_t& kh) {
-      std::cout << "min_value_changed_no_recert... " << &kh << std::endl;
       // let's remove/add new cars, which might cause batch promotion, before we do individual promotion.
       min_value_changed_no_recert(kh);
       // we have to start at the last value, promoting them up, as a value might get promoted multiple time.
       for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
-        std::cout << "looping... " << &kh << std::endl;
         auto front_it = it;
         ++front_it;
         if (front_it != kh.train.cars.rend()) {
@@ -474,7 +472,6 @@ public:
           });
         }
       }
-      std::cout << "time_changed_no_recert ok! " << &kh << std::endl;
     }
 
     // return whether we need recert.
@@ -482,16 +479,21 @@ public:
     // it will not infinite loop, as there is no sequence of infinite pop(we only have finite cars), no sequence of infinite push(the number will decrease).
     // and no alternate push/pop(promotion_threshold will not overcorrect).
     static bool min_value_changed_no_recert(self_t& kh) {
+      std::cout << "min_value_changed_no_recert... " << &kh << std::endl;
       if (!kh.train.cars.empty()) {
         Car& c = kh.train.cars.front();
         assert(!kh.heap.empty());
         auto cur_min_value = kh.cur_min_value();
         if (c.promotion_threshold < cur_min_value) {
+          std::cout << "pop_head_no_recert... " << &kh << std::endl;
           pop_head_no_recert(kh);
+          std::cout << "pop_head_no_recert ok! " << &kh << std::endl;
           return true;
         } else if (c.promotion_threshold >= bigger_mag(cur_min_value, threshold_factor * threshold_factor)) {
+          std::cout << "push_head_no_recert... " << &kh << std::endl;
           std::cout << "c.promotion_threshold = " << c.promotion_threshold << std::endl;
           push_head_no_recert(kh);
+          std::cout << "push_head_no_recert ok! " << &kh << std::endl;
           return true;
         } else {
           return false;
