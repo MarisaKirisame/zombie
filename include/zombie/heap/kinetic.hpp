@@ -602,6 +602,7 @@ private:
   }
 
   void recert() {
+    std::cout << "calling recert... " << this << std::endl;
     cert_invariant();
     // why a while here? wont all problem be done with a single fix?
     // consider a kinetic heap with A < B < C.
@@ -626,6 +627,7 @@ private:
       train.pop_head_no_recert(*this);
     }
     train.min_value_changed(*this);
+    std::cout << "recert ok! " << this << std::endl;
   }
 
 public:
