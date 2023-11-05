@@ -341,9 +341,11 @@ public:
     std::list<Car> cars;
 
     static void pop_head_no_recert(self_t& kh) {
+      std::cout << "calling pop_head_no_recert... " << &kh << std::endl;
       assert(!kh.train.cars.empty());
       kh.train.cars.front().promote_all([&](T&& t, const AffFunction& aff) { kh.push_main_no_recert(std::move(t), aff); });
       kh.train.cars.pop_front();
+      std::cout << "pop_head_no_recert ok! " << &kh << std::endl;
     }
 
     static void pop_tail_no_recert(self_t& kh) {
