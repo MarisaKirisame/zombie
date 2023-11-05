@@ -360,6 +360,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
 
   template<typename F, typename O>
   void remove_if_recurse(const F& f, const O& o, size_t idx) {
+    std::cout << "calling remove_if_recurse... " << idx << std::endl;
     if (has_value(idx)) {
       remove_if_recurse(f, o, heap_left_child(idx));
       remove_if_recurse(f, o, heap_right_child(idx));
@@ -367,6 +368,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
         o(remove(idx));
       }
     }
+    std::cout << "remove_if_recurse ok! " << idx << std::endl;
   }
 
   Compare cmp;
