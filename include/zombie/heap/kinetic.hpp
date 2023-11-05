@@ -309,6 +309,10 @@ public:
     }
 
     void push(T&& t, const AffFunction& f, shift_t time) {
+      std::cout << "push " << f.slope << std::endl;
+      if (!(f(time) > promotion_threshold)) {
+        std::cout << "car.push bad" << std::endl;
+      }
       assert(f(time) > promotion_threshold);
       nursery.push(Young(std::move(t), f, promotion_threshold));
     }
@@ -471,9 +475,9 @@ public:
         ++front_it;
         if (front_it != kh.train.cars.rend()) {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
-            std::cout << "calling train.push..." << std::endl;
+            std::cout << "calling car.push..." << std::endl;
             front_it->push(std::move(t), aff, kh.time());
-            std::cout << "train.push ok!" << std::endl;
+            std::cout << "car.push ok!" << std::endl;
           });
         } else {
           it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
