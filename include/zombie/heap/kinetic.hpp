@@ -464,7 +464,7 @@ public:
           while (insert_it != kh.train.cars.rend() && !(insert_it->promotion_threshold > score)) {
             ++insert_it;
           }
-          if (insert_it != kh.train.cars.rend) {
+          if (insert_it != kh.train.cars.rend()) {
             assert(insert_it->promotion_threshold > score);
             insert_it->push(std::move(t), aff, kh.time());
           } else {
