@@ -330,7 +330,7 @@ public:
   };
 
   struct Train {
-    constexpr static bool use_train = true;
+    constexpr static bool use_train = false;
     constexpr static double threshold_factor = 3;
     constexpr static size_t enough_car = 2;
     constexpr static size_t max_car = 3;
