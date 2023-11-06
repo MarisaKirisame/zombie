@@ -461,11 +461,11 @@ public:
         it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
           auto score = aff(kh.time());
           auto insert_it = it;
-          while (insert_it != kh.train.cars.rend() && !(insert_it->promotion_threshold > score)) {
+          while (insert_it != kh.train.cars.rend() && !(score > insert_it->promotion_threshold)) {
             ++insert_it;
           }
           if (insert_it != kh.train.cars.rend()) {
-            assert(insert_it->promotion_threshold > score);
+            assert(score > insert_it->promotion_threshold);
             insert_it->push(std::move(t), aff, kh.time());
           } else {
             kh.push_main_no_recert(std::move(t), aff);
