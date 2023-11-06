@@ -132,7 +132,6 @@ public:
   }
 
   void advance_to(int64_t new_time) {
-    std::cout << "calling advance_to... " << this << std::endl;
     assert(new_time >= time_);
     time_ = new_time;
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
@@ -141,12 +140,9 @@ public:
       total_recert += 1;
     }
     // does not need to recert because we are recerting it at the next line.
-    std::cout << "calling time_changed_no_recert... " << this << std::endl;
     train.time_changed_no_recert(*this);
-    std::cout << "time_changed_no_recert ok! " << this << std::endl;
     recert();
     invariant();
-    std::cout << "advance_to ok! " << this << std::endl;
   }
 
   KineticMinHeap(int64_t time) :
@@ -309,7 +305,6 @@ public:
     }
 
     void push(T&& t, const AffFunction& f, shift_t time) {
-      std::cout << "push " << f.slope << std::endl;
       if (!(f(time) > promotion_threshold)) {
         std::cout << "car.push bad" << std::endl;
       }
@@ -319,14 +314,10 @@ public:
 
     template<typename F>
     void promote(aff_t time, const F& output_to) {
-      std::cout << "calling promote... " << this << std::endl;
       while ((!nursery.empty()) && nursery.peek().promote_time <= time) {
         Young yg = nursery.pop();
-        std::cout << "calling output..." << this << std::endl;
         output_to(std::move(yg.t), yg.aff);
-        std::cout << "output ok! " << this << std::endl;
       }
-      std::cout << "promote ok! " << this << std::endl;
     }
 
     template<typename F>
@@ -471,21 +462,19 @@ public:
       std::cout << "min_value_changed_no_recert ok! " << &kh << std::endl;
       // we have to start at the last value, promoting them up, as a value might get promoted multiple time.
       for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
-        auto front_it = it;
-        ++front_it;
-        if (front_it != kh.train.cars.rend()) {
-          it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
-            std::cout << "calling car.push..." << std::endl;
-            front_it->push(std::move(t), aff, kh.time());
-            std::cout << "car.push ok!" << std::endl;
-          });
-        } else {
-          it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
-            std::cout << "calling kh.push..." << std::endl;
+        it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+          auto score = aff(kh.time());
+          auto insert_it = it;
+          while (insert_it != kh.train.cars.rend() && !(insert_it->promotion_threshold > score)) {
+            ++insert_it;
+          }
+          if (insert_it != kh.train.cars.rend) {
+            assert(insert_it->promotion_threshold > score);
+            insert_it->push(std::move(t), aff, kh.time());
+          } else {
             kh.push_main_no_recert(std::move(t), aff);
-            std::cout << "kh.push ok!" << std::endl;
-          });
-        }
+          }
+        });
       }
     }
 
