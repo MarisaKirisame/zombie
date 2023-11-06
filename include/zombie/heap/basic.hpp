@@ -206,7 +206,6 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
   }
   template<typename F, typename O>
   void remove_if(const F& f, const O& o) {
-    std::cout << "normal_heap.remove_if... " << this << std::endl;
     size_t idx = 0;
     while (idx < arr.size()) {
       if (f(arr[idx])) {
@@ -216,7 +215,6 @@ struct MinNormalHeap : MinHeapCRTP<T, MinNormalHeap<T, Compare, NHIC, NHER>> {
       }
     }
     heapify();
-    std::cout << "normal_heapremove_if ok! " << this << std::endl;
   }
 
   Compare cmp;
@@ -353,10 +351,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
 
   template<typename F, typename O>
   void remove_if(const F& f, const O& o) {
-    std::cout << "hanger.remove_if... " << this << std::endl;
-    std::cout << size() << std::endl;
     remove_if_recurse(f, o, 0);
-    std::cout << "hanger.remove_if ok! " << this << std::endl;
   }
 
   template<typename F, typename O>
