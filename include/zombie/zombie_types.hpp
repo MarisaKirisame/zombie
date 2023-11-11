@@ -233,7 +233,7 @@ template<const ZombieConfig& cfg, typename T>
 struct Zombie : EZombie<cfg> {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
 
-  ns least_recently_used = 0ns;
+  mutable ns least_recently_used = 0ns;
 
   template<typename... Args>
   void construct(Args&&... args);
@@ -261,9 +261,7 @@ struct Zombie : EZombie<cfg> {
   void recompute() const {
     shared_ptr();
   }
-  T get_value() const {
-    return shared_ptr()->get_ref();
-  }
+  T get_value() const;
 };
 
 } // end of namespace ZombieInternal

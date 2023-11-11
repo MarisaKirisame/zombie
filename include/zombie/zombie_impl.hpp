@@ -334,7 +334,11 @@ void Zombie<cfg, T>::construct(Args&&... args) {
   }
 }
 
-
+template<const ZombieConfig& cfg, typename T>
+T Zombie<cfg, T>::get_value() const {
+  this->least_recently_used = Trailokya<cfg>::get_trailokya().meter.time();
+  return shared_ptr()->get_ref();
+}
 
 template<typename F, size_t... Is>
 auto gen_tuple_impl(F func, std::index_sequence<Is...>) {
