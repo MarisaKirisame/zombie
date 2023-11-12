@@ -7,6 +7,10 @@
 
 #include "common.hpp"
 
+enum class EvictionPolicy {
+  Zombie,
+  LeastRecentlyUsed,
+};
 
 using AffMetric = AffFunction(*)(Time last_accessed, Time cost, Time neighbor_cost, Space size);
 
@@ -22,6 +26,7 @@ struct ZombieConfig {
   std::pair<unsigned int, unsigned int> approx_factor;
 
   bool if_count_eviction;
+  EvictionPolicy eviction_policy;
 };
 
 
@@ -53,4 +58,5 @@ constexpr ZombieConfig default_config = ZombieConfig {
   &local_metric, 
   {1, 1},
   true,
+  EvictionPolicy::Zombie,
  };

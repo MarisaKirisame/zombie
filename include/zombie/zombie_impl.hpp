@@ -303,6 +303,7 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
     if (!t.akasha.has_precise(created_time)) {
       std::shared_ptr<EZombieNode<cfg>> strong;
       typename Trailokya<cfg>::Tardis tardis = t.tardis;
+
       bracket([&]() { t.tardis = typename Trailokya<cfg>::Tardis { this->created_time, &strong }; },
               [&]() { std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(created_time).value).replay(); },
               [&]() { t.tardis = tardis; });
