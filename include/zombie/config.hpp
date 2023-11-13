@@ -23,9 +23,19 @@ struct ZombieConfig {
   bool if_count_eviction;
 };
 
-
+inline bool use_lru() {
+  char const* USE_LRU = getenv("USE_LRU");
+  return USE_LRU != nullptr && strcmp(USE_LRU, "yes") == 0;
+}
 
 inline AffFunction local_metric(Time last_accessed, Time cost, Time neighbor_cost, Space size) {
+
+  // for the convinence of benchmark
+  if (use_lru()) {
+    puts("using lru ...");
+    return lru_metric(last_accessed, cost, neighbor_cost, size);
+  }
+
   // This is a min heap, so we have to flip the slope.
   // Recently accessed node should have the higest score of 0, so shift is just -last_accessed.
   return AffFunction {
