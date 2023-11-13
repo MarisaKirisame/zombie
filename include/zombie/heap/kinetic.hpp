@@ -132,6 +132,7 @@ public:
   }
 
   void advance_to(int64_t new_time) {
+    std::cout << "calling advance_to... " << this << std::endl;
     assert(new_time >= time_);
     time_ = new_time;
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
@@ -143,6 +144,7 @@ public:
     train.time_changed_no_recert(*this);
     recert();
     invariant();
+    std::cout << "advance_to ok! " << this << std::endl;
   }
 
   KineticMinHeap(int64_t time) :
