@@ -268,11 +268,11 @@ public:
     };
 
     struct YoungIndexChanged {
-      void operator()(const Young& y, const size_t& idx) { }
+      void operator()(const Young&, const size_t&) { }
     };
 
     struct YoungElementRemoved {
-      void operator()(const Young& y) { }
+      void operator()(const Young&) { }
 
     };
 
