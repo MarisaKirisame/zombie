@@ -7,11 +7,6 @@
 
 #include "common.hpp"
 
-enum class EvictionPolicy {
-  Zombie,
-  LeastRecentlyUsed,
-};
-
 using AffMetric = AffFunction(*)(Time last_accessed, Time cost, Time neighbor_cost, Space size);
 
 struct ZombieConfig {
@@ -26,7 +21,6 @@ struct ZombieConfig {
   std::pair<unsigned int, unsigned int> approx_factor;
 
   bool if_count_eviction;
-  EvictionPolicy eviction_policy;
 };
 
 
@@ -52,11 +46,25 @@ inline AffFunction uf_metric(Time last_accessed, Time cost, Time neighbor_cost, 
   };
 }
 
+inline AffFunction lru_metric(Time last_accessed, Time cost, Time neighbor_cost, Space size) {
+  return AffFunction {
+    0,
+    - last_accessed.count(),
+  };
+}
+
 constexpr ZombieConfig default_config = ZombieConfig { 
   KineticHeapImpl::Heap, 
   TockTreeImpl::Tree, 
   &local_metric, 
   {1, 1},
   true,
-  EvictionPolicy::Zombie,
  };
+
+constexpr ZombieConfig lru_config = ZombieConfig {
+  KineticHeapImpl::Heap, 
+  TockTreeImpl::Tree, 
+  &lru_metric, 
+  {1, 1},
+  true,
+};
