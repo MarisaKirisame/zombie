@@ -5,6 +5,7 @@
 #include <random>
 #include <optional>
 #include <cassert>
+#include <iostream>
 
 inline bool heap_is_root(size_t i) {
   return i == 0;
@@ -360,6 +361,7 @@ struct MinHanger : MinHeapCRTP<T, MinHanger<T, Compare, NHIC, NHER>> {
     if (has_value(idx)) {
       remove_if_recurse(f, o, heap_left_child(idx));
       remove_if_recurse(f, o, heap_right_child(idx));
+      assert(has_value(idx));
       if (f(arr[idx].value())) {
         o(remove(idx));
       }

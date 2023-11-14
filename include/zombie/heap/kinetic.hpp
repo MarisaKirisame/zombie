@@ -134,6 +134,7 @@ public:
   }
 
   void advance_to(int64_t new_time) {
+    std::cout << "calling advance_to... " << this << std::endl;
     assert(new_time >= time_);
     time_ = new_time;
     while ((!cert_queue.empty()) && cert_queue.peek().break_time <= time()) {
@@ -145,6 +146,7 @@ public:
     train.time_changed_no_recert(*this);
     recert();
     invariant();
+    std::cout << "advance_to ok! " << this << std::endl;
   }
 
   KineticMinHeap(int64_t time) :
@@ -222,8 +224,6 @@ private:
     }
   };
 
-
-
 private:
   int64_t time_;
   std::unordered_set<size_t> pending_recert;
@@ -270,11 +270,11 @@ public:
     };
 
     struct YoungIndexChanged {
-      void operator()(const Young& y, const size_t& idx) { }
+      void operator()(const Young&, const size_t&) { }
     };
 
     struct YoungElementRemoved {
-      void operator()(const Young& y) { }
+      void operator()(const Young&) { }
 
     };
 
@@ -366,18 +366,15 @@ public:
       // unlike classical generational garbage collection where object go from young generation to old generation only,
       // when we have a new car, we put object from old generation to young generation as old generation maintainence is expensive.
       size_t total_demote = 0;
-      std::cout << "size before demote: " << kh.heap.size() << std::endl;
       kh.heap.remove_if(
         [&](const Node& n) {
-          return n.aff(kh.time()) > new_promotion_threshold;
+          return n.aff.slope < 0 && n.aff(kh.time()) > new_promotion_threshold;
         },
         [&](Node&& n) {
           ++total_demote;
           // maybe we should push to the furthest car.
           kh.train.cars.front().push(std::move(n.t), n.aff, kh.time());
         });
-      std::cout << "total_demote: " << total_demote << std::endl;
-      std::cout << "size after demote: " << kh.heap.size() << std::endl;
       while (kh.train.cars.size() > max_car) {
         pop_tail_no_recert(kh);
       }
@@ -462,17 +459,19 @@ public:
       min_value_changed_no_recert(kh);
       // we have to start at the last value, promoting them up, as a value might get promoted multiple time.
       for (auto it = kh.train.cars.rbegin(); it != kh.train.cars.rend(); ++it) {
-        auto front_it = it;
-        ++front_it;
-        if (front_it != kh.train.cars.rend()) {
-          it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
-            front_it->push(std::move(t), aff, kh.time());
-          });
-        } else {
-          it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+        it->promote(kh.time(), [&](T&& t, const AffFunction& aff) {
+          auto score = aff(kh.time());
+          auto insert_it = it;
+          while (insert_it != kh.train.cars.rend() && !(score > insert_it->promotion_threshold)) {
+            ++insert_it;
+          }
+          if (insert_it != kh.train.cars.rend()) {
+            assert(score > insert_it->promotion_threshold);
+            insert_it->push(std::move(t), aff, kh.time());
+          } else {
             kh.push_main_no_recert(std::move(t), aff);
-          });
-        }
+          }
+        });
       }
     }
 

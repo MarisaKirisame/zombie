@@ -34,6 +34,7 @@ void aff_function_delete(AffFunction *aff_function) {
   delete aff_function;
 }
 
+
 struct EmptyNotifyHeapIndexChanged {
   void operator()(void *n, size_t idx) {}
 };
@@ -84,4 +85,38 @@ void kinetic_hanger_advance_to(KineticHanger *hanger, int64_t new_time) {
 
 void kinetic_hanger_delete(KineticHanger *hanger) {
   delete hanger;
+}
+
+struct CompareMinNode {
+  bool operator()(const MinNode& l, const MinNode& r) {
+    return l.score < r.score;
+  }
+};
+struct NHICMinNode {
+  void operator()(const MinNode&, size_t) {}
+};
+struct NHERMinNode {
+  void operator()(const MinNode&) {}
+};
+
+Heap* heap_new() {
+  return new Heap();
+}
+void heap_delete(Heap* heap) {
+  delete heap;
+}
+size_t heap_size(const Heap* heap) {
+  return heap->size();
+}
+void heap_push(Heap* heap, void* t, double score) {
+  heap->push({t, score});
+}
+double heap_peek_score(const Heap* heap) {
+  return heap->peek().score;
+}
+void* heap_peek(const Heap* heap) {
+  return heap->peek().elm;
+}
+void* heap_pop(Heap* heap) {
+  return heap->pop().elm;
 }
