@@ -58,7 +58,7 @@ inline AffFunction local_metric(Time last_accessed, Time cost, Time neighbor_cos
   // Recently accessed node should have the higest score of 0, so shift is just -last_accessed.
   return AffFunction {
     -((static_cast<int128_t>(cost.count()) * (1UL << 63)) / size.count()),
-    - last_accessed.count() * 4
+    - last_accessed.count() / 100
   };
 }
 
