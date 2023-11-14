@@ -37,6 +37,7 @@ extern "C" {
 
   Heap* heap_new();
   void heap_delete(Heap* heap);
+  bool heap_empty(const Heap* heap);
   size_t heap_size(const Heap* heap);
   void heap_push(Heap* hanger, void* t, double score);
   double heap_peek_score(const Heap* heap);

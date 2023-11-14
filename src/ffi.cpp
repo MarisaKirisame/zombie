@@ -105,6 +105,9 @@ Heap* heap_new() {
 void heap_delete(Heap* heap) {
   delete heap;
 }
+bool heap_empty(const Heap* heap) {
+  return heap->empty();
+}
 size_t heap_size(const Heap* heap) {
   return heap->size();
 }
