@@ -51,7 +51,6 @@ inline AffFunction local_metric(Time last_accessed, Time cost, Time neighbor_cos
 
   // for the convinence of benchmark
   if (use_lru()) {
-    puts("using lru ...");
     return lru_metric(last_accessed, cost, neighbor_cost, size);
   }
 
