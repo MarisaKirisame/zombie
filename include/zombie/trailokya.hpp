@@ -58,10 +58,19 @@ public:
   Tock current_tock = 1;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
+  int32_t eviction_count = 0;
+  Space space_used = Space(0);
 
 public:
   Trailokya() : book(0) {}
-  ~Trailokya() {}
+  ~Trailokya() {
+    if constexpr (cfg.if_count_eviction) {
+      printf("evction_count: %d\n", eviction_count);
+      FILE* f = fopen("evction_count.log", "w");
+      fprintf(f, "%d\n", eviction_count);
+      fclose(f);
+    }
+  }
 
   static Trailokya& get_trailokya() {
     static Trailokya t;
@@ -91,7 +100,7 @@ public:
     Reaper(Trailokya& t) : t(t) { }
 
     bool have_soul() {
-      return t.book.empty();
+      return !t.book.empty();
     }
 
     void advance() {
@@ -113,8 +122,13 @@ public:
         old_val = - old_val;
       }
       if (old_val / cfg.approx_factor.first <= new_val / cfg.approx_factor.second
-       && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second)
+       && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second) {
         phantom->evict();
+
+        if constexpr (cfg.if_count_eviction) {
+          Trailokya::get_trailokya().eviction_count++;
+        }
+       }
       else {
         t.book.push(std::move(phantom), new_aff);
         murder();
@@ -128,6 +142,12 @@ public:
 
     void mass_extinction(aff_t threshold) {
       while(have_soul() && score() < threshold) {
+        murder();
+      }
+    }
+
+    void mass_extinction_by_memory(size_t size) {
+      while (have_soul() && t.space_used.bytes > size) {
         murder();
       }
     }

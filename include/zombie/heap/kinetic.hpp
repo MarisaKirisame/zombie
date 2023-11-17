@@ -3,6 +3,8 @@
 #include "basic.hpp"
 #include "aff_function.hpp"
 
+#include "../profiler/profiler.hpp"
+
 #include <cstdint>
 #include <optional>
 #include <cassert>
@@ -115,11 +117,11 @@ public:
   }
 
   AffFunction get_aff(size_t i) const {
-    return heap[i].f;
+    return heap[i].aff;
   }
 
   void set_aff(size_t i, const AffFunction& f) {
-    heap[i].f = f;
+    heap[i].aff = f;
     heap.rebalance(i, false);
   }
 
@@ -307,9 +309,6 @@ public:
     }
 
     void push(T&& t, const AffFunction& f, shift_t time) {
-      if (!(f(time) > promotion_threshold)) {
-        std::cout << "car.push bad" << std::endl;
-      }
       assert(f(time) > promotion_threshold);
       nursery.push(Young(std::move(t), f, promotion_threshold));
     }

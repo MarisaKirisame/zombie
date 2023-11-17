@@ -2,6 +2,8 @@
 
 #include "aff_function.hpp"
 
+#include "../profiler/profiler.hpp"
+
 #include <vector>
 #include <set>
 #include <cstddef>
@@ -46,6 +48,8 @@ public:
 
 
   size_t min_idx() const {
+    TimeCounter tc("min_idx");
+
     size_t min_idx = vec.size();
     for (size_t i = 0; i < vec.size(); ++i)
       if (min_idx >= vec.size() || vec[i].f(time_) <= vec[min_idx].f(time_))
@@ -69,6 +73,8 @@ public:
   }
 
   T remove(size_t i) {
+    TimeCounter tc("min_idx");
+    
     if (i == 0 && vec.size() == 1) {
       T t = std::move(vec.back().t);
       vec.pop_back();

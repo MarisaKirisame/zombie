@@ -5,6 +5,7 @@
 #include <functional>
 
 #include "common.hpp"
+#include "../common.hpp" // for Space
 
 namespace TockTreeImpls {
 
@@ -105,7 +106,6 @@ private:
 
 public:
   Node n = Node(nullptr, TockRange{std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()}, V());
-
 
   TockTreeData<V>& get_node(const Tock& t) {
     return n.get_node(t).data;

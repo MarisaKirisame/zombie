@@ -136,6 +136,8 @@ struct ZombieNode : EZombieNode<cfg> {
 
   template<typename... Args>
   ZombieNode(Tock created_time, Args&&... args);
+
+  ~ZombieNode();
 };
 
 
@@ -230,6 +232,8 @@ struct EZombie {
 template<const ZombieConfig& cfg, typename T>
 struct Zombie : EZombie<cfg> {
   static_assert(!std::is_reference_v<T>, "should not be a reference");
+
+  mutable ns least_recently_used = 0ns;
 
   template<typename... Args>
   void construct(Args&&... args);

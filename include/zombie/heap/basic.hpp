@@ -1,5 +1,7 @@
 #pragma once
 
+#include "segmented_array.hpp"
+
 #include <random>
 #include <optional>
 #include <cassert>
