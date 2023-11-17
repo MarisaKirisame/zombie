@@ -261,7 +261,9 @@ struct Zombie : EZombie<cfg> {
   void recompute() const {
     shared_ptr();
   }
-  T get_value() const;
+  T get_value() const {
+    return shared_ptr()->get_ref();
+  }
 };
 
 } // end of namespace ZombieInternal
