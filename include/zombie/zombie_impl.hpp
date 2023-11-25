@@ -223,8 +223,9 @@ void EZombieNode<cfg>::accessed() const {
 template<const ZombieConfig& cfg>
 std::shared_ptr<MicroWave<cfg>> EZombieNode<cfg>::get_parent() const {
   auto ret = parent_cache.lock();
-  if (ret)
+  if (ret) {
     return ret;
+  }
 
   auto& t = Trailokya<cfg>::get_trailokya();
   auto parent = t.akasha.get_parent(created_time);

@@ -250,6 +250,7 @@ struct Zombie : EZombie<cfg> {
   Zombie(Tock&& t) : EZombie<cfg>(t) { }
   Zombie(const Tock& t) : EZombie<cfg>(t) { }
   Zombie(Tock& t) : EZombie<cfg>(t) { }
+  Zombie() = delete;
 
   std::shared_ptr<ZombieNode<cfg, T>> shared_ptr() const {
     return non_null(std::dynamic_pointer_cast<ZombieNode<cfg, T>>(EZombie<cfg>::shared_ptr()));
@@ -261,5 +262,11 @@ struct Zombie : EZombie<cfg> {
     return shared_ptr()->get_ref();
   }
 };
-
 } // end of namespace ZombieInternal
+
+template<const ZombieConfig& cfg, typename T>
+struct GetSize<ZombieInternal::Zombie<cfg, T>> {
+  size_t operator()(const ZombieInternal::Zombie<cfg, T>& z) {
+    return sizeof(z); // note that this does not care about T - it is merely 'what is the size of this struct'
+  }
+};

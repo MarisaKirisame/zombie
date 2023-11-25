@@ -56,3 +56,6 @@ target_link_libraries(
 
 include(GoogleTest)
 gtest_discover_tests(zombie_test)
+
+add_executable(benchmark benchmark.cpp)
+target_link_libraries(benchmark zombie_lib)
