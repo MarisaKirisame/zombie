@@ -40,20 +40,13 @@ public:
     };
   };
 
-  struct NotifyIndexChanged {
-    void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
-      p->notify_index_changed(idx);
-    };
-  };
-
-
   struct Reaper;
 
 
 public:
   // Hold MicroWave and GraveYard.
   TockTree<cfg.tree, TockTreeElem, NotifyParentChanged> akasha;
-  KineticHeap<cfg.heap, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
+  // KineticHeap<cfg.heap, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
   Tardis tardis;
   Tock current_tock = 1;
   ZombieMeter meter;

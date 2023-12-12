@@ -5,22 +5,22 @@
 // note that in the canonical implementation, each page have two root pointer (except the root page), as when you reach the bottom of a page,
 // you need to look at both it's child which is in two different page.
 // this is ugly as fuck and I hate it. I will not implement it unless necessary.
-template<typename T>
+template <typename T>
 struct BHeap {
   struct Page {
     size_t idx;
     std::vector<T> nodes;
     explicit Page(size_t idx) : idx(idx) {
-      
     }
     Page() = delete;
   };
+
   std::vector<Page> pages;
+
   void expand(size_t page_count) {
-    
   }
+
   void shrink() {
-    
   }
 
   constexpr static size_t level_in_page = 10;
@@ -46,7 +46,7 @@ struct BHeap {
   }
 
   using std::pair<size_t, size_t> = index_t;
-  static index_t parent(const index_t& idx) {
+  static index_t parent(const index_t &idx) {
     size_t page_idx = idx.left;
     size_t node_idx = idx.right;
     if (heap_is_root(node_idx)) {
@@ -54,10 +54,11 @@ struct BHeap {
       size_t shifted_idx = page_idx - 1;
       return {shifted_idx / page_branching_factor, shifted_idx % page_branching_factor};
     } else {
-      return {page_idx, heap_parent(node_idx);
+      return {page_idx, heap_parent(node_idx)};
     }
   }
-  static index_t left_child(const index_t& idx) {
+
+  static index_t left_child(const index_t &idx) {
     size_t page_idx = idx.left;
     size_t node_idx = idx.right;
     size_t idx = heap_left_child(node_idx);
@@ -65,10 +66,11 @@ struct BHeap {
       return {page_idx, left_idx};
     } else {
       size_t page_shift = idx - node_in_page;
-      return {page_idx * page_branching_factor + 1 + page_shift, 0}
+      return {page_idx * page_branching_factor + 1 + page_shift, 0};
     }
   }
-  static index_t right_child(const index_t& idx) {
+
+  static index_t right_child(const index_t &idx) {
     size_t page_idx = idx.left;
     size_t node_idx = idx.right;
     size_t idx = heap_right_child(node_idx);
@@ -76,7 +78,7 @@ struct BHeap {
       return {page_idx, left_idx};
     } else {
       size_t page_shift = idx - node_in_page;
-      return {page_idx * page_branching_factor + 1 + page_shift, 0}
+      return {page_idx * page_branching_factor + 1 + page_shift, 0};
     }
   }
 };

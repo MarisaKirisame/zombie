@@ -87,10 +87,10 @@ template<const ZombieConfig& cfg>
 void MicroWave<cfg>::accessed() const {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   last_accessed = Time(t.meter.time());
-  if (pool_index != -1) {
-    assert(pool_index >= 0);
-    t.book.set_aff(pool_index, get_aff());
-  }
+  // if (pool_index != -1) {
+  //   assert(pool_index >= 0);
+  //   t.book.set_aff(pool_index, get_aff());
+  // }
 }
 
 
