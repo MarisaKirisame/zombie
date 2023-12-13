@@ -6,7 +6,7 @@
 #include "meter.hpp"
 #include "config.hpp"
 #include "zombie_types.hpp"
-
+#include "heap/gd_heap.hpp"
 
 
 namespace ZombieInternal {
@@ -17,8 +17,6 @@ namespace TockTreeElemKind {
   static constexpr size_t MicroWave = 1;
   static constexpr size_t ZombieNode = 2;
 };
-
-
 
 template<const ZombieConfig& cfg>
 struct Trailokya {
@@ -46,6 +44,9 @@ public:
     };
   };
 
+  struct NotifyElementRemoved {
+    void operator()(const std::unique_ptr<Phantom>&) { }
+  };
 
   struct Reaper;
 
@@ -53,15 +54,15 @@ public:
 public:
   // Hold MicroWave and GraveYard.
   TockTree<cfg.tree, TockTreeElem, NotifyParentChanged> akasha;
-  KineticHeap<cfg.heap, std::unique_ptr<Phantom>, NotifyIndexChanged> book;
+  GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
   Tardis tardis;
   Tock current_tock = 1;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
 
 public:
-  Trailokya() : book(0) {}
-  ~Trailokya() {}
+  Trailokya() { }
+  ~Trailokya() { }
 
   static Trailokya& get_trailokya() {
     static Trailokya t;
@@ -72,15 +73,17 @@ public:
   // return the closest MicroWave holding [t]
   std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {
     TockTreeElem elem = akasha.get_node(t).value;
-    if (elem.index() == TockTreeElemKind::MicroWave)
+    if (elem.index() == TockTreeElemKind::MicroWave) {
       return std::get<TockTreeElemKind::MicroWave>(elem);
-
-    auto parent = akasha.get_parent(t);
-    if (! parent || parent->value.index() == TockTreeElemKind::Nothing)
-      return nullptr;
-
-    assert (parent->value.index() == TockTreeElemKind::MicroWave);
-    return std::get<TockTreeElemKind::MicroWave>(parent->value);
+    } else {
+      auto parent = akasha.get_parent(t);
+      if (! parent || parent->value.index() == TockTreeElemKind::Nothing) {
+        return nullptr;
+      } else {
+        assert (parent->value.index() == TockTreeElemKind::MicroWave);
+        return std::get<TockTreeElemKind::MicroWave>(parent->value);
+      }
+    }
   }
 
 
@@ -94,42 +97,13 @@ public:
       return t.book.empty();
     }
 
-    void advance() {
-      t.book.advance_to(Time(t.meter.time()).count());
-    }
-
     void murder() {
-      advance();
-
       assert (t.book.size() > 0);
-
-      AffFunction old_aff = t.book.get_aff(t.book.min_idx());
-      auto phantom = t.book.pop();
-      AffFunction new_aff = phantom->get_aff();
-      auto old_val = old_aff(t.book.time());
-      auto new_val = new_aff(t.book.time());
-      if (new_val < 0) {
-        new_val = - new_val;
-        old_val = - old_val;
-      }
-      if (old_val / cfg.approx_factor.first <= new_val / cfg.approx_factor.second
-       && new_val / cfg.approx_factor.first <= old_val / cfg.approx_factor.second)
-        phantom->evict();
-      else {
-        t.book.push(std::move(phantom), new_aff);
-        murder();
-      }
+      t.book.adjust_pop([](const std::unique_ptr<Phantom>& p) { return p->cost(); })->evict();
     }
 
-    aff_t score() {
-      advance();
-      return t.book.get_aff(t.book.min_idx())(t.book.time());
-    }
-
-    void mass_extinction(aff_t threshold) {
-      while(have_soul() && score() < threshold) {
-        murder();
-      }
+    uint64_t score() {
+      return t.book.score();
     }
   };
 };

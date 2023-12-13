@@ -53,9 +53,7 @@ public:
 
   static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
                    const std::vector<Tock>& inputs);
-
-  AffFunction get_aff() const;
-
+  cost_t cost() const;
   void replay();
 
   void accessed() const;
@@ -144,12 +142,12 @@ struct ZombieNode : EZombieNode<cfg> {
 class Phantom {
 public:
   virtual ~Phantom() {}
-  virtual AffFunction get_aff() const = 0;
+  virtual cost_t cost() const = 0;
   virtual void evict() = 0;
   virtual void notify_index_changed(size_t new_index) = 0;
 };
 
-// RecomputeLater wraps holds a weak pointer to a EZombieNode,
+// RecomputeLater holds a weak pointer to a MicroWave,
 // and is stored in Trailokya::book for eviction.
 template<const ZombieConfig& cfg>
 struct RecomputeLater : Phantom {
@@ -157,15 +155,12 @@ struct RecomputeLater : Phantom {
   std::weak_ptr<MicroWave<cfg>> weak_ptr;
 
   RecomputeLater(const Tock& created_time, const std::shared_ptr<MicroWave<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
-
-  AffFunction get_aff() const override;
+  cost_t cost() const override;
   void evict() override;
   void notify_index_changed(size_t idx) override {
     non_null(weak_ptr.lock())->pool_index = idx;
   }
 };
-
-
 
 // Note that this type do not have a virtual destructor.
 // Doing so save the pointer to the virtual method table,
@@ -186,10 +181,12 @@ struct EZombie {
   bool evicted() const {
     return ptr().lock() == nullptr;
   }
+
   bool evictable() const {
     auto ptr = this->ptr().lock();
     return ptr && ptr->get_parent() != nullptr;
   }
+
   bool unique() const {
     return ptr().use_count() ==  1;
   }
@@ -210,8 +207,6 @@ struct EZombie {
 
   std::shared_ptr<EZombieNode<cfg>> shared_ptr() const;
 };
-
-
 
 // The core of the library.
 // Represent something that could be recomputed to save space.

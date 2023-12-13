@@ -74,14 +74,10 @@ void MicroWave<cfg>::replay() {
   }
 }
 
-
-
 template<const ZombieConfig& cfg>
-AffFunction MicroWave<cfg>::get_aff() const {
-  return cfg.metric(last_accessed, time_taken, cost_of_set(), space_taken);
+cost_t MicroWave<cfg>::cost() const {
+  return cfg.metric(time_taken, cost_of_set(), space_taken);
 }
-
-
 
 template<const ZombieConfig& cfg>
 void MicroWave<cfg>::accessed() const {
@@ -89,71 +85,70 @@ void MicroWave<cfg>::accessed() const {
   last_accessed = Time(t.meter.time());
   if (pool_index != -1) {
     assert(pool_index >= 0);
-    t.book.set_aff(pool_index, get_aff());
+    t.book.touch(pool_index);
   }
 }
 
 
 template<const ZombieConfig& cfg>
 void MicroWave<cfg>::evict() {
-  for (const Tock& t : inputs)
+  for (const Tock& t : inputs) {
     merge_with(t);
-
-  for (const Tock& t : used_by)
+  }
+  for (const Tock& t : used_by) {
     merge_with(t);
-
+  }
   evicted = true;
 }
-
-
 
 template<const ZombieConfig& cfg>
 Tock MicroWave<cfg>::root_of_set() const {
   return info_of_set().first;
 }
 
-
 template<const ZombieConfig& cfg>
 Time MicroWave<cfg>::cost_of_set() const {
   // already evicted
-  if (evicted)
+  if (evicted) {
     return info_of_set().second;
+  } else {
+    // [*this] is not evicted. calculate the cost of UF class after we evict it
+    auto& t = Trailokya<cfg>::get_trailokya();
+    std::set<Tock> roots;
+    Time cost = time_taken;
 
-  // [*this] is not evicted. calculate the cost of UF class after we evict it
-  auto& t = Trailokya<cfg>::get_trailokya();
-  std::set<Tock> roots;
-  Time cost = time_taken;
-
-  auto add_neighbor = [&](const Tock& tock) {
-    auto m = t.get_microwave(tock);
-    if (m && m->evicted) {
-      auto root = m->info_of_set();
-      if (roots.find(root.first) == roots.end()) {
-        roots.insert(root.first);
-        cost = cost + root.second;
+    auto add_neighbor = [&](const Tock& tock) {
+      auto m = t.get_microwave(tock);
+      if (m && m->evicted) {
+        auto root = m->info_of_set();
+        if (roots.find(root.first) == roots.end()) {
+          roots.insert(root.first);
+          cost = cost + root.second;
+        }
       }
+    };
+    for (const Tock& in : inputs) {
+      add_neighbor(in);
     }
-  };
-  for (const Tock& in : inputs)
-    add_neighbor(in);
-  for (const Tock& out : used_by)
-    add_neighbor(out);
-
-  return cost;
+    for (const Tock& out : used_by) {
+      add_neighbor(out);
+    }
+    return cost;
+  }
 }
-
 
 template<const ZombieConfig& cfg>
 std::pair<Tock, Time> MicroWave<cfg>::info_of_set() const {
-  if (_set_parent == start_time)
+  if (_set_parent == start_time) {
     return { start_time, _set_cost };
+  } else {
+    auto& t = Trailokya<cfg>::get_trailokya();
+    auto parent = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(_set_parent).value);
+    auto root_info = parent->info_of_set();
+    _set_parent = root_info.first;
 
-  auto& t = Trailokya<cfg>::get_trailokya();
-  auto parent = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(_set_parent).value);
-  auto root_info = parent->info_of_set();
-  _set_parent = root_info.first;
-
-  return root_info;
+    return root_info;
+  }
 }
 
 
@@ -192,7 +187,7 @@ MicroWavePtr<cfg>::MicroWavePtr(
   const Time& time_taken
 ) : std::shared_ptr<MicroWave<cfg>>(std::make_shared<MicroWave<cfg>>(std::move(f), inputs, output, start_time, end_time, space, time_taken)) {
   auto& t = Trailokya<cfg>::get_trailokya();
-  t.book.push(std::make_unique<RecomputeLater<cfg>>(start_time, *this), (*this)->get_aff());
+  t.book.push(std::make_unique<RecomputeLater<cfg>>(start_time, *this), (*this)->cost());
 }
 
 template<const ZombieConfig& cfg>
@@ -200,7 +195,7 @@ void MicroWavePtr<cfg>::replay() {
   (*this)->replay();
 
   auto& t = Trailokya<cfg>::get_trailokya();
-  t.book.push(std::make_unique<RecomputeLater<cfg>>((*this)->start_time, *this), (*this)->get_aff());
+  t.book.push(std::make_unique<RecomputeLater<cfg>>((*this)->start_time, *this), (*this)->cost());
 }
 
 
@@ -209,7 +204,6 @@ void MicroWavePtr<cfg>::replay() {
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
   : created_time(created_time) { }
-
 
 template<const ZombieConfig& cfg>
 void EZombieNode<cfg>::accessed() const {
@@ -258,10 +252,9 @@ std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
   return ptr_cache;
 }
 
-
 template<const ZombieConfig& cfg>
-AffFunction RecomputeLater<cfg>::get_aff() const {
-  return non_null(weak_ptr.lock())->get_aff();
+cost_t RecomputeLater<cfg>::cost() const {
+  return non_null(weak_ptr.lock())->cost();
 }
 
 template<const ZombieConfig& cfg>

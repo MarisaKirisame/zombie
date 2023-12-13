@@ -3,15 +3,11 @@
 
 #include <gtest/gtest.h>
 
-constexpr ZombieConfig uf_cost_cfg = { default_config.heap, default_config.tree, &uf_cost_metric, {1, 1} };
-constexpr ZombieConfig uf_cfg = { default_config.heap, default_config.tree, &uf_metric, {1, 1} };
+constexpr ZombieConfig local_cfg = { default_config.tree, &local_metric, {1, 1} };
+constexpr ZombieConfig uf_cfg = { default_config.tree, &uf_metric, {1, 1} };
 
 namespace Local {
   IMPORT_ZOMBIE(default_config)
-}
-
-namespace UFCost {
-  IMPORT_ZOMBIE(uf_cost_cfg)
 }
 
 namespace UF {
@@ -29,7 +25,7 @@ struct GetSize<std::pair<T, U>> {
 
 
 TEST(ZombieUFTest, CalculateTotalCost) {
-  using namespace UFCost;
+  using namespace UF;
   auto& t = Trailokya::get_trailokya();
 
   Zombie<int> z1 = bindZombie([&]() {
@@ -69,7 +65,7 @@ TEST(ZombieUFTest, CalculateTotalCost) {
 
 
 TEST(ZombieUFTest, ReplayChangeCost) {
-  using namespace UFCost;
+  using namespace UF;
   auto& t = Trailokya::get_trailokya();
 
   // z1 -> z2 -> z4 <- z3
@@ -146,7 +142,7 @@ TEST(ZombieUFTest, CompareWithLocal) {
   }
 
   {
-    using namespace UFCost;
+    using namespace UF;
     EXAMPLE_CODE
     EXPECT_TRUE (z3.evicted());
     EXPECT_FALSE(z2.evicted());

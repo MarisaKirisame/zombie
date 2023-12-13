@@ -4,13 +4,11 @@
 #include <functional>
 #include <vector>
 
-
 #include "common.hpp"
 #include "config.hpp"
 #include "zombie_types.hpp"
 #include "trailokya.hpp"
 #include "zombie_impl.hpp"
-
 
 #define IMPORT_ZOMBIE(cfg)\
     template<typename T>\
