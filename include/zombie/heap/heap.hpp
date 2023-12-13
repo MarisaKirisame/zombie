@@ -4,7 +4,6 @@
 
 #include "basic.hpp"
 #include "bag.hpp"
-#include "fake_kinetic.hpp"
 #include "kinetic.hpp"
 
 
