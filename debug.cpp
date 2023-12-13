@@ -24,41 +24,36 @@ struct GetSize<std::pair<T, U>> {
 };
 
 int main() {
-  using namespace UF;
-  auto& t = Trailokya::get_trailokya();
-
-  Zombie<int> z1 = bindZombie([&]() {
-    t.meter.fast_forward(10s);
-    return Zombie<int>(1);
-  });
-  Zombie<int> z2 = bindZombie([&](int x1) {
-    t.meter.fast_forward(11s);
-    return Zombie<int>(x1 + 1);
-  }, z1);
-
-
-  Zombie<int> z3 = bindZombie([&]() {
-    t.meter.fast_forward(20s);
-    return Zombie<int>(4);
-  });
-
-  t.meter.fast_forward(1s);
-
-  Time z1_cost = Trailokya::get_trailokya().get_microwave(z1.created_time)->cost_of_set();
-  Time z2_cost = Trailokya::get_trailokya().get_microwave(z2.created_time)->cost_of_set();
-  Time z3_cost = Trailokya::get_trailokya().get_microwave(z3.created_time)->cost_of_set();
-  EXPECT_EQ(z1_cost.count() / Time(1s).count(), 10);
-  EXPECT_EQ(z2_cost.count() / Time(1s).count(), 11);
-  EXPECT_EQ(z3_cost.count() / Time(1s).count(), 20);
-
+#define EXAMPLE_CODE                            \
+  auto& t = Trailokya::get_trailokya();         \
+  Zombie<int> z1 = bindZombie([&]() {           \
+    t.meter.fast_forward(100s);                 \
+    return Zombie<int>(1);                      \
+  });                                           \
+  Zombie<int> z2 = bindZombie([&](int x1) {     \
+    t.meter.fast_forward(101s);                 \
+    return Zombie<int>(x1 + 1);                 \
+  }, z1);                                       \
+  Zombie<int> z3 = bindZombie([&]() {           \
+    t.meter.fast_forward(150s);                 \
+    return Zombie<int>(3);                      \
+  });                                           \
+  t.reaper.murder();                            \
+  EXPECT_TRUE (z1.evicted());                   \
+  EXPECT_FALSE(z2.evicted() || z3.evicted());   \
   t.reaper.murder();
-  std::cout << "here" << std::endl;
 
-  EXPECT_TRUE (z1.evicted());
-  EXPECT_FALSE(z2.evicted() || z3.evicted());
+  {
+    using namespace Local;
+    EXAMPLE_CODE;
+    EXPECT_TRUE (z2.evicted());
+    EXPECT_FALSE(z3.evicted());
+  }
 
-  z2_cost = Trailokya::get_trailokya().get_microwave(z2.created_time)->cost_of_set();
-  z3_cost = Trailokya::get_trailokya().get_microwave(z3.created_time)->cost_of_set();
-  EXPECT_EQ(z2_cost.count() / Time(1s).count(), 21);
-  EXPECT_EQ(z3_cost.count() / Time(1s).count(), 20);
+  {
+    using namespace UF;
+    EXAMPLE_CODE;
+    EXPECT_TRUE (z3.evicted());
+    EXPECT_FALSE(z2.evicted());
+  }
 }

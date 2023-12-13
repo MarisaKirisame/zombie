@@ -14,8 +14,6 @@ namespace UF {
   IMPORT_ZOMBIE(uf_cfg)
 }
 
-
-
 template<typename T, typename U>
 struct GetSize<std::pair<T, U>> {
   size_t operator()(const std::pair<T, U>& p) {
@@ -93,8 +91,9 @@ TEST(ZombieUFTest, ReplayChangeCost) {
 
 
   t.meter.fast_forward(1s);
-  for (int i = 0; i < 4; ++i)
+  for (int i = 0; i < 4; ++i) {
     t.reaper.murder();
+  }
 
   EXPECT_TRUE (z2.evicted() && z2.evicted() && z3.evicted() && z4.evicted());
 
@@ -114,35 +113,35 @@ TEST(ZombieUFTest, ReplayChangeCost) {
 
 
 TEST(ZombieUFTest, CompareWithLocal) {
-#define EXAMPLE_CODE \
-    auto& t = Trailokya::get_trailokya();\
-    Zombie<int> z1 = bindZombie([&]() {\
-      t.meter.fast_forward(100s);\
-      return Zombie<int>(1);\
-    });\
-    Zombie<int> z2 = bindZombie([&](int x1) {\
-      t.meter.fast_forward(101s);\
-      return Zombie<int>(x1 + 1);\
-    }, z1);\
-    Zombie<int> z3 = bindZombie([&]() {\
-      t.meter.fast_forward(200s);\
-      return Zombie<int>(3);\
-    });\
-    t.reaper.murder();\
-    EXPECT_TRUE (z1.evicted());\
-    EXPECT_FALSE(z2.evicted() || z3.evicted());\
-    t.reaper.murder();
+#define EXAMPLE_CODE                            \
+  auto& t = Trailokya::get_trailokya();         \
+  Zombie<int> z1 = bindZombie([&]() {           \
+    t.meter.fast_forward(100s);                 \
+    return Zombie<int>(1);                      \
+  });                                           \
+  Zombie<int> z2 = bindZombie([&](int x1) {     \
+    t.meter.fast_forward(101s);                 \
+    return Zombie<int>(x1 + 1);                 \
+  }, z1);                                       \
+  Zombie<int> z3 = bindZombie([&]() {           \
+    t.meter.fast_forward(200s);                 \
+    return Zombie<int>(3);                      \
+  });                                           \
+  t.reaper.murder();                            \
+  EXPECT_TRUE (z1.evicted());                   \
+  EXPECT_FALSE(z2.evicted() || z3.evicted());   \
+  t.reaper.murder();
 
   {
     using namespace Local;
-    EXAMPLE_CODE
+    EXAMPLE_CODE;
     EXPECT_TRUE (z2.evicted());
     EXPECT_FALSE(z3.evicted());
   }
 
   {
     using namespace UF;
-    EXAMPLE_CODE
+    EXAMPLE_CODE;
     EXPECT_TRUE (z3.evicted());
     EXPECT_FALSE(z2.evicted());
   }
@@ -201,8 +200,9 @@ unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsign
     EXPECT_FALSE(z.evicted());
   }
 
-  while (t.reaper.have_soul())
+  while (t.reaper.have_soul()) {
     t.reaper.murder();
+  }
 
   return work_done;
 }
@@ -238,8 +238,9 @@ TEST(ZombieUFTest, SqrtSpaceLinearTime) {
   struct Test {};
 
   std::vector<double> work;
-  for (int i = 8; i < 20; ++i)
+  for (int i = 8; i < 20; ++i) {
     work.push_back(LinearDependencyForwardBackwardTest<Test>(i * i, 2 * i));
+  }
 
   double r2 = r_square(work, [](unsigned int x) { return 8 + x; });
   EXPECT_LT(0.9, r2);
@@ -252,8 +253,9 @@ TEST(ZombieUFTest, LogSpaceNLogNTime) {
   struct Test {};
 
   std::vector<double> work;
-  for (int i = 8; i < 20; ++i)
+  for (int i = 8; i < 20; ++i) {
     work.push_back(LinearDependencyForwardBackwardTest<Test>(pow(2, 0.5 * i), 2 * i));
+  }
 
   double r2 = r_square(work, [](unsigned int x) {
     double size = pow(2, 0.5 * (8 + x));
@@ -261,5 +263,4 @@ TEST(ZombieUFTest, LogSpaceNLogNTime) {
   });
   EXPECT_LT(0.9, r2);
   EXPECT_LT(r2, 1.0);
-
 }
