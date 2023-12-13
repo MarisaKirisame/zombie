@@ -43,7 +43,6 @@ TEST(ZombieUFTest, CalculateTotalCost) {
     return Zombie<int>(4);
   });
 
-
   t.meter.fast_forward(1s);
 
   Time z1_cost = Trailokya::get_trailokya().get_microwave(z1.created_time)->cost_of_set();
