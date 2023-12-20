@@ -33,8 +33,9 @@ MicroWave<cfg>::MicroWave(
   auto& t = Trailokya<cfg>::get_trailokya();
   for (const Tock& in : inputs) {
     auto parent = t.akasha.get_parent(in)->value;
-    if (parent.index() == TockTreeElemKind::MicroWave)
-        std::get<TockTreeElemKind::MicroWave>(parent)->used_by.push_back(start_time);
+    if (parent.index() == TockTreeElemKind::MicroWave) {
+      std::get<TockTreeElemKind::MicroWave>(parent)->used_by.push_back(start_time);
+    }
   }
 }
 
@@ -338,6 +339,7 @@ struct IsZombie : std::false_type { };
 template<const ZombieConfig& cfg, typename T>
 struct IsZombie<Zombie<cfg, T>> : std::true_type { };
 
+// todo: when in recompute mode, once the needed value is computed, we can skip the rest of the computation, jumping straight up.
 template<const ZombieConfig& cfg, typename ret_type>
 ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   static_assert(IsZombie<ret_type>::value, "should be zombie");
@@ -358,16 +360,8 @@ ret_type bindZombieRaw(std::function<Tock(const std::vector<const void*>&)>&& fu
     static_assert(IsZombie<ret_type>::value, "should be zombie");
     std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(n.value);
     ret_type ret(mv->output);
-    // we choose call-by-value because
-    // 0: the original code evaluate in call by value, so there is likely no asymptotic speedup by calling call-by-need.
-    // 1: calculating ret will force it's dependency, and call-by-value should provide better locality:
-    //   to be precise, when this bindZombie is being replayed, it's dependency might be rematerialized for other use,
-    //   thus it make sense to replay this bindZombie, to avoid the dependency being evicted later.
-    // 2: rematerializing later require getting the GraveYard from the tock_tree,
-    //   which require traversing a datastructure,
-    //   while once context(zipper) is implemented, call-by-value doesnt need that.
-    // of course, we could and should benchmark and see whether it should be call-by-value or call-by-need.
-    constexpr bool call_by_value = true;
+    // we choose call-by-need because it is more memory efficient.
+    constexpr bool call_by_value = false;
     if (call_by_value) {
       ret.shared_ptr();
     }

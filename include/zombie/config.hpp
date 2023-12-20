@@ -8,6 +8,17 @@
 #include "common.hpp"
 
 using cost_t = int128_t;
+inline std::ostream& operator<<(std::ostream& o, const cost_t& x) {
+  if (x == std::numeric_limits<cost_t>::min()) {
+    return o << "-170141183460469231731687303715884105728";
+  } else if (x < 0) {
+    return o << "-" << -x;
+  } else if (x < 10) {
+    return o << (char)(x + '0');
+  } else {
+    return o << x / 10 << (char)(x % 10 + '0');
+  }
+}
 using Metric = cost_t(*)(Time cost, Time neighbor_cost, Space size);
 
 struct ZombieConfig {
