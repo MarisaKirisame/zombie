@@ -10,6 +10,21 @@
 
 namespace ZombieInternal {
 
+struct OutputNode {
+  virtual ~OutputNode() { }
+};
+
+using Output = std::shared_ptr<OutputNode>;
+
+struct ReturnNode : OutputNode {
+  Tock t;
+  explicit ReturnNode(const Tock& t) : t(t) { }
+};
+
+struct TCNode : OutputNode {
+  std::function<Output()> func;
+};
+
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
 // When that happend, the outer MicroWave will not replay the inner one,
@@ -17,11 +32,21 @@ namespace ZombieInternal {
 // Note: MicroWave might be created or destroyed,
 // Thus the work executed by the parent MicroWave will also change.
 // The metadata must be updated accordingly.
+//
+// Zombie support tail call by trampoline.
+// There are a special kind of microwave: the one we are tail-calling into.
+// We know everything about those microwave, except,
+// 0: their end time
+// 1: their return tock
+//
+// the end time will be temporarily set to infinity (or the largest finite number),
+// and the output tock will be temporarily set to 0, and should not be accessed.
+// once a tail call end, Bind need to look up all such microwave, setting the end time and return tock accordingly.
 template<const ZombieConfig& cfg>
 struct MicroWave {
 public:
   // we dont really use the Tock return type, but this allow one less boxing.
-  std::function<Tock(const std::vector<const void*>& in)> f;
+  std::function<Output(const std::vector<const void*>& in)> f;
   Tock output;
   Tock start_time;
   Tock end_time;
@@ -43,7 +68,7 @@ public:
   mutable Time _set_cost;
 
 public:
-  MicroWave(std::function<Tock(const std::vector<const void*>& in)>&& f,
+  MicroWave(std::function<Output(const std::vector<const void*>& in)>&& f,
             const std::vector<Tock>& inputs,
             const Tock& output,
             const Tock& start_time,
@@ -51,8 +76,8 @@ public:
             const Space& space,
             const Time& time_taken);
 
-  static Tock play(const std::function<Tock(const std::vector<const void*>& in)>& f,
-                   const std::vector<Tock>& inputs);
+  static Output play(const std::function<Output(const std::vector<const void*>& in)>& f,
+                     const std::vector<Tock>& inputs);
   cost_t cost() const;
   void replay();
 
@@ -74,7 +99,7 @@ private:
 template<const ZombieConfig& cfg>
 struct MicroWavePtr : public std::shared_ptr<MicroWave<cfg>> {
   MicroWavePtr(
-    std::function<Tock(const std::vector<const void*>& in)>&& f,
+    std::function<Output(const std::vector<const void*>& in)>&& f,
     const std::vector<Tock>& inputs,
     const Tock& output,
     const Tock& start_time,
