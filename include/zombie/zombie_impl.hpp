@@ -379,7 +379,6 @@ Output TailCall(F f, const Zombie<cfg, Arg>& ...x) {
   return std::make_shared<TCNode>(o);
 }
 
-// todo: broken code. fix.
 template<typename Ret, const ZombieConfig& cfg, typename F, typename... Arg>
 Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
