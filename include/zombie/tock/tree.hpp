@@ -22,6 +22,14 @@ private:
     Node(Node* parent, const TockRange& range, V&& value) :
       parent(parent), data{range, std::move(value)} { }
 
+    void finish_tc(const Tock& t, const std::function<void(V*)>& f) {
+      if (parent != nullptr) {
+        assert(data.range.end == std::numeric_limits<Tock>::max());
+        data.range.end = t;
+        f(&data.value);
+        parent->finish_tc(t, f);
+      }
+    }
 
     bool children_in_range(const Tock& t) const {
       auto it = largest_value_le(children, t);
@@ -57,7 +65,6 @@ private:
       return children_in_range(t) ? get_shallow(t).get_node(t) : *this;
     }
 
-
     void delete_node() {
       // the root node is not for deletion.
       assert(parent != nullptr);
@@ -71,16 +78,15 @@ private:
       parent->children.erase(data.range.beg);
     }
 
-
-    void filter_children(std::function<bool(const TockTreeData<V>)> f) {
+    void filter_children(const std::function<bool(const TockTreeData<V>)>& f) {
       for (auto it = children.begin(); it != children.end();) {
-        if (f(it->second.data))
+        if (f(it->second.data)) {
           it = children.erase(it);
-        else
+        } else {
           ++it;
+        }
       }
     }
-
 
     void check_invariant() const {
       std::optional<TockRange> prev_range;
@@ -102,10 +108,8 @@ private:
     NotifyParentChanged()(n.data, parent);
   }
 
-
 public:
   Node n = Node(nullptr, TockRange{std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()}, V());
-
 
   TockTreeData<V>& get_node(const Tock& t) {
     return n.get_node(t).data;
@@ -129,17 +133,16 @@ public:
     return get_node(t);
   }
 
-
   TockTreeData<V>* get_parent(const Tock& t) {
     auto& node = n.get_node(t);
-    if (! has_precise(t))
+    if (! has_precise(t)) {
       return &node.data;
-    else if (node.parent)
+    } else if (node.parent) {
       return &node.parent->data;
-    else
+    } else {
       return nullptr;
+    }
   }
-
 
   void check_invariant() const {
     n.check_invariant();
@@ -169,18 +172,20 @@ public:
     return inserted_node.data;
   }
 
-
   void remove_precise(const Tock& t) {
     assert(has_precise(t));
     n.get_node(t).delete_node();
   }
 
-  void filter_children(std::function<bool(const TockTreeData<V>&)> f, const Tock& t) {
+  void filter_children(const std::function<bool(const TockTreeData<V>&)>& f, const Tock& t) {
     assert(has_precise(t));
-    n.get_node(t).filter_children(std::move(f));
+    n.get_node(t).filter_children(f);
+  }
+
+  void finish_tc(const Tock& t, const std::function<void(V*)>& f) {
+    n.get_node(t).finish_tc(t, f);
   }
 };
-
 
 template<typename V, typename NPC>
 std::ostream& print(std::ostream& os, const typename TockTree<V, NPC>::Node& n) {

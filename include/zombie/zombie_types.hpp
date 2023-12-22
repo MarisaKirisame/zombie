@@ -23,6 +23,8 @@ struct ReturnNode : OutputNode {
 
 struct TCNode : OutputNode {
   std::function<Output()> func;
+  template<typename... Arg>
+  explicit TCNode(Arg... arg) : func(std::forward<Arg>(arg)...) { }
 };
 
 // A MicroWave record a computation executed by bindZombie, to replay it.
@@ -94,8 +96,6 @@ private:
   void merge_with(Tock);
 };
 
-
-
 template<const ZombieConfig& cfg>
 struct MicroWavePtr : public std::shared_ptr<MicroWave<cfg>> {
   MicroWavePtr(
@@ -110,9 +110,6 @@ struct MicroWavePtr : public std::shared_ptr<MicroWave<cfg>> {
 
   void replay();
 };
-
-
-
 
 // EZombieNode is a type-erased interface to a computed value.
 // The value may be evicted later and need to be recomputed when needed again.
@@ -134,7 +131,6 @@ public:
 
   std::shared_ptr<MicroWave<cfg>> get_parent() const;
 };
-
 
 // ZombieNode is the concrete implementation of EZombieNode,
 template<const ZombieConfig &cfg, typename T>
@@ -160,9 +156,6 @@ struct ZombieNode : EZombieNode<cfg> {
   template<typename... Args>
   ZombieNode(Tock created_time, Args&&... args);
 };
-
-
-
 
 class Phantom {
 public:
@@ -229,7 +222,6 @@ struct EZombie {
     evict();
   }
 
-
   std::shared_ptr<EZombieNode<cfg>> shared_ptr() const;
 };
 
@@ -249,7 +241,7 @@ struct EZombie {
 // T having Zombie is allowed though.
 template<const ZombieConfig& cfg, typename T>
 struct Zombie : EZombie<cfg> {
-  static_assert(!std::is_reference_v<T>, "should not be a reference");
+  static_assert(!std::is_reference_v<T>, "Zombie should not hold a reference");
 
   template<typename... Args>
   void construct(Args&&... args);
@@ -257,9 +249,11 @@ struct Zombie : EZombie<cfg> {
   Zombie(const Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
   Zombie(Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
   Zombie(Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
-  template<typename... Args>
-  Zombie(Args&&... args) {
-    construct(std::forward<Args>(args)...);
+  Zombie(const Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
+  template<typename... Arg>
+  Zombie(Arg&&... arg) {
+    static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Zombie<cfg, T>>>::value, "should not match this constructor");
+    construct(std::forward<Arg>(arg)...);
   }
   Zombie(const T& t) {
     construct(t);
@@ -282,6 +276,12 @@ struct Zombie : EZombie<cfg> {
     return shared_ptr()->get_ref();
   }
 };
+
+template<const ZombieConfig& cfg, typename T>
+Output Result(const Zombie<cfg, T>& z) {
+  return std::make_shared<ReturnNode>(z.created_time);
+}
+
 } // end of namespace ZombieInternal
 
 template<const ZombieConfig& cfg, typename T>

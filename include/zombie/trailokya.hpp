@@ -11,7 +11,6 @@
 
 namespace ZombieInternal {
 
-
 namespace TockTreeElemKind {
   static constexpr size_t Nothing = 0; /* should only occur at root */
   static constexpr size_t MicroWave = 1;
@@ -25,7 +24,6 @@ public:
     Tock forward_at = std::numeric_limits<Tock>::max();
     std::shared_ptr<EZombieNode<cfg>>* forward_to = nullptr;
   };
-
 
   using TockTreeElem = std::variant<
     std::monostate,
@@ -49,7 +47,6 @@ public:
   };
 
   struct Reaper;
-
 
 public:
   // Hold MicroWave and GraveYard.

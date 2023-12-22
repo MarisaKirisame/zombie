@@ -51,21 +51,16 @@ struct std::numeric_limits<Tock> {
   }
 };
 
-
-
 // open-close.
 struct TockRange {
   Tock beg, end;
 };
-
 
 template<typename V>
 struct TockTreeData {
   TockRange range;
   V value;
 };
-
-
 
 template<typename K, typename V>
 auto largest_value_le(const std::map<K, V>& m, const K& k) {

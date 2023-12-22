@@ -254,8 +254,6 @@ TEST(ZombieTest, Reaper) {
   EXPECT_FALSE(d.evicted());
 }
 
-
-
 template<typename T, typename U>
 struct GetSize<std::pair<T, U>> {
   size_t operator()(const std::pair<T, U>& p) {
@@ -287,7 +285,6 @@ TEST(ZombieTest, EvictByMicroWave) {
   EXPECT_TRUE(a.evicted());
   EXPECT_TRUE(b.evicted());
 }
-
 
 TEST(ZombieTest, MeasureSpace) {
   {
@@ -322,4 +319,14 @@ TEST(ZombieTest, MeasureSpace) {
     auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
     EXPECT_EQ(m->space_taken.count(), Space(2 * sizeof(int)).count());
   }
+}
+
+TEST(ZombieTest, TC) {
+  Zombie<int> a(1);
+  Zombie<int> b = bindZombieTC<int>([&](int) {
+    return TailCall([](int x){ return Result(Zombie<int>(x + 1)); }, a);
+  }, a);
+  EXPECT_EQ(b.get_value(), 2);
+  b.evict();
+  EXPECT_EQ(b.get_value(), 2);
 }

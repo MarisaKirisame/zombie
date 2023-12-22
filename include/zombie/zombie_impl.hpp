@@ -39,7 +39,6 @@ MicroWave<cfg>::MicroWave(
   }
 }
 
-
 template<const ZombieConfig& cfg>
 Output MicroWave<cfg>::play(const std::function<Output(const std::vector<const void*>& in)>& f,
                           const std::vector<Tock>& inputs) {
@@ -89,7 +88,6 @@ void MicroWave<cfg>::accessed() const {
     t.book.touch(pool_index);
   }
 }
-
 
 template<const ZombieConfig& cfg>
 void MicroWave<cfg>::evict() {
@@ -152,7 +150,6 @@ std::pair<Tock, Time> MicroWave<cfg>::info_of_set() const {
   }
 }
 
-
 template<const ZombieConfig& cfg>
 void MicroWave<cfg>::merge_with(Tock other_tock) {
   auto& t = Trailokya<cfg>::get_trailokya();
@@ -173,9 +170,6 @@ void MicroWave<cfg>::merge_with(Tock other_tock) {
   root1->_set_parent = root_info2.first;
   root2->_set_cost = root1->_set_cost + root2->_set_cost;
 }
-
-
-
 
 template<const ZombieConfig& cfg>
 MicroWavePtr<cfg>::MicroWavePtr(
@@ -362,27 +356,45 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
     [f = std::forward<F>(f)](const std::vector<const void*> in) {
       auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
       std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-      auto z = std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
-      return std::make_shared<ReturnNode>(z.created_time);
+      return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args));
     };
   std::vector<Tock> in = {x.created_time...};
   Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
   return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
 }
 
-// todo: broken code. fix.
 template<const ZombieConfig& cfg, typename F, typename... Arg>
-auto bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
-  using ret_type = decltype(f(std::declval<Arg>()...));
-  std::function<Tock(const std::vector<const void*>&)> func =
-    [f = std::forward<F>(f)](const std::vector<const void*> in) {
-      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-      auto z = std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
-      return z.created_time;
-    };
-  std::vector<Tock> in = {x.created_time...};
-  return bindZombieRaw<cfg, ret_type>(std::move(func), std::move(in));
+Output TailCall(F f, const Zombie<cfg, Arg>& ...x) {
+  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
+  std::function<Output()> o = [g = std::move(f), x...]() {
+    std::function<Output(const std::vector<const void*>&)> func =
+      [f = std::move(g)](const std::vector<const void*> in) {
+        auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+        std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+        return std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
+      };
+    std::vector<Tock> in = {x.created_time...};
+    return bindZombieRaw<cfg>(std::move(func), std::move(in));
+  };
+  return std::make_shared<TCNode>(o);
+}
+
+// todo: broken code. fix.
+template<typename Ret, const ZombieConfig& cfg, typename F, typename... Arg>
+Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
+  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  Output o = TailCall(std::forward<F>(f), x...);
+  while(dynamic_cast<ReturnNode*>(o.get()) == nullptr) {
+    o = dynamic_cast<TCNode*>(o.get())->func();
+  }
+  Tock output = dynamic_cast<ReturnNode*>(o.get())->t;
+  t.akasha.finish_tc(t.current_tock, [&](auto* v) {
+    std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(*v);
+    mv->end_time = t.current_tock;
+    mv->output = output;
+  });
+  return Zombie<cfg, Ret>(output);
 }
 
 // While this function is not strictly necessary, as it could be replaced by binding and passing a Zombie<list<Any>>,
@@ -396,8 +408,7 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
   }
   std::function<Output(const std::vector<const void*>&)> func =
     [f = std::forward<F>(f)](const std::vector<const void*> in) {
-      auto z = f(in);
-      return std::make_shared<ReturnNode>(z.created_time);
+      return Result(f(in));
     };
   Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
   return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
