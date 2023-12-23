@@ -80,3 +80,21 @@ void TockTreeTestFilterChildren() {
 TEST(TockTreeTest, FilterChildren) {
   TockTreeTestFilterChildren<TockTreeImpl::Tree>();
 }
+
+template<TockTreeImpl impl>
+void TockTreeTestRemove() {
+  TockTree<impl, int, NotifyParentChanged> tt;
+
+  for (int i = 1; i <= 20; i++) {
+    tt.put({i, 21 - i}, i);
+  }
+
+  for (int i = 18; i >= 2; i--) {
+    tt.remove_precise(i);
+  }
+}
+
+TEST(TockTreeTest, Remove) {
+  TockTreeTestRemove<TockTreeImpl::Tree>();
+}
+

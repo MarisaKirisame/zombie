@@ -149,7 +149,8 @@ public:
   }
 
   TockTreeData<V>& put(const TockRange& r, const V& v) {
-    return put(r, v);
+    V v_ = v;
+    return put(r, std::move(v_));
   }
 
   TockTreeData<V>& put(const TockRange& r, V&& v) {
