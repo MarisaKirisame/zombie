@@ -3,6 +3,7 @@
 #include <variant>
 
 #include "common.hpp"
+#include "cache.hpp"
 #include "tree.hpp"
 
 enum class TockTreeImpl {
@@ -14,6 +15,6 @@ template<TockTreeImpl impl, typename T, typename NotifyParentChanged>
 using TockTree = std::variant_alternative_t<
   (size_t)impl,
   std::variant<
-    TockTreeImpls::TockTree<T, NotifyParentChanged>
+    TockTreeImpls::TockTree<T, TockTreeCaches::NoneCache, NotifyParentChanged>
   >
 >;

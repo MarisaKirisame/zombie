@@ -9,7 +9,7 @@
 
 namespace TockTreeImpls {
 
-template<typename V, typename NotifyParentChanged>
+template<typename V, template<typename> class Cache, typename NotifyParentChanged>
 struct TockTree {
 private:
   struct Node : std::enable_shared_from_this<Node> {
@@ -109,15 +109,27 @@ private:
     NotifyParentChanged()(n->data, parent);
   }
 
+  mutable Cache<Node> cache;
+
 public:
   std::shared_ptr<Node> n = std::make_shared<Node>(nullptr, TockRange{std::numeric_limits<Tock>::min(), std::numeric_limits<Tock>::max()}, V());
 
+  std::shared_ptr<Node> visit_node(const Tock& t) {
+    auto nd = cache.get(t).value_or(n)->get_node(t);
+    cache.update(t, nd);
+    return nd;
+  }
+
   TockTreeData<V>& get_node(const Tock& t) {
-    return n->get_node(t)->data;
+    auto nd = cache.get(t).value_or(n)->get_node(t);
+    cache.update(t, nd);
+    return nd->data;
   }
 
   const TockTreeData<V>& get_node(const Tock& t) const {
-    return n->get_node(t)->data;
+    auto nd = cache.get(t).value_or(n)->get_node(t);
+    cache.update(t, nd);
+    return nd->data;
   }
 
   bool has_precise(const Tock& t) const {
@@ -176,21 +188,21 @@ public:
 
   void remove_precise(const Tock& t) {
     assert(has_precise(t));
-    n->get_node(t)->delete_node();
+    visit_node(t)->delete_node();
   }
 
   void filter_children(const std::function<bool(const TockTreeData<V>&)>& f, const Tock& t) {
     assert(has_precise(t));
-    n->get_node(t)->filter_children(f);
+    visit_node(t)->filter_children(f);
   }
 
   void finish_tc(const Tock& t, const std::function<void(V*)>& f) {
-    n->get_node(t)->finish_tc(t, f);
+    visit_node(t)->finish_tc(t, f);
   }
 };
 
-template<typename V, typename NPC>
-std::ostream& print(std::ostream& os, const typename TockTree<V, NPC>::Node& n) {
+template<typename V, template<typename> class Cache, typename NPC>
+std::ostream& print(std::ostream& os, const typename TockTree<V, Cache, NPC>::Node& n) {
   os << "Node " << n.data.value << " [" << n.data.range.beg << ", " << n.data.range.end << ")" << " {" << std::endl;
   for (const auto& p : n.children) {
     print<V>(os, p.second);
@@ -198,8 +210,8 @@ std::ostream& print(std::ostream& os, const typename TockTree<V, NPC>::Node& n) 
   return os << "}" << std::endl;
 }
 
-template<typename V, typename NPC>
-std::ostream& operator<<(std::ostream& os, const TockTree<V, NPC>& v) {
+template<typename V, template<typename> class Cache, typename NPC>
+std::ostream& operator<<(std::ostream& os, const TockTree<V, Cache, NPC>& v) {
   print<V>(os, v.n);
   return os;
 }
