@@ -86,7 +86,7 @@ void TockTreeTestRemove() {
   TockTree<impl, int, NotifyParentChanged> tt;
 
   for (int i = 1; i <= 20; i++) {
-    tt.put({i, 21 - i}, i);
+    tt.put({i, 41 - i}, i);
   }
 
   for (int i = 18; i >= 2; i--) {
