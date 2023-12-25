@@ -47,7 +47,6 @@ public:
   };
 
   struct Reaper;
-
 public:
   // Hold MicroWave and GraveYard.
   TockTree<cfg.tree, TockTreeElem, NotifyParentChanged> akasha;
@@ -66,7 +65,6 @@ public:
     return t;
   }
 
-
   // return the closest MicroWave holding [t]
   std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {
     TockTreeElem elem = akasha.get_node(t).value;
@@ -82,7 +80,6 @@ public:
       }
     }
   }
-
 
 public:
   struct Reaper {

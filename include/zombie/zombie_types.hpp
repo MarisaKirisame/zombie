@@ -247,31 +247,43 @@ struct Zombie : EZombie<cfg> {
   void construct(Args&&... args);
 
   Zombie(const Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
+
   Zombie(Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
+
   Zombie(Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
+
   Zombie(const Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
+
   template<typename... Arg>
   Zombie(Arg&&... arg) {
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Zombie<cfg, T>>>::value, "should not match this constructor");
     construct(std::forward<Arg>(arg)...);
   }
+
   Zombie(const T& t) {
     construct(t);
   }
+
   Zombie(T&& t) {
     construct(std::move(t));
   }
+
   Zombie(Tock&& t) : EZombie<cfg>(t) { }
+
   Zombie(const Tock& t) : EZombie<cfg>(t) { }
+
   Zombie(Tock& t) : EZombie<cfg>(t) { }
+
   Zombie() = delete;
 
   std::shared_ptr<ZombieNode<cfg, T>> shared_ptr() const {
     return non_null(std::dynamic_pointer_cast<ZombieNode<cfg, T>>(EZombie<cfg>::shared_ptr()));
   }
+
   void recompute() const {
     shared_ptr();
   }
+
   T get_value() const {
     return shared_ptr()->get_ref();
   }
