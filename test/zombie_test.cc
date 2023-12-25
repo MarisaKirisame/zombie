@@ -296,7 +296,6 @@ TEST(ZombieTest, MeasureSpace) {
       }, za);
     });
 
-
     z.evict();
     EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
     auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
@@ -323,10 +322,22 @@ TEST(ZombieTest, MeasureSpace) {
 
 TEST(ZombieTest, TC) {
   Zombie<int> a(1);
-  Zombie<int> b = bindZombieTC<int>([&](int) {
+  Zombie<int> b = bindZombieTC<int>([&]() {
     return TailCall([](int x){ return Result(Zombie<int>(x + 1)); }, a);
-  }, a);
+  });
   EXPECT_EQ(b.get_value(), 2);
   b.evict();
   EXPECT_EQ(b.get_value(), 2);
+}
+
+TEST(ZombieTest, NoSteal) {
+  Zombie<int> y = [](){
+    std::function<Zombie<int>()> f = [](){ return Zombie<int>(0); };
+    Zombie<int> x = bindZombie(f);
+    EXPECT_EQ(x.get_value(), 0);
+    EXPECT_EQ(static_cast<bool>(f), true);
+    return x;
+  }();
+  y.evict();
+  EXPECT_EQ(y.get_value(), 0);
 }

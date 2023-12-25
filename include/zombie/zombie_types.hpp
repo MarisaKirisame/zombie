@@ -22,6 +22,7 @@ struct ReturnNode : OutputNode {
 };
 
 struct TCNode : OutputNode {
+  // can only be called once.
   std::function<Output()> func;
   template<typename... Arg>
   explicit TCNode(Arg... arg) : func(std::forward<Arg>(arg)...) { }

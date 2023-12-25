@@ -15,6 +15,11 @@
     using Zombie = ZombieInternal::Zombie<cfg, T>;\
     using Trailokya = ZombieInternal::Trailokya<cfg>;\
     template<typename F, typename... Args>\
-    inline auto bindZombie(F&& f, const Zombie<Args>& ...x) { return ZombieInternal::bindZombie<cfg, F, Args...>(std::move(f), x...); }\
+    inline auto bindZombie(F&& f, const Zombie<Args>& ...x) { return ZombieInternal::bindZombie<cfg, F, Args...>(std::forward<F>(f), x...); }\
     template<typename F>\
-    inline auto bindZombieUnTyped(F&& f, const std::vector<ZombieInternal::EZombie<cfg>>& x) { return ZombieInternal::bindZombieUnTyped<cfg, F>(std::move(f), x); }
+    inline auto bindZombieUnTyped(F&& f, const std::vector<ZombieInternal::EZombie<cfg>>& x) { return ZombieInternal::bindZombieUnTyped<cfg, F>(std::forward<F>(f), x); } \
+    template<typename Ret, typename F, typename... Args>\
+    inline auto bindZombieTC(F&& f, const Zombie<Args>& ...x) { return ZombieInternal::bindZombieTC<cfg, Ret, F, Args...>(std::forward<F>(f), x...); } \
+    using Output = ZombieInternal::Output;\
+    template<typename F, typename... Arg>\
+    inline Output TailCall(F&& f, const Zombie<Arg>& ...x) { return ZombieInternal::TailCall<cfg, F, Arg...>(std::forward<F>(f), x...); }

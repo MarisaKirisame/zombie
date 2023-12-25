@@ -364,11 +364,11 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
-Output TailCall(F f, const Zombie<cfg, Arg>& ...x) {
+Output TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
-  std::function<Output()> o = [g = std::move(f), x...]() {
+  std::function<Output()> o = [f = std::forward<F>(f), x...]() {
     std::function<Output(const std::vector<const void*>&)> func =
-      [f = std::move(g)](const std::vector<const void*> in) {
+      [f = std::move(f)](const std::vector<const void*> in) {
         auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
         std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
         return std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
@@ -379,7 +379,7 @@ Output TailCall(F f, const Zombie<cfg, Arg>& ...x) {
   return std::make_shared<TCNode>(o);
 }
 
-template<typename Ret, const ZombieConfig& cfg, typename F, typename... Arg>
+template<const ZombieConfig& cfg, typename Ret, typename F, typename... Arg>
 Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
