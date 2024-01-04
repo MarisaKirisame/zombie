@@ -11,24 +11,25 @@
 namespace ZombieInternal {
 
 template<const ZombieConfig& cfg>
-MicroWave<cfg>::MicroWave(
-  std::function<Output(const std::vector<const void*>& in)>&& f,
-  const std::vector<Tock>& inputs,
-  const Tock& output,
-  const Tock& start_time,
-  const Tock& end_time,
-  const Space& space,
-  const Time& time_taken
-) : f(std::move(f)),
-  inputs(inputs),
-  output(output),
-  start_time(start_time),
-  end_time(end_time),
-  space_taken(space),
-  time_taken(time_taken),
-  last_accessed(Trailokya<cfg>::get_trailokya().meter.time()),
-  _set_parent(start_time),
-  _set_cost(time_taken) {
+MicroWave<cfg>::MicroWave(std::function<Output(const std::vector<const void*>& in)>&& f,
+                          const MWState& state,
+                          const std::vector<Tock>& inputs,
+                          const Tock& output,
+                          const Tock& start_time,
+                          const Tock& end_time,
+                          const Space& space,
+                          const Time& time_taken)
+  : f(std::move(f)),
+    state(state),
+    inputs(inputs),
+    output(output),
+    start_time(start_time),
+    end_time(end_time),
+    space_taken(space),
+    time_taken(time_taken),
+    last_accessed(Trailokya<cfg>::get_trailokya().meter.time()),
+    _set_parent(start_time),
+    _set_cost(time_taken) {
 
   auto& t = Trailokya<cfg>::get_trailokya();
   for (const Tock& in : inputs) {
@@ -172,15 +173,15 @@ void MicroWave<cfg>::merge_with(Tock other_tock) {
 }
 
 template<const ZombieConfig& cfg>
-MicroWavePtr<cfg>::MicroWavePtr(
-  std::function<Output(const std::vector<const void*>& in)>&& f,
-  const std::vector<Tock>& inputs,
-  const Tock& output,
-  const Tock& start_time,
-  const Tock& end_time,
-  const Space& space,
-  const Time& time_taken
-) : std::shared_ptr<MicroWave<cfg>>(std::make_shared<MicroWave<cfg>>(std::move(f), inputs, output, start_time, end_time, space, time_taken)) {
+MicroWavePtr<cfg>::MicroWavePtr(std::function<Output(const std::vector<const void*>& in)>&& f,
+                                const MWState& state,
+                                const std::vector<Tock>& inputs,
+                                const Tock& output,
+                                const Tock& start_time,
+                                const Tock& end_time,
+                                const Space& space,
+                                const Time& time_taken) :
+  std::shared_ptr<MicroWave<cfg>>(std::make_shared<MicroWave<cfg>>(std::move(f), state, inputs, output, start_time, end_time, space, time_taken)) {
   auto& t = Trailokya<cfg>::get_trailokya();
   t.book.push(std::make_unique<RecomputeLater<cfg>>(start_time, *this), (*this)->cost());
 }
@@ -332,7 +333,8 @@ Output bindZombieRaw(std::function<Output(const std::vector<const void*>&)>&& fu
     bool is_tailcall = dynamic_cast<ReturnNode*>(out.get()) == nullptr;
     Tock end_time = (!is_tailcall) ? t.current_tock : std::numeric_limits<Tock>::max();
     Tock out_tock = (!is_tailcall) ? dynamic_cast<ReturnNode*>(out.get())->t : 0;
-    t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    MWState state = (!is_tailcall) ? MWState::Complete() : MWState::TailCall();
+    t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), state, in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
     return out;
   } else {
     const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);

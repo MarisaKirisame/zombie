@@ -9,6 +9,8 @@
 
 namespace TockTreeImpls {
 
+// note that as TockRange is open-close, the largest value is natrually out of the range of tock tree.
+// this is not a critical limitation: one can always use Option<X> in place of X, with None being the largest value.
 template<typename V, template<typename> class Cache, typename NotifyParentChanged>
 struct TockTree {
 private:
