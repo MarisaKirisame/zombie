@@ -344,29 +344,56 @@ struct IsZombie<Zombie<cfg, T>> : std::true_type { };
 template<const ZombieConfig& cfg>
 Output bindZombieRaw(std::function<Output(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  if (!t.akasha.has_precise(t.current_tock)) {
+  auto default_path = [&](const Tock& min_end_time) {
     Tock start_time = t.current_tock++;
     std::tuple<Output, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
     Output out = std::get<0>(p);
     ns time_taken = std::get<1>(p);
     size_t space_taken = std::get<2>(p);
+    t.current_tock = std::max(min_end_time, t.current_tock);
     bool is_tailcall = dynamic_cast<ReturnNode*>(out.get()) == nullptr;
-    Tock end_time = (!is_tailcall) ? t.current_tock : std::numeric_limits<Tock>::max();
-    Tock out_tock = (!is_tailcall) ? dynamic_cast<ReturnNode*>(out.get())->t : 0;
-    MWState state = (!is_tailcall) ? MWState::Complete() : MWState::TailCall();
-    t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), state, in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    if (is_tailcall) {
+      // get the to-be-inserted MicroWave's parent, and set the end to that's end.
+      Tock end_time = t.akasha.get_node(start_time).range.end;
+      Tock out_tock = std::numeric_limits<Tock>::max();
+      t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::TailCall(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    } else if (t.tardis.is_partial) {
+      Tock end_time = t.current_tock;
+      Tock out_tock = std::numeric_limits<Tock>::max();
+      t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::Partial(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    } else {
+      Tock end_time = t.current_tock;
+      Tock out_tock = dynamic_cast<ReturnNode*>(out.get())->t;
+      MWState state = (!is_tailcall) ? MWState::Complete() : MWState::TailCall();
+      t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::Complete(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    }
     return out;
+  };
+  if (!t.akasha.has_precise(t.current_tock)) {
+    return default_path(std::numeric_limits<Tock>::min());
   } else {
     const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
-    t.current_tock = n.range.end;
     std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(n.value);
-    auto ret(mv->output);
-    // we choose call-by-need because it is more memory efficient.
-    constexpr bool call_by_value = false;
-    if (call_by_value) {
-      EZombie<cfg>(ret).shared_ptr();
+    if (mv->state == MWState::Complete()) {
+      t.current_tock = n.range.end;
+      auto ret(mv->output);
+      // we choose call-by-need because it is more memory efficient.
+      constexpr bool call_by_value = false;
+      if (call_by_value) {
+        EZombie<cfg>(ret).shared_ptr();
+      }
+      return std::make_shared<ReturnNode>(ret);
+    } else if (mv->state == MWState::TailCall()) {
+      // replaying. we will not finish because our result is partial. no need to update the MicroWave in such case.
+      Tock start_time = t.current_tock++;
+      return MicroWave<cfg>::play(func, in);
+    } else {
+      assert(mv->state == MWState::Partial());
+      // technically we dont need this, but I want to remove the shared_ptr. lets not setup trap for future us.
+      Tock min_end_time = mv->end_time;
+      t.akasha.remove_precise(t.current_tock);
+      return default_path(min_end_time);
     }
-    return std::make_shared<ReturnNode>(ret);
   }
 }
 
@@ -427,20 +454,26 @@ Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
     o = dynamic_cast<TCNode*>(o.get())->func();
   }
   Tock output = dynamic_cast<ReturnNode*>(o.get())->t;
-  auto node = t.akasha.visit_node(t.current_tock-1);
-  while (node) {
-    if (node->data.value.index() == TockTreeElemKind::MicroWave) {
-      std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(node->data.value);
-      if (mv->state == MWState::TailCall()) {
-        node->data.range.end = t.current_tock;
-        mv->state = t.tardis.is_partial ? MWState::Partial() : MWState::Complete();
-        mv->end_time = t.current_tock;
-        mv->output = output;
-      } else {
-        break;
+  // Why do we only fix to complete and not to partial?
+  // TailCall mean "we are still actively working on it."
+  // It will eventually get fixed once that return, so there is no need to touch it.
+  // Another way of thinking about it is, changing it to Partial does not have any benefit.
+  if (!t.tardis.is_partial) {
+    auto node = t.akasha.visit_node(t.current_tock-1);
+    while (node) {
+      if (node->data.value.index() == TockTreeElemKind::MicroWave) {
+        std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(node->data.value);
+        if (mv->state == MWState::TailCall()) {
+          node->data.range.end = t.current_tock;
+          mv->state = MWState::Complete();
+          mv->end_time = t.current_tock;
+          mv->output = output;
+        } else {
+          break;
+        }
       }
+      node = node->parent;
     }
-    node = node->parent;
   }
   return Zombie<cfg, Ret>(output);
 }
