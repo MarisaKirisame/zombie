@@ -43,6 +43,9 @@ struct MWState {
   static MWState TailCall() {
     return MWState(TailCall_);
   }
+  bool operator==(const MWState& rhs) const {
+    return inner == rhs.inner;
+  }
 };
 // A MicroWave record a computation executed by bindZombie, to replay it.
 // Note that a MicroWave may invoke more bindZombie, which may create MicroWave.
@@ -222,6 +225,8 @@ struct EZombie {
   EZombie(Tock created_time) : created_time(created_time) { }
   EZombie() { }
 
+  static EZombie Partial();
+
   std::weak_ptr<EZombieNode<cfg>> ptr() const;
 
   bool evicted() const {
@@ -264,12 +269,14 @@ struct EZombie {
 //
 // the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
 // T should manage it's own memory:
-// when T is construct, only then all memory is released.
-// this mean T should not hold shared_ptr.
+// when T is destructed, only then all memory is released.
+// this mean T should not hold shared_ptr, as others might be sharing it.
 // T having Zombie is allowed though.
 template<const ZombieConfig& cfg, typename T>
 struct Zombie : EZombie<cfg> {
   static_assert(!std::is_reference_v<T>, "Zombie should not hold a reference");
+
+  static Zombie Partial();
 
   template<typename... Args>
   void construct(Args&&... args);

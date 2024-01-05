@@ -205,8 +205,6 @@ void EZombieNode<cfg>::accessed() const {
     parent->accessed();
 }
 
-
-
 template<const ZombieConfig& cfg>
 std::shared_ptr<MicroWave<cfg>> EZombieNode<cfg>::get_parent() const {
   auto ret = parent_cache.lock();
@@ -289,18 +287,40 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
   }
 }
 
+template<const ZombieConfig& cfg>
+EZombie<cfg> EZombie<cfg>::Partial() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  t.current_tock++;
+  return EZombie(std::numeric_limits<Tock>::max());
+}
+
+template<const ZombieConfig& cfg, typename T>
+Zombie<cfg, T> Zombie<cfg, T>::Partial() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  t.current_tock++;
+  return Zombie<cfg, T>(std::numeric_limits<Tock>::max());
+}
+
 template<const ZombieConfig& cfg, typename T>
 template<typename... Args>
 void Zombie<cfg, T>::construct(Args&&... args) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  EZombie<cfg>::created_time = t.current_tock++;
-  if (!t.akasha.has_precise(EZombie<cfg>::created_time)) {
-    auto shared = std::make_shared<ZombieNode<cfg, T>>(this->created_time, std::forward<Args>(args)...);
-    this->ptr_cache = shared;
-    t.akasha.put({this->created_time, this->created_time + 1}, { shared });
-  }
-  if (t.tardis.forward_at == this->created_time) {
-    *t.tardis.forward_to = shared_ptr();
+  if (t.tardis.is_partial) {
+    assert(t.tardis.forward_to == nullptr || *t.tardis.forward_to);
+    EZombie<cfg>::created_time = std::numeric_limits<Tock>::max();
+    // why bother increasing the tock? well - the larger this tock is the larger that of capturing microwave.
+    // this potentially cause a replay at a more precise partial node.
+    t.current_tock++;
+  } else {
+    EZombie<cfg>::created_time = t.current_tock++;
+    if (!t.akasha.has_precise(EZombie<cfg>::created_time)) {
+      auto shared = std::make_shared<ZombieNode<cfg, T>>(this->created_time, std::forward<Args>(args)...);
+      this->ptr_cache = shared;
+      t.akasha.put({this->created_time, this->created_time + 1}, { shared });
+    }
+    if (t.tardis.forward_at == this->created_time) {
+      *t.tardis.forward_to = shared_ptr();
+    }
   }
 }
 
@@ -354,31 +374,48 @@ template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
   using ret_type = decltype(f(std::declval<Arg>()...));
   static_assert(IsZombie<ret_type>::value, "should be zombie");
-  std::function<Output(const std::vector<const void*>&)> func =
-    [f = std::forward<F>(f)](const std::vector<const void*> in) {
-      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-      return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args));
-    };
-  std::vector<Tock> in = {x.created_time...};
-  Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
-  return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  // I hate we have the following partial-handling code at here, tc, and untyped.
+  assert(t.current_tock != t.tardis.forward_at);
+  if (t.current_tock > t.tardis.forward_at) {
+    t.tardis.is_partial = true;
+    // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
+    return ret_type::Partial();
+  } else {
+    std::function<Output(const std::vector<const void*>&)> func =
+      [f = std::forward<F>(f)](const std::vector<const void*> in) {
+        auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+        std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+        return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args));
+      };
+    std::vector<Tock> in = {x.created_time...};
+    Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
+    return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
+  }
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 Output TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
-  std::function<Output()> o = [f = std::forward<F>(f), x...]() {
-    std::function<Output(const std::vector<const void*>&)> func =
-      [f = std::move(f)](const std::vector<const void*> in) {
-        auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-        std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-        return std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
-      };
-    std::vector<Tock> in = {x.created_time...};
-    return bindZombieRaw<cfg>(std::move(func), std::move(in));
-  };
-  return std::make_shared<TCNode>(o);
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  assert(t.current_tock != t.tardis.forward_at);
+  if (t.current_tock > t.tardis.forward_at) {
+    t.tardis.is_partial = true;
+    // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
+    return std::make_shared<ReturnNode>(EZombie<cfg>::Partial().created_time);
+  } else {
+    std::function<Output()> o = [f = std::forward<F>(f), x...]() {
+      std::function<Output(const std::vector<const void*>&)> func =
+        [f = std::move(f)](const std::vector<const void*> in) {
+          auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+          std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+          return std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
+        };
+      std::vector<Tock> in = {x.created_time...};
+      return bindZombieRaw<cfg>(std::move(func), std::move(in));
+    };
+    return std::make_shared<TCNode>(o);
+  }
 }
 
 template<const ZombieConfig& cfg, typename Ret, typename F, typename... Arg>
@@ -390,11 +427,21 @@ Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
     o = dynamic_cast<TCNode*>(o.get())->func();
   }
   Tock output = dynamic_cast<ReturnNode*>(o.get())->t;
-  t.akasha.finish_tc(t.current_tock, [&](auto* v) {
-    std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(*v);
-    mv->end_time = t.current_tock;
-    mv->output = output;
-  });
+  auto node = t.akasha.visit_node(t.current_tock-1);
+  while (node) {
+    if (node->data.value.index() == TockTreeElemKind::MicroWave) {
+      std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(node->data.value);
+      if (mv->state == MWState::TailCall()) {
+        node->data.range.end = t.current_tock;
+        mv->state = t.tardis.is_partial ? MWState::Partial() : MWState::Complete();
+        mv->end_time = t.current_tock;
+        mv->output = output;
+      } else {
+        break;
+      }
+    }
+    node = node->parent;
+  }
   return Zombie<cfg, Ret>(output);
 }
 
@@ -403,15 +450,23 @@ Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
 template<const ZombieConfig& cfg, typename F>
 auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
   using ret_type = decltype(f(std::declval<std::vector<const void*>>()));
-  std::vector<Tock> in;
-  for (const EZombie<cfg>& ez : x) {
-    in.push_back(ez.created_time);
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  assert(t.current_tock != t.tardis.forward_at);
+  if (t.current_tock > t.tardis.forward_at) {
+    t.tardis.is_partial = true;
+    // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
+    return ret_type::Partial();
+  } else {
+    std::vector<Tock> in;
+    for (const EZombie<cfg>& ez : x) {
+      in.push_back(ez.created_time);
+    }
+    std::function<Output(const std::vector<const void*>&)> func =
+      [f = std::forward<F>(f)](const std::vector<const void*> in) {
+        return Result(f(in));
+      };
+    Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
+    return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
   }
-  std::function<Output(const std::vector<const void*>&)> func =
-    [f = std::forward<F>(f)](const std::vector<const void*> in) {
-      return Result(f(in));
-    };
-  Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
-  return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
 }
 } // end of namespace ZombieInternal

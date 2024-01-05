@@ -23,6 +23,7 @@ public:
   struct Tardis {
     Tock forward_at = std::numeric_limits<Tock>::max();
     std::shared_ptr<EZombieNode<cfg>>* forward_to = nullptr;
+    bool is_partial = false;
   };
 
   using TockTreeElem = std::variant<

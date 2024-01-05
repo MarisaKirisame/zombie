@@ -13,7 +13,9 @@ namespace TockTreeImpls {
 // this is not a critical limitation: one can always use Option<X> in place of X, with None being the largest value.
 template<typename V, template<typename> class Cache, typename NotifyParentChanged>
 struct TockTree {
-private:
+// todo: it should be private, but upward fixing of tailcall require more publicity then i thought.
+// make some stuff private again.
+public:
   struct Node : std::enable_shared_from_this<Node> {
     // nullptr iff toplevel
     std::shared_ptr<Node> parent;
@@ -196,10 +198,6 @@ public:
   void filter_children(const std::function<bool(const TockTreeData<V>&)>& f, const Tock& t) {
     assert(has_precise(t));
     visit_node(t)->filter_children(f);
-  }
-
-  void finish_tc(const Tock& t, const std::function<void(V*)>& f) {
-    visit_node(t)->finish_tc(t, f);
   }
 };
 
