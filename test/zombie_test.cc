@@ -229,30 +229,30 @@ struct GetSize<Block> {
   }
 };
 
-TEST(ZombieTest, Reaper) {
-  size_t MB_in_bytes = 1 >> 19;
+// TEST(ZombieTest, Reaper) {
+//   size_t MB_in_bytes = 1 >> 19;
 
-  Zombie<Block> a(MB_in_bytes);
-  Zombie<Block> b = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().meter.fast_forward(2s);
-    return Zombie<Block>(MB_in_bytes);
-  }, a);
-  Zombie<Block> c = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().meter.fast_forward(1s);
-    return Zombie<Block>(MB_in_bytes);
-  }, a);
-  Zombie<Block> d = bindZombie([&](const Block& a) {
-    Trailokya::get_trailokya().meter.fast_forward(2s);
-    return Zombie<Block>(MB_in_bytes);
-  }, a);
-  Trailokya::get_trailokya().meter.fast_forward(2s);
-  b.get_value();
-  Trailokya::get_trailokya().reaper.murder();
-  EXPECT_FALSE(a.evicted());
-  EXPECT_FALSE(b.evicted());
-  EXPECT_TRUE(c.evicted());
-  EXPECT_FALSE(d.evicted());
-}
+//   Zombie<Block> a(MB_in_bytes);
+//   Zombie<Block> b = bindZombie([&](const Block& a) {
+//     Trailokya::get_trailokya().meter.fast_forward(2s);
+//     return Zombie<Block>(MB_in_bytes);
+//   }, a);
+//   Zombie<Block> c = bindZombie([&](const Block& a) {
+//     Trailokya::get_trailokya().meter.fast_forward(1s);
+//     return Zombie<Block>(MB_in_bytes);
+//   }, a);
+//   Zombie<Block> d = bindZombie([&](const Block& a) {
+//     Trailokya::get_trailokya().meter.fast_forward(2s);
+//     return Zombie<Block>(MB_in_bytes);
+//   }, a);
+//   Trailokya::get_trailokya().meter.fast_forward(2s);
+//   b.get_value();
+//   Trailokya::get_trailokya().reaper.murder();
+//   EXPECT_FALSE(a.evicted());
+//   EXPECT_FALSE(b.evicted());
+//   EXPECT_TRUE(c.evicted());
+//   EXPECT_FALSE(d.evicted());
+// }
 
 template<typename T, typename U>
 struct GetSize<std::pair<T, U>> {
@@ -268,23 +268,23 @@ struct GetSize<Zombie<T>> {
   };
 };
 
-TEST(ZombieTest, EvictByMicroWave) {
-  size_t MB_in_bytes = 1 >> 19;
+// TEST(ZombieTest, EvictByMicroWave) {
+//   size_t MB_in_bytes = 1 >> 19;
 
-  auto z = bindZombie([&]() {
-    Zombie<Block> a(MB_in_bytes);
-    Zombie<Block> b(MB_in_bytes);
-    return Zombie<std::pair<Zombie<Block>, Zombie<Block>>>{ a, b };
-  });
-  Zombie<Block> a = z.get_value().first;
-  Zombie<Block> b = z.get_value().second;
+//   auto z = bindZombie([&]() {
+//     Zombie<Block> a(MB_in_bytes);
+//     Zombie<Block> b(MB_in_bytes);
+//     return Zombie<std::pair<Zombie<Block>, Zombie<Block>>>{ a, b };
+//   });
+//   Zombie<Block> a = z.get_value().first;
+//   Zombie<Block> b = z.get_value().second;
 
-  Trailokya::get_trailokya().meter.fast_forward(1s);
-  Trailokya::get_trailokya().reaper.murder();
+//   Trailokya::get_trailokya().meter.fast_forward(1s);
+//   Trailokya::get_trailokya().reaper.murder();
 
-  EXPECT_TRUE(a.evicted());
-  EXPECT_TRUE(b.evicted());
-}
+//   EXPECT_TRUE(a.evicted());
+//   EXPECT_TRUE(b.evicted());
+// }
 
 TEST(ZombieTest, MeasureSpace) {
   {

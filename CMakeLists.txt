@@ -59,3 +59,23 @@ gtest_discover_tests(zombie_test)
 
 add_executable(benchmark benchmark.cpp)
 target_link_libraries(benchmark zombie_lib)
+
+# ------- FOR USING GCOV -----------------
+
+# set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
+# if(CMAKE_COMPILER_IS_GNUCXX)
+# include(CodeCoverage.cmake)
+# append_coverage_compiler_flags()
+# setup_target_for_coverage(NAME ${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
+# endif()
+
+# if(CMAKE_COMPILER_IS_GNUCXX)
+# target_link_libraries(${PROJECT_TEST_NAME} gcov)
+# endif()
+
+set (MAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules)
+include (CodeCoverage.cmake)
+append_coverage_compiler_flags_to_target (zombie_test)
+    setup_target_for_coverage_gcovr_html(
+    NAME coverage
+    EXECUTABLE zombie_test)
