@@ -23,4 +23,6 @@
     template<typename T>\
     using Output = ZombieInternal::Output<T>;   \
     template<typename F, typename... Arg>\
-    inline Output<Tock> TailCall(F&& f, const Zombie<Arg>& ...x) { return ZombieInternal::TailCall<cfg, F, Arg...>(std::forward<F>(f), x...); }
+    inline Output<Tock> TailCall(F&& f, const Zombie<Arg>& ...x) { return ZombieInternal::TailCall<cfg, F, Arg...>(std::forward<F>(f), x...); }\
+    template<typename T>\
+    using TCZombie = Output<Tock>;
