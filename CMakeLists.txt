@@ -47,10 +47,11 @@ add_executable(
   zombie_test
   ${zombie_test_src}
 )
-target_link_libraries(zombie_test zombie_lib)
+target_link_libraries(zombie_test PUBLIC zombie_lib)
 
 target_link_libraries(
   zombie_test
+  PUBLIC
   GTest::gtest_main
 )
 
@@ -60,22 +61,20 @@ gtest_discover_tests(zombie_test)
 add_executable(benchmark benchmark.cpp)
 target_link_libraries(benchmark zombie_lib)
 
-# ------- FOR USING GCOV -----------------
-
-# set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR})
-# if(CMAKE_COMPILER_IS_GNUCXX)
-# include(CodeCoverage.cmake)
-# append_coverage_compiler_flags()
-# setup_target_for_coverage(NAME ${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
-# endif()
-
-# if(CMAKE_COMPILER_IS_GNUCXX)
-# target_link_libraries(${PROJECT_TEST_NAME} gcov)
-# endif()
-
+# ------- CODE COVERAGE -----------------
 set (MAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules)
 include (CodeCoverage.cmake)
 append_coverage_compiler_flags_to_target (zombie_test)
-    setup_target_for_coverage_gcovr_html(
+setup_target_for_coverage_gcovr_html(
     NAME coverage
     EXECUTABLE zombie_test)
+
+setup_target_for_coverage_lcov(
+  NAME code_coverage                             # New target name
+  EXECUTABLE ctest -j ${PROCESSOR_COUNT}         # Executable in PROJECT_BINARY_DIR
+  DEPENDENCIES zombie_test                       # Dependencies to build first
+  EXCLUDE "/usr/*" "${CMAKE_BINARY_DIR}/_deps/*" # Patterns to exclude (can be relative
+                                                 #  to BASE_DIRECTORY, with CMake 3.4+)
+  NO_DEMANGLE                                    # Don't demangle C++ symbols
+                                                 #  even if c++filt is found
+)
