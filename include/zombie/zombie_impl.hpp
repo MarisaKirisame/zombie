@@ -11,7 +11,7 @@
 namespace ZombieInternal {
 
 template<const ZombieConfig& cfg>
-MicroWave<cfg>::MicroWave(std::function<Output(const std::vector<const void*>& in)>&& f,
+MicroWave<cfg>::MicroWave(std::function<Output<Tock>(const std::vector<const void*>& in)>&& f,
                           const MWState& state,
                           const std::vector<Tock>& inputs,
                           const Tock& output,
@@ -41,8 +41,8 @@ MicroWave<cfg>::MicroWave(std::function<Output(const std::vector<const void*>& i
 }
 
 template<const ZombieConfig& cfg>
-Output MicroWave<cfg>::play(const std::function<Output(const std::vector<const void*>& in)>& f,
-                          const std::vector<Tock>& inputs) {
+Output<Tock> MicroWave<cfg>::play(const std::function<Output<Tock>(const std::vector<const void*>& in)>& f,
+                                  const std::vector<Tock>& inputs) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   std::vector<std::shared_ptr<EZombieNode<cfg>>> input_zombie;
   std::vector<const void*> in;
@@ -173,7 +173,7 @@ void MicroWave<cfg>::merge_with(Tock other_tock) {
 }
 
 template<const ZombieConfig& cfg>
-MicroWavePtr<cfg>::MicroWavePtr(std::function<Output(const std::vector<const void*>& in)>&& f,
+MicroWavePtr<cfg>::MicroWavePtr(std::function<Output<Tock>(const std::vector<const void*>& in)>&& f,
                                 const MWState& state,
                                 const std::vector<Tock>& inputs,
                                 const Tock& output,
@@ -342,16 +342,16 @@ struct IsZombie<Zombie<cfg, T>> : std::true_type { };
 
 // todo: when in recompute mode, once the needed value is computed, we can skip the rest of the computation, jumping straight up.
 template<const ZombieConfig& cfg>
-Output bindZombieRaw(std::function<Output(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
+Output<Tock> bindZombieRaw(std::function<Output<Tock>(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   auto default_path = [&](const Tock& min_end_time) {
     Tock start_time = t.current_tock++;
-    std::tuple<Output, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
-    Output out = std::get<0>(p);
+    std::tuple<Output<Tock>, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
+    Output<Tock> out = std::get<0>(p);
     ns time_taken = std::get<1>(p);
     size_t space_taken = std::get<2>(p);
     t.current_tock = std::max(min_end_time, t.current_tock);
-    bool is_tailcall = dynamic_cast<ReturnNode*>(out.get()) == nullptr;
+    bool is_tailcall = dynamic_cast<ReturnNode<Tock>*>(out.get()) == nullptr;
     if (is_tailcall) {
       // get the to-be-inserted MicroWave's parent, and set the end to that's end.
       Tock end_time = t.akasha.get_node(start_time).range.end;
@@ -363,7 +363,7 @@ Output bindZombieRaw(std::function<Output(const std::vector<const void*>&)>&& fu
       t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::Partial(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
     } else {
       Tock end_time = t.current_tock;
-      Tock out_tock = dynamic_cast<ReturnNode*>(out.get())->t;
+      Tock out_tock = dynamic_cast<ReturnNode<Tock>*>(out.get())->t;
       MWState state = (!is_tailcall) ? MWState::Complete() : MWState::TailCall();
       t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::Complete(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
     }
@@ -382,7 +382,7 @@ Output bindZombieRaw(std::function<Output(const std::vector<const void*>&)>&& fu
       if (call_by_value) {
         EZombie<cfg>(ret).shared_ptr();
       }
-      return std::make_shared<ReturnNode>(ret);
+      return std::make_shared<ReturnNode<Tock>>(ret);
     } else if (mv->state == MWState::TailCall()) {
       // replaying. we will not finish because our result is partial. no need to update the MicroWave in such case.
       Tock start_time = t.current_tock++;
@@ -409,30 +409,30 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
     // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
     return ret_type::Partial();
   } else {
-    std::function<Output(const std::vector<const void*>&)> func =
+    std::function<Output<Tock>(const std::vector<const void*>&)> func =
       [f = std::forward<F>(f)](const std::vector<const void*> in) {
         auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
         std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
         return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args));
       };
     std::vector<Tock> in = {x.created_time...};
-    Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
-    return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
+    Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
+    return ret_type(dynamic_cast<ReturnNode<Tock>*>(o.get())->t);
   }
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
-Output TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
-  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
+Output<Tock> TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
+  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output<Tock>>::value, "result must be Output");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.tardis.is_partial = true;
     // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
-    return std::make_shared<ReturnNode>(EZombie<cfg>::Partial().created_time);
+    return std::make_shared<ReturnNode<Tock>>(EZombie<cfg>::Partial().created_time);
   } else {
-    std::function<Output()> o = [f = std::forward<F>(f), x...]() {
-      std::function<Output(const std::vector<const void*>&)> func =
+    std::function<Output<Tock>()> o = [f = std::forward<F>(f), x...]() {
+      std::function<Output<Tock>(const std::vector<const void*>&)> func =
         [f = std::move(f)](const std::vector<const void*> in) {
           auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
           std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
@@ -441,19 +441,19 @@ Output TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
       std::vector<Tock> in = {x.created_time...};
       return bindZombieRaw<cfg>(std::move(func), std::move(in));
     };
-    return std::make_shared<TCNode>(o);
+    return std::make_shared<TCNode<Tock>>(o);
   }
 }
 
 template<const ZombieConfig& cfg, typename Ret, typename F, typename... Arg>
 Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
-  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output>::value, "result must be Output");
+  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output<Tock>>::value, "result must be Output");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  Output o = TailCall(std::forward<F>(f), x...);
-  while(dynamic_cast<ReturnNode*>(o.get()) == nullptr) {
-    o = dynamic_cast<TCNode*>(o.get())->func();
+  Output<Tock> o = TailCall(std::forward<F>(f), x...);
+  while(dynamic_cast<ReturnNode<Tock>*>(o.get()) == nullptr) {
+    o = dynamic_cast<TCNode<Tock>*>(o.get())->func();
   }
-  Tock output = dynamic_cast<ReturnNode*>(o.get())->t;
+  Tock output = dynamic_cast<ReturnNode<Tock>*>(o.get())->t;
   // Why do we only fix to complete and not to partial?
   // TailCall mean "we are still actively working on it."
   // It will eventually get fixed once that return, so there is no need to touch it.
@@ -494,12 +494,12 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
     for (const EZombie<cfg>& ez : x) {
       in.push_back(ez.created_time);
     }
-    std::function<Output(const std::vector<const void*>&)> func =
+    std::function<Output<Tock>(const std::vector<const void*>&)> func =
       [f = std::forward<F>(f)](const std::vector<const void*> in) {
         return Result(f(in));
       };
-    Output o = bindZombieRaw<cfg>(std::move(func), std::move(in));
-    return ret_type(dynamic_cast<ReturnNode*>(o.get())->t);
+    Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
+    return ret_type(dynamic_cast<ReturnNode<Tock>*>(o.get())->t);
   }
 }
 } // end of namespace ZombieInternal

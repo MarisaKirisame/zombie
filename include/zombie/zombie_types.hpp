@@ -10,20 +10,29 @@
 
 namespace ZombieInternal {
 
-struct OutputNode {
-  virtual ~OutputNode() { }
+struct EOutputNode {
+  virtual ~EOutputNode() { }
 };
 
-using Output = std::shared_ptr<OutputNode>;
+using EOutput = std::shared_ptr<EOutputNode>;
 
-struct ReturnNode : OutputNode {
-  Tock t;
-  explicit ReturnNode(const Tock& t) : t(t) { }
+template<typename T>
+struct OutputNode : EOutputNode { };
+
+template<typename T>
+using Output = std::shared_ptr<OutputNode<T>>;
+
+template<typename T>
+struct ReturnNode : OutputNode<T> {
+  T t;
+  ReturnNode(T&& t) : t(std::move(t)) { }
+  ReturnNode(const T& t) : t(t) { }
 };
 
-struct TCNode : OutputNode {
+template<typename T>
+struct TCNode : OutputNode<T> {
   // can only be called once.
-  std::function<Output()> func;
+  std::function<Output<T>()> func;
   template<typename... Arg>
   explicit TCNode(Arg... arg) : func(std::forward<Arg>(arg)...) { }
 };
@@ -77,7 +86,7 @@ template<const ZombieConfig& cfg>
 struct MicroWave {
 public:
   // we dont really use the Tock return type, but this allow one less boxing.
-  std::function<Output(const std::vector<const void*>& in)> f;
+  std::function<Output<Tock>(const std::vector<const void*>& in)> f;
   MWState state;
   std::vector<Tock> inputs;
   Tock output;
@@ -101,7 +110,7 @@ public:
   mutable Time _set_cost;
 
 public:
-  MicroWave(std::function<Output(const std::vector<const void*>& in)>&& f,
+  MicroWave(std::function<Output<Tock>(const std::vector<const void*>& in)>&& f,
             const MWState& state,
             const std::vector<Tock>& inputs,
             const Tock& output,
@@ -110,8 +119,8 @@ public:
             const Space& space,
             const Time& time_taken);
 
-  static Output play(const std::function<Output(const std::vector<const void*>& in)>& f,
-                     const std::vector<Tock>& inputs);
+  static Output<Tock> play(const std::function<Output<Tock>(const std::vector<const void*>& in)>& f,
+                           const std::vector<Tock>& inputs);
   cost_t cost() const;
   void replay();
 
@@ -130,7 +139,7 @@ private:
 
 template<const ZombieConfig& cfg>
 struct MicroWavePtr : public std::shared_ptr<MicroWave<cfg>> {
-  MicroWavePtr(std::function<Output(const std::vector<const void*>& in)>&& f,
+  MicroWavePtr(std::function<Output<Tock>(const std::vector<const void*>& in)>&& f,
                const MWState& state,
                const std::vector<Tock>& inputs,
                const Tock& output,
@@ -325,8 +334,8 @@ struct Zombie : EZombie<cfg> {
 };
 
 template<const ZombieConfig& cfg, typename T>
-Output Result(const Zombie<cfg, T>& z) {
-  return std::make_shared<ReturnNode>(z.created_time);
+Output<Tock> Result(const Zombie<cfg, T>& z) {
+  return std::make_shared<ReturnNode<Tock>>(z.created_time);
 }
 
 } // end of namespace ZombieInternal
