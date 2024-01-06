@@ -320,7 +320,7 @@ TEST(ZombieTest, MeasureSpace) {
   }
 }
 
-TEST(ZombieTest, TC) {
+TEST(ZombieTest, TailCall) {
   Zombie<int> a(1);
   Zombie<int> b = bindZombieTC<int>([&]() {
     return TailCall([](int x){ return Result(Zombie<int>(x + 1)); }, a);

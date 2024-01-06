@@ -37,6 +37,11 @@ struct TCNode : OutputNode<T> {
   explicit TCNode(Arg... arg) : func(std::forward<Arg>(arg)...) { }
 };
 
+template<typename T>
+struct TCZombie {
+  Output<Tock> o;
+};
+
 struct MWState {
   enum Inner {
     Complete_, Partial_, TailCall_
@@ -334,8 +339,8 @@ struct Zombie : EZombie<cfg> {
 };
 
 template<const ZombieConfig& cfg, typename T>
-Output<Tock> Result(const Zombie<cfg, T>& z) {
-  return std::make_shared<ReturnNode<Tock>>(z.created_time);
+TCZombie<T> Result(const Zombie<cfg, T>& z) {
+  return TCZombie<T> {std::make_shared<ReturnNode<Tock>>(z.created_time)};
 }
 
 } // end of namespace ZombieInternal

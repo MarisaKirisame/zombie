@@ -340,6 +340,12 @@ struct IsZombie : std::false_type { };
 template<const ZombieConfig& cfg, typename T>
 struct IsZombie<Zombie<cfg, T>> : std::true_type { };
 
+template<typename T>
+struct IsTCZombie : std::false_type { };
+
+template<typename T>
+struct IsTCZombie<TCZombie<T>> : std::true_type { };
+
 // todo: when in recompute mode, once the needed value is computed, we can skip the rest of the computation, jumping straight up.
 template<const ZombieConfig& cfg>
 Output<Tock> bindZombieRaw(std::function<Output<Tock>(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
@@ -413,7 +419,7 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
       [f = std::forward<F>(f)](const std::vector<const void*> in) {
         auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
         std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-        return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args));
+        return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args)).o;
       };
     std::vector<Tock> in = {x.created_time...};
     Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
@@ -422,34 +428,35 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
-Output<Tock> TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
-  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output<Tock>>::value, "result must be Output");
+auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
+  using ret_type = decltype(f(std::declval<Arg>()...));
+  static_assert(IsTCZombie<ret_type>::value, "should be TCZombie");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.tardis.is_partial = true;
     // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
-    return std::make_shared<ReturnNode<Tock>>(EZombie<cfg>::Partial().created_time);
+    return ret_type { std::make_shared<ReturnNode<Tock>>(EZombie<cfg>::Partial().created_time) };
   } else {
     std::function<Output<Tock>()> o = [f = std::forward<F>(f), x...]() {
       std::function<Output<Tock>(const std::vector<const void*>&)> func =
         [f = std::move(f)](const std::vector<const void*> in) {
           auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
           std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-          return std::apply([&](const Arg*... arg) { return f(*arg...); }, args);
+          return std::apply([&](const Arg*... arg) { return f(*arg...); }, args).o;
         };
       std::vector<Tock> in = {x.created_time...};
       return bindZombieRaw<cfg>(std::move(func), std::move(in));
     };
-    return std::make_shared<TCNode<Tock>>(o);
+    return ret_type { std::make_shared<TCNode<Tock>>(o) };
   }
 }
 
 template<const ZombieConfig& cfg, typename Ret, typename F, typename... Arg>
 Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
-  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), Output<Tock>>::value, "result must be Output");
+  static_assert(std::is_same<decltype(f(std::declval<Arg>()...)), TCZombie<Ret>>::value, "result must be TCZombie");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  Output<Tock> o = TailCall(std::forward<F>(f), x...);
+  Output<Tock> o = TailCall(std::forward<F>(f), x...).o;
   while(dynamic_cast<ReturnNode<Tock>*>(o.get()) == nullptr) {
     o = dynamic_cast<TCNode<Tock>*>(o.get())->func();
   }
@@ -496,7 +503,7 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
     }
     std::function<Output<Tock>(const std::vector<const void*>&)> func =
       [f = std::forward<F>(f)](const std::vector<const void*> in) {
-        return Result(f(in));
+        return Result(f(in)).o;
       };
     Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
     return ret_type(dynamic_cast<ReturnNode<Tock>*>(o.get())->t);
