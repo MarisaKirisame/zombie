@@ -63,11 +63,25 @@ public:
     }
 
     std::shared_ptr<const Node> get_node(const Tock& t) const {
-      return children_in_range(t) ? get_shallow(t)->get_node(t) : this->shared_from_this();
+      if (children_in_range(t)) {
+        return get_shallow(t)->get_node(t);
+      } else if (in_range(this->data.range, t)) {
+        return this->shared_from_this();
+      } else {
+        // if t isn't inside this subtree, go to parent
+        // by doing this, we can return any node close to t from cache
+        return this->parent->get_node(t);
+      }
     }
 
     std::shared_ptr<Node> get_node(const Tock& t) {
-      return children_in_range(t) ? get_shallow(t)->get_node(t) : this->shared_from_this();
+      if (children_in_range(t)) {
+        return get_shallow(t)->get_node(t);
+      } else if (in_range(this->data.range, t)) {
+        return this->shared_from_this();
+      } else {
+        return this->parent->get_node(t);
+      }
     }
 
     void delete_node() {
