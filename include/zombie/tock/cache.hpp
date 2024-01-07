@@ -194,7 +194,7 @@ template <typename Node> struct SplayCache {
       return {};
     } else {
       if (ptr->value.expired()) {
-        // remove(ptr);
+        remove(ptr);
         return {};
       } else {
         return ptr->value.lock();
