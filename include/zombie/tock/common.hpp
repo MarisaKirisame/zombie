@@ -82,6 +82,10 @@ auto largest_value_le(std::map<K, V>& m, const K& k) {
   }
 }
 
+inline bool in_range(const TockRange& r, const Tock &t) {
+  return r.beg <= t && t < r.end;
+}
+
 inline bool range_dominate(const TockRange& l, const TockRange& r) {
   return l.beg <= r.beg && l.end >= r.end;
 }

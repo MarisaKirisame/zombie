@@ -99,8 +99,9 @@ template <typename Node> struct SplayCache {
     }
   }
 
-  Pointer find(Pointer o, const Tock& key) {
-    Pointer& last = o;
+  Pointer find_nearby(const Pointer& root, const Tock& key) {
+    Pointer o = root;
+    Pointer last = nullptr;
 
     for (; o != nullptr; o = o->son[key < o->key ? 0 : 1]) {
       last = o;
@@ -112,28 +113,75 @@ template <typename Node> struct SplayCache {
     if (last != nullptr) {
       splay(last);
     }
-    return o;
+    return last;
   }
 
-  void insert(Pointer& o, const Tock& key, const std::shared_ptr<Node>& _value) {
-    std::weak_ptr<Node> value(_value);
-    Pointer fa = nullptr;
+  Pointer find(const Pointer& root, const Tock& key) {
+    Pointer o = find_nearby(root, key);
+    return (o == nullptr || o->key == key) ? nullptr : o;
+  }
 
-    while (o != nullptr) {
+  Pointer insert(const Pointer& root, const Tock& key, const std::shared_ptr<Node>& _value) {
+    std::weak_ptr<Node> value(_value);
+
+    if (root == nullptr) {
+      return std::make_shared<SplayNode>(nullptr, value, key);
+    }
+
+    Pointer o = root;
+    while (true) {
       if (o->key == key) {
         o->value = value;
         break;
       }
 
-      fa = o;
+      int d = key < o->key ? 0 : 1;
+      if (o->son[d] == nullptr) {
+        o->son[d] = std::make_shared<SplayNode>(o, value, key);
+        break;
+      }
+
       o = o->son[key < o->key ? 0 : 1];
     }
-
-    if (o == nullptr) {
-      o = std::make_shared<SplayNode>(fa, value, key);
-    }
+    
     splay(o);
+    return o;
   }
+
+  Pointer find_max(const Pointer& root) {
+    Pointer o = root;
+    while (o->son[1] != nullptr) {
+      o = o->son[1];
+    }
+
+    return o;
+  }
+
+  Pointer merge(const Pointer &left, const Pointer &right) {
+    if (left == nullptr) return right;
+    if (right == nullptr) return left;
+
+    Pointer left_max = find_max(left);
+    splay(left_max);
+
+    left_max->son[1] = right;
+    return left_max;
+  }
+
+  Pointer remove(const Pointer& o) {
+    assert(o != nullptr);
+    splay(o);
+    
+    for (int d = 0; d <= 1; d++) {
+      if (o->son[d] != nullptr) {
+        o->son[d]->fa = nullptr;
+      }
+    }
+
+    return merge(o->son[0], o->son[1]);
+  }
+
+  // splay tree codes end here
 
   Pointer root = nullptr;
 
@@ -144,6 +192,7 @@ template <typename Node> struct SplayCache {
       return {};
     } else {
       if (ptr->value.expired()) {
+        remove(ptr);
         return {};
       } else {
         return ptr->value.lock();
@@ -152,7 +201,7 @@ template <typename Node> struct SplayCache {
   }
 
   void update(const Tock &t, std::shared_ptr<Node> &p) {
-    insert(root, t, p);
+    root = insert(root, t, p);
   }
 };
 
