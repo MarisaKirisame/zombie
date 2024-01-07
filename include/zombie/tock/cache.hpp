@@ -142,8 +142,6 @@ template <typename Node> struct SplayCache {
       }
 
       o = o->son[key < o->key ? 0 : 1];
-
-      puts("XDDD");
     }
     
     splay(o);
