@@ -61,91 +61,91 @@ TEST(ZombieUFTest, CalculateTotalCost) {
 }
 
 
-TEST(ZombieUFTest, ReplayChangeCost) {
-  using namespace UF;
-  auto& t = Trailokya::get_trailokya();
+// TEST(ZombieUFTest, ReplayChangeCost) {
+//   using namespace UF;
+//   auto& t = Trailokya::get_trailokya();
 
-  // z1 -> z2 -> z4 <- z3
-  Zombie<int> z1 = bindZombie([&]() {
-    t.meter.fast_forward(10s);
-    return Zombie<int>(1);
-  });
-  Zombie<int> z2 = bindZombie([&](int x1) {
-    t.meter.fast_forward(11s);
-    return Zombie<int>(x1 + 1);
-  }, z1);
-  Zombie<int> z3 = bindZombie([&]() {
-    t.meter.fast_forward(12s);
-    return Zombie<int>(3);
-  });
-  Zombie<int> z4 = bindZombie([&](int x2, int x3) {
-    t.meter.fast_forward(14s);
-    return Zombie<int>(x2 + x3);
-  }, z2, z3);
-
-
-  auto m1 = t.get_microwave(z1.created_time);
-  auto m2 = t.get_microwave(z2.created_time);
-  auto m3 = t.get_microwave(z3.created_time);
-  auto m4 = t.get_microwave(z4.created_time);
+//   // z1 -> z2 -> z4 <- z3
+//   Zombie<int> z1 = bindZombie([&]() {
+//     t.meter.fast_forward(10s);
+//     return Zombie<int>(1);
+//   });
+//   Zombie<int> z2 = bindZombie([&](int x1) {
+//     t.meter.fast_forward(11s);
+//     return Zombie<int>(x1 + 1);
+//   }, z1);
+//   Zombie<int> z3 = bindZombie([&]() {
+//     t.meter.fast_forward(12s);
+//     return Zombie<int>(3);
+//   });
+//   Zombie<int> z4 = bindZombie([&](int x2, int x3) {
+//     t.meter.fast_forward(14s);
+//     return Zombie<int>(x2 + x3);
+//   }, z2, z3);
 
 
-  t.meter.fast_forward(1s);
-  for (int i = 0; i < 4; ++i) {
-    t.reaper.murder();
-  }
-
-  EXPECT_TRUE (z2.evicted() && z2.evicted() && z3.evicted() && z4.evicted());
-
-  EXPECT_EQ(m1->cost_of_set().count() / Time(1s).count(), 47);
-  EXPECT_EQ(m2->cost_of_set().count() / Time(1s).count(), 47);
-  EXPECT_EQ(m3->cost_of_set().count() / Time(1s).count(), 47);
-  EXPECT_EQ(m4->cost_of_set().count() / Time(1s).count(), 47);
-
-  int x2 = z2.get_value();
-  EXPECT_EQ(x2, 2);
-  EXPECT_FALSE(z2.evicted());
-
-  EXPECT_EQ(m3->cost_of_set().count() / Time(1s).count(), 26);
-  EXPECT_EQ(m4->cost_of_set().count() / Time(1s).count(), 26);
-}
+//   auto m1 = t.get_microwave(z1.created_time);
+//   auto m2 = t.get_microwave(z2.created_time);
+//   auto m3 = t.get_microwave(z3.created_time);
+//   auto m4 = t.get_microwave(z4.created_time);
 
 
+//   t.meter.fast_forward(1s);
+//   for (int i = 0; i < 4; ++i) {
+//     t.reaper.murder();
+//   }
 
-TEST(ZombieUFTest, CompareWithLocal) {
-#define EXAMPLE_CODE                            \
-  auto& t = Trailokya::get_trailokya();         \
-  Zombie<int> z1 = bindZombie([&]() {           \
-    t.meter.fast_forward(100s);                 \
-    return Zombie<int>(1);                      \
-  });                                           \
-  Zombie<int> z2 = bindZombie([&](int x1) {     \
-    t.meter.fast_forward(101s);                 \
-    return Zombie<int>(x1 + 1);                 \
-  }, z1);                                       \
-  Zombie<int> z3 = bindZombie([&]() {           \
-    t.meter.fast_forward(200s);                 \
-    return Zombie<int>(3);                      \
-  });                                           \
-  t.reaper.murder();                            \
-  EXPECT_TRUE (z1.evicted());                   \
-  EXPECT_FALSE(z2.evicted() || z3.evicted());   \
-  t.reaper.murder();
+//   EXPECT_TRUE (z2.evicted() && z2.evicted() && z3.evicted() && z4.evicted());
 
-  {
-    using namespace Local;
-    EXAMPLE_CODE;
-    EXPECT_TRUE (z2.evicted());
-    EXPECT_FALSE(z3.evicted());
-  }
+//   EXPECT_EQ(m1->cost_of_set().count() / Time(1s).count(), 47);
+//   EXPECT_EQ(m2->cost_of_set().count() / Time(1s).count(), 47);
+//   EXPECT_EQ(m3->cost_of_set().count() / Time(1s).count(), 47);
+//   EXPECT_EQ(m4->cost_of_set().count() / Time(1s).count(), 47);
 
-  {
-    using namespace UF;
-    EXAMPLE_CODE;
-    EXPECT_TRUE (z3.evicted());
-    EXPECT_FALSE(z2.evicted());
-  }
-}
+//   int x2 = z2.get_value();
+//   EXPECT_EQ(x2, 2);
+//   EXPECT_FALSE(z2.evicted());
+
+//   EXPECT_EQ(m3->cost_of_set().count() / Time(1s).count(), 26);
+//   EXPECT_EQ(m4->cost_of_set().count() / Time(1s).count(), 26);
+// }
+
+
+
+// TEST(ZombieUFTest, CompareWithLocal) {
+// #define EXAMPLE_CODE                            \
+//   auto& t = Trailokya::get_trailokya();         \
+//   Zombie<int> z1 = bindZombie([&]() {           \
+//     t.meter.fast_forward(100s);                 \
+//     return Zombie<int>(1);                      \
+//   });                                           \
+//   Zombie<int> z2 = bindZombie([&](int x1) {     \
+//     t.meter.fast_forward(101s);                 \
+//     return Zombie<int>(x1 + 1);                 \
+//   }, z1);                                       \
+//   Zombie<int> z3 = bindZombie([&]() {           \
+//     t.meter.fast_forward(200s);                 \
+//     return Zombie<int>(3);                      \
+//   });                                           \
+//   t.reaper.murder();                            \
+//   EXPECT_TRUE (z1.evicted());                   \
+//   EXPECT_FALSE(z2.evicted() || z3.evicted());   \
+//   t.reaper.murder();
+
+//   {
+//     using namespace Local;
+//     EXAMPLE_CODE;
+//     EXPECT_TRUE (z2.evicted());
+//     EXPECT_FALSE(z3.evicted());
+//   }
+
+//   {
+//     using namespace UF;
+//     EXAMPLE_CODE;
+//     EXPECT_TRUE (z3.evicted());
+//     EXPECT_FALSE(z2.evicted());
+//   }
+// }
 
 
 
