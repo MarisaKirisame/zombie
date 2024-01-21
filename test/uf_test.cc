@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-constexpr ZombieConfig local_cfg = { &local_metric, {1, 1} };
-constexpr ZombieConfig uf_cfg = { &uf_metric, {1, 1} };
+constexpr ZombieConfig local_cfg(/*use_cps=*/false, /*metric=*/&local_metric, /*approx_factor=*/{1, 1});
+constexpr ZombieConfig uf_cfg(/*use_cps=*/false, /*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
 
 namespace Local {
   IMPORT_ZOMBIE(default_config)
@@ -20,7 +20,6 @@ struct GetSize<std::pair<T, U>> {
     return GetSize<T>()(p.first) + GetSize<U>()(p.second);
   };
 };
-
 
 TEST(ZombieUFTest, CalculateTotalCost) {
   using namespace UF;

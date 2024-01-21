@@ -16,8 +16,6 @@
     template<typename T>                                                                             \
     using TCZombie = ZombieInternal::TCZombie<T>;                                                    \
     using Trailokya = ZombieInternal::Trailokya<cfg>;                                                \
-    template<typename T>                                                                             \
-    using Output = ZombieInternal::Output<T>;                                                        \
     template<typename F, typename... Args>                                                           \
     inline auto bindZombie(F&& f, const Zombie<Args>& ...x) {                                        \
       return ZombieInternal::bindZombie<cfg, F, Args...>(std::forward<F>(f), x...);                  \

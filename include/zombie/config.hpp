@@ -22,6 +22,11 @@ inline std::ostream& operator<<(std::ostream& o, const cost_t& x) {
 using Metric = cost_t(*)(Time cost, Time neighbor_cost, Space size);
 
 struct ZombieConfig {
+  // There are two zombie mode,
+  // The ANF('default mode') and the cps mode.
+  // The cps mode is more efficient but it does not allow bindZombie inside bindZombie.
+  // Instead every call must be tailcall.
+  bool use_cps;
   Metric metric;
   // for some varying metric, such as those concerning UF set,
   // the cost in [Trailokya::book] may not be up-to-date.
@@ -29,6 +34,13 @@ struct ZombieConfig {
   // we ignore the difference
   // [approx_factor] is stored as a rational number as a/b here. it must be greater than 1.
   std::pair<unsigned int, unsigned int> approx_factor;
+  constexpr ZombieConfig(const bool& use_cps,
+               const Metric& metric,
+               const std::pair<unsigned int, unsigned int>& approx_factor) :
+    use_cps(use_cps),
+    metric(metric),
+    approx_factor(approx_factor)
+  { }
 };
 
 inline cost_t local_metric(Time cost, Time neighbor_cost, Space size) {
@@ -39,4 +51,4 @@ inline cost_t uf_metric(Time cost, Time neighbor_cost, Space size) {
   return (static_cast<int128_t>(neighbor_cost.count()) * (1UL << 63)) / size.count();
 }
 
-constexpr ZombieConfig default_config = ZombieConfig { .metric = &uf_metric, .approx_factor = {2, 1} };
+constexpr ZombieConfig default_config(/*use_cps=*/false, /*metric=*/&uf_metric, /*approx_factor=*/{2, 1});
