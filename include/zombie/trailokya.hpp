@@ -50,7 +50,7 @@ public:
   struct Reaper;
 public:
   // Hold MicroWave and GraveYard.
-  TockTree<cfg.tree, TockTreeElem, NotifyParentChanged> akasha;
+  TockTree<TockTreeElem, NotifyParentChanged> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
   Tardis tardis;
   Tock current_tock = 1;

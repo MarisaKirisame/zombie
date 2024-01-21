@@ -6,15 +6,5 @@
 #include "cache.hpp"
 #include "tree.hpp"
 
-enum class TockTreeImpl {
-  Tree = 0
-};
-
-
-template<TockTreeImpl impl, typename T, typename NotifyParentChanged>
-using TockTree = std::variant_alternative_t<
-  (size_t)impl,
-  std::variant<
-    TockTreeImpls::TockTree<T, TockTreeCaches::SplayCache, NotifyParentChanged>
-  >
->;
+template<typename T, typename NotifyParentChanged>
+using TockTree = TockTreeImpls::TockTree<T, TockTreeCaches::SplayCache, NotifyParentChanged>;

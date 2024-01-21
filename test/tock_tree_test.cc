@@ -27,9 +27,8 @@ TEST(LargestValueLeTest, LVTTest) {
   EXPECT_EQ(largest_value_le(m, 10)->second, 9);
 }
 
-template<TockTreeImpl impl>
 void TockTreeTestReverseOrder() {
-  TockTree<impl, int, NotifyParentChanged> tt;
+  TockTree<int, NotifyParentChanged> tt;
   tt.put({2,6}, 1);
   tt.put({1,10}, 2);
   tt.check_invariant();
@@ -38,14 +37,11 @@ void TockTreeTestReverseOrder() {
 }
 
 TEST(TockTreeTest, ReversedOrder) {
-  TockTreeTestReverseOrder<TockTreeImpl::Tree>();
+  TockTreeTestReverseOrder();
 }
 
-
-
-template<TockTreeImpl impl>
 void TockTreeTestFilterChildren() {
-  TockTree<impl, int, NotifyParentChanged> tt;
+  TockTree<int, NotifyParentChanged> tt;
   tt.put({1, 10}, 1);
   tt.put({2, 3}, 2);
   tt.put({3, 4}, 3);
@@ -78,12 +74,11 @@ void TockTreeTestFilterChildren() {
 }
 
 TEST(TockTreeTest, FilterChildren) {
-  TockTreeTestFilterChildren<TockTreeImpl::Tree>();
+  TockTreeTestFilterChildren();
 }
 
-template<TockTreeImpl impl>
 void TockTreeTestRemove() {
-  TockTree<impl, int, NotifyParentChanged> tt;
+  TockTree<int, NotifyParentChanged> tt;
 
   for (int i = 1; i <= 20; i++) {
     tt.put({i, 41 - i}, i);
@@ -95,6 +90,6 @@ void TockTreeTestRemove() {
 }
 
 TEST(TockTreeTest, Remove) {
-  TockTreeTestRemove<TockTreeImpl::Tree>();
+  TockTreeTestRemove();
 }
 

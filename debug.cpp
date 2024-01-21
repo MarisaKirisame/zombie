@@ -5,7 +5,7 @@
 #define EXPECT_TRUE(x) assert(x);
 #define EXPECT_FALSE(x) assert(!(x));
 
-constexpr ZombieConfig uf_cfg = { default_config.tree, &uf_metric, {1, 1} };
+constexpr ZombieConfig uf_cfg = { &uf_metric, {1, 1} };
 
 IMPORT_ZOMBIE(uf_cfg)
 

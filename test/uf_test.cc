@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-constexpr ZombieConfig local_cfg = { default_config.tree, &local_metric, {1, 1} };
-constexpr ZombieConfig uf_cfg = { default_config.tree, &uf_metric, {1, 1} };
+constexpr ZombieConfig local_cfg = { &local_metric, {1, 1} };
+constexpr ZombieConfig uf_cfg = { &uf_metric, {1, 1} };
 
 namespace Local {
   IMPORT_ZOMBIE(default_config)

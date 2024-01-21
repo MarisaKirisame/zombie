@@ -22,7 +22,6 @@ inline std::ostream& operator<<(std::ostream& o, const cost_t& x) {
 using Metric = cost_t(*)(Time cost, Time neighbor_cost, Space size);
 
 struct ZombieConfig {
-  TockTreeImpl tree;
   Metric metric;
   // for some varying metric, such as those concerning UF set,
   // the cost in [Trailokya::book] may not be up-to-date.
@@ -40,4 +39,4 @@ inline cost_t uf_metric(Time cost, Time neighbor_cost, Space size) {
   return (static_cast<int128_t>(neighbor_cost.count()) * (1UL << 63)) / size.count();
 }
 
-constexpr ZombieConfig default_config = ZombieConfig { TockTreeImpl::Tree, &uf_metric, {2, 1} };
+constexpr ZombieConfig default_config = ZombieConfig { .metric = &uf_metric, .approx_factor = {2, 1} };
