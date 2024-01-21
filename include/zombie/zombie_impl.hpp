@@ -287,20 +287,6 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
   }
 }
 
-template<const ZombieConfig& cfg>
-EZombie<cfg> EZombie<cfg>::Partial() {
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.current_tock++;
-  return EZombie(std::numeric_limits<Tock>::max());
-}
-
-template<const ZombieConfig& cfg, typename T>
-Zombie<cfg, T> Zombie<cfg, T>::Partial() {
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.current_tock++;
-  return Zombie<cfg, T>(std::numeric_limits<Tock>::max());
-}
-
 template<const ZombieConfig& cfg, typename T>
 template<typename... Args>
 void Zombie<cfg, T>::construct(Args&&... args) {
@@ -412,8 +398,8 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.tardis.is_partial = true;
-    // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
-    return ret_type::Partial();
+    t.current_tock++;
+    return ret_type(std::numeric_limits<Tock>::max());
   } else {
     std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)> func =
       [f = std::forward<F>(f)](const std::vector<const void*> in) {
@@ -435,8 +421,8 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.tardis.is_partial = true;
-    // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
-    return ret_type { std::make_shared<Trampoline::ReturnNode<Tock>>(EZombie<cfg>::Partial().created_time) };
+    t.current_tock++;
+    return ret_type { std::make_shared<Trampoline::ReturnNode<Tock>>(std::numeric_limits<Tock>::max()) };
   } else {
     std::function<Trampoline::Output<Tock>()> o = [f = std::forward<F>(f), x...]() {
       std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)> func =
@@ -494,8 +480,8 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.tardis.is_partial = true;
-    // note how we cannot advance tock here: a bindZombie might only advance tock by 1, and Partial() already does such advancement.
-    return ret_type::Partial();
+    t.current_tock++;
+    return ret_type(std::numeric_limits<Tock>::max());
   } else {
     std::vector<Tock> in;
     for (const EZombie<cfg>& ez : x) {

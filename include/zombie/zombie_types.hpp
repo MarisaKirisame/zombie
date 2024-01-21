@@ -98,8 +98,6 @@ struct EZombie {
   EZombie(Tock created_time) : created_time(created_time) { }
   EZombie() { }
 
-  static EZombie Partial();
-
   std::weak_ptr<EZombieNode<cfg>> ptr() const;
 
   bool evicted() const {
@@ -148,8 +146,6 @@ struct EZombie {
 template<const ZombieConfig& cfg, typename T>
 struct Zombie : EZombie<cfg> {
   static_assert(!std::is_reference_v<T>, "Zombie should not hold a reference");
-
-  static Zombie Partial();
 
   template<typename... Args>
   void construct(Args&&... args);
