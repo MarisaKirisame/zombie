@@ -198,6 +198,28 @@ TCZombie<T> Result(const Zombie<cfg, T>& z) {
   return TCZombie<T> {std::make_shared<Trampoline::ReturnNode<Tock>>(z.created_time)};
 }
 
+template<typename F, size_t... Is>
+auto gen_tuple_impl(F func, std::index_sequence<Is...>) {
+  return std::make_tuple(func(Is)...);
+}
+
+template<size_t N, typename F>
+auto gen_tuple(F func) {
+  return gen_tuple_impl(func, std::make_index_sequence<N>{} );
+}
+
+template<typename T>
+struct IsZombie : std::false_type { };
+
+template<const ZombieConfig& cfg, typename T>
+struct IsZombie<Zombie<cfg, T>> : std::true_type { };
+
+template<typename T>
+struct IsTCZombie : std::false_type { };
+
+template<typename T>
+struct IsTCZombie<TCZombie<T>> : std::true_type { };
+
 } // end of namespace ZombieInternal
 
 template<const ZombieConfig& cfg, typename T>

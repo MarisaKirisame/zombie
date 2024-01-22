@@ -52,3 +52,4 @@ inline cost_t uf_metric(Time cost, Time neighbor_cost, Space size) {
 }
 
 constexpr ZombieConfig default_config(/*use_cps=*/false, /*metric=*/&uf_metric, /*approx_factor=*/{2, 1});
+constexpr ZombieConfig cps_config(/*use_cps=*/true, /*metric=*/&uf_metric, /*approx_factor=*/{2, 1});
