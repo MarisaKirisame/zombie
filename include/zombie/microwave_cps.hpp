@@ -1,3 +1,5 @@
+#pragma once
+
 namespace ZombieInternal {
 
 namespace CPS {
@@ -17,7 +19,6 @@ public:
   std::vector<Tock> inputs;
   Tock output;
   Tock start_time;
-  Tock end_time;
 
   Space space_taken;
   Time time_taken;
@@ -40,7 +41,6 @@ public:
             const std::vector<Tock>& inputs,
             const Tock& output,
             const Tock& start_time,
-            const Tock& end_time,
             const Space& space,
             const Time& time_taken);
 
@@ -68,7 +68,6 @@ struct MicroWavePtr : public std::shared_ptr<MicroWave<cfg>> {
                const std::vector<Tock>& inputs,
                const Tock& output,
                const Tock& start_time,
-               const Tock& end_time,
                const Space& space,
                const Time& time_taken);
 

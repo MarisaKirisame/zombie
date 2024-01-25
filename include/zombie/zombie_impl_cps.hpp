@@ -17,14 +17,12 @@ MicroWave<cfg>::MicroWave(std::function<Trampoline::Output<Tock>(const std::vect
                           const std::vector<Tock>& inputs,
                           const Tock& output,
                           const Tock& start_time,
-                          const Tock& end_time,
                           const Space& space,
                           const Time& time_taken)
   : f(std::move(f)),
     inputs(inputs),
     output(output),
     start_time(start_time),
-    end_time(end_time),
     space_taken(space),
     time_taken(time_taken),
     last_accessed(Trailokya<cfg>::get_trailokya().meter.time()),
@@ -177,10 +175,9 @@ MicroWavePtr<cfg>::MicroWavePtr(std::function<Trampoline::Output<Tock>(const std
                                 const std::vector<Tock>& inputs,
                                 const Tock& output,
                                 const Tock& start_time,
-                                const Tock& end_time,
                                 const Space& space,
                                 const Time& time_taken) :
-  std::shared_ptr<MicroWave<cfg>>(std::make_shared<MicroWave<cfg>>(std::move(f), inputs, output, start_time, end_time, space, time_taken)) {
+  std::shared_ptr<MicroWave<cfg>>(std::make_shared<MicroWave<cfg>>(std::move(f), inputs, output, start_time, space, time_taken)) {
   auto& t = Trailokya<cfg>::get_trailokya();
   t.book.push(std::make_unique<RecomputeLater<cfg>>(start_time, *this), (*this)->cost());
 }
@@ -197,20 +194,15 @@ void MicroWavePtr<cfg>::replay() {
 template<const ZombieConfig& cfg>
 Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  auto default_path = [&](const Tock& min_end_time) {
+  if (!t.akasha.has_precise(t.current_tock)) {
     Tock start_time = t.current_tock++;
     std::tuple<Trampoline::Output<Tock>, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
     Trampoline::Output<Tock> out = std::get<0>(p);
     ns time_taken = std::get<1>(p);
     size_t space_taken = std::get<2>(p);
-    t.current_tock = std::max(min_end_time, t.current_tock);
-    Tock end_time = t.current_tock;
     Tock out_tock = dynamic_cast<Trampoline::ReturnNode<Tock>*>(out.get())->t;
-    t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
+    t.akasha.put(start_time, { MicroWavePtr<cfg>(std::move(func), in, out_tock, start_time, Space(space_taken), Time(time_taken)) });
     return out;
-  };
-  if (!t.akasha.has_precise(t.current_tock)) {
-    return default_path(std::numeric_limits<Tock>::min());
   } else {
     const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
     std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(n.value);

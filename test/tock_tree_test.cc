@@ -3,6 +3,8 @@
 
 #include <gtest/gtest.h>
 
+constexpr ZombieConfig cfg(/*use_cps=*/false, /*metric=*/&uf_metric, /*approx_factor=*/{2, 1});
+
 struct NotifyParentChanged {
   void operator()(const TockTreeData<int>& n, const TockTreeData<int>* p) {
   }
@@ -28,7 +30,7 @@ TEST(LargestValueLeTest, LVTTest) {
 }
 
 void TockTreeTestReverseOrder() {
-  TockTree<int, NotifyParentChanged> tt;
+  TockTree<cfg, int, NotifyParentChanged> tt;
   tt.put({2,6}, 1);
   tt.put({1,10}, 2);
   tt.check_invariant();
@@ -41,7 +43,7 @@ TEST(TockTreeTest, ReversedOrder) {
 }
 
 void TockTreeTestFilterChildren() {
-  TockTree<int, NotifyParentChanged> tt;
+  TockTree<cfg, int, NotifyParentChanged> tt;
   tt.put({1, 10}, 1);
   tt.put({2, 3}, 2);
   tt.put({3, 4}, 3);
@@ -78,7 +80,7 @@ TEST(TockTreeTest, FilterChildren) {
 }
 
 void TockTreeTestRemove() {
-  TockTree<int, NotifyParentChanged> tt;
+  TockTree<cfg, int, NotifyParentChanged> tt;
 
   for (int i = 1; i <= 20; i++) {
     tt.put({i, 41 - i}, i);

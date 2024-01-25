@@ -23,7 +23,13 @@ public:
   struct Tardis {
     Tock forward_at = std::numeric_limits<Tock>::max();
     std::shared_ptr<EZombieNode<cfg>>* forward_to = nullptr;
-    bool is_partial = false;
+    std::conditional_t<!cfg.use_cps, bool, std::monostate> is_partial = [](){
+      if constexpr (!cfg.use_cps) {
+        return false;
+      } else {
+        return std::monostate();
+      }
+    }();
   };
 
   using TockTreeElem = std::variant<
@@ -50,7 +56,7 @@ public:
   struct Reaper;
 public:
   // Hold MicroWave and GraveYard.
-  TockTree<TockTreeElem, NotifyParentChanged> akasha;
+  TockTree<cfg, TockTreeElem, NotifyParentChanged> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
   Tardis tardis;
   Tock current_tock = 1;

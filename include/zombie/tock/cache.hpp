@@ -12,8 +12,8 @@
 namespace TockTreeCaches {
 
 template <typename Node> struct NoneCache {
-  std::optional<std::shared_ptr<Node>> get(const Tock &t) { 
-    return {}; 
+  std::optional<std::shared_ptr<Node>> get(const Tock &t) {
+    return {};
   }
 
   void update(const Tock &t, const std::shared_ptr<Node> &p) {
@@ -143,7 +143,6 @@ template <typename Node> struct SplayCache {
 
       o = o->son[key < o->key ? 0 : 1];
     }
-    
     splay(o);
     return o;
   }
@@ -171,7 +170,6 @@ template <typename Node> struct SplayCache {
   Pointer remove(const Pointer& o) {
     assert(o != nullptr);
     splay(o);
-    
     for (int d = 0; d <= 1; d++) {
       if (o->son[d] != nullptr) {
         o->son[d]->fa = nullptr;
