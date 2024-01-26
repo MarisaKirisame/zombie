@@ -1,3 +1,5 @@
+#pragma once
+
 #include "zombie_impl_anf.hpp"
 #include "zombie_impl_cps.hpp"
 

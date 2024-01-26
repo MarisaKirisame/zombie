@@ -55,12 +55,12 @@ template <typename Node> struct SplayCache {
     Tock key;
 
     SplayNode(
-      const std::shared_ptr<SplayNode>& fa, 
+      const std::shared_ptr<SplayNode>& fa,
       const std::weak_ptr<Node>& value,
       const Tock& key
     ) : fa(fa), value(value), key(key) {}
   };
-  
+
   using Pointer = std::shared_ptr<SplayNode>;
 
   bool which_son_of_fa(const Pointer& o) {

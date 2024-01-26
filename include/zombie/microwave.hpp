@@ -1,3 +1,5 @@
+#pragma once
+
 #include "microwave_anf.hpp"
 #include "microwave_cps.hpp"
 namespace ZombieInternal {
