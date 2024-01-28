@@ -213,10 +213,6 @@ Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(co
       Tock end_time = t.akasha.get_node(start_time).range.end;
       Tock out_tock = std::numeric_limits<Tock>::max();
       t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::TailCall(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
-    } else if (t.tardis.is_partial) {
-      Tock end_time = t.current_tock;
-      Tock out_tock = std::numeric_limits<Tock>::max();
-      t.akasha.put({start_time, end_time}, { MicroWavePtr<cfg>(std::move(func), MWState::Partial(), in, out_tock, start_time, end_time, Space(space_taken), Time(time_taken)) });
     } else {
       Tock end_time = t.current_tock;
       Tock out_tock = dynamic_cast<Trampoline::ReturnNode<Tock>*>(out.get())->t;
@@ -261,7 +257,6 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
   // I hate we have the following partial-handling code at here, tc, and untyped.
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
-    t.tardis.is_partial = true;
     t.current_tock++;
     return ret_type(std::numeric_limits<Tock>::max());
   } else {
@@ -284,7 +279,6 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
-    t.tardis.is_partial = true;
     t.current_tock++;
     return ret_type { std::make_shared<Trampoline::ReturnNode<Tock>>(std::numeric_limits<Tock>::max()) };
   } else {
@@ -315,7 +309,6 @@ Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
   // TailCall mean "we are still actively working on it."
   // It will eventually get fixed once that return, so there is no need to touch it.
   // Another way of thinking about it is, changing it to Partial does not have any benefit.
-  if (!t.tardis.is_partial) {
     auto node = t.akasha.visit_node(t.current_tock-1);
     while (node) {
       if (node->data.value.index() == TockTreeElemKind::MicroWave) {
@@ -331,7 +324,6 @@ Zombie<cfg, Ret> bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
       }
       node = node->parent;
     }
-  }
   return Zombie<cfg, Ret>(output);
 }
 
@@ -343,7 +335,6 @@ auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
-    t.tardis.is_partial = true;
     t.current_tock++;
     return ret_type(std::numeric_limits<Tock>::max());
   } else {

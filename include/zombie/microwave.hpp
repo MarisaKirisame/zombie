@@ -5,9 +5,9 @@
 namespace ZombieInternal {
 
 template<const ZombieConfig &cfg>
-using MicroWave = std::conditional_t<cfg.use_cps, CPS::MicroWave<cfg>, ANF::MicroWave<cfg>>;
+using MicroWave = ANF::MicroWave<cfg>;
 
 template<const ZombieConfig &cfg>
-using MicroWavePtr = std::conditional_t<cfg.use_cps, CPS::MicroWavePtr<cfg>, ANF::MicroWavePtr<cfg>>;
+using MicroWavePtr = ANF::MicroWavePtr<cfg>;
 
 } // end of namespace ZombieInternal

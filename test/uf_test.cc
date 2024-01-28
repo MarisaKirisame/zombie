@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-constexpr ZombieConfig local_cfg(/*use_cps=*/false, /*metric=*/&local_metric, /*approx_factor=*/{1, 1});
-constexpr ZombieConfig uf_cfg(/*use_cps=*/false, /*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
+constexpr ZombieConfig local_cfg(/*metric=*/&local_metric, /*approx_factor=*/{1, 1});
+constexpr ZombieConfig uf_cfg(/*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
 
 namespace Local {
   IMPORT_ZOMBIE(default_config)

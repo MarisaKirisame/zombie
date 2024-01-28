@@ -99,13 +99,6 @@ template<const ZombieConfig& cfg, typename T>
 template<typename... Args>
 void Zombie<cfg, T>::construct(Args&&... args) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  if (t.tardis.is_partial) {
-    assert(t.tardis.forward_to == nullptr || *t.tardis.forward_to);
-    EZombie<cfg>::created_time = std::numeric_limits<Tock>::max();
-    // why bother increasing the tock? well - the larger this tock is the larger that of capturing microwave.
-    // this potentially cause a replay at a more precise partial node.
-    t.current_tock++;
-  } else {
     EZombie<cfg>::created_time = t.current_tock++;
     if (!t.akasha.has_precise(EZombie<cfg>::created_time)) {
       auto shared = std::make_shared<ZombieNode<cfg, T>>(this->created_time, std::forward<Args>(args)...);
@@ -115,48 +108,27 @@ void Zombie<cfg, T>::construct(Args&&... args) {
     if (t.tardis.forward_at == this->created_time) {
       *t.tardis.forward_to = shared_ptr();
     }
-  }
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Args>
 inline auto bindZombie(F&& f, const Zombie<cfg, Args>& ...x) {
-  if constexpr (cfg.use_cps) {
-    return CPS::bindZombie<cfg, F, Args...>(std::forward<F>(f), x...);
-  }
-  else {
-    return ANF::bindZombie<cfg, F, Args...>(std::forward<F>(f), x...);
-  }
+  return ANF::bindZombie<cfg, F, Args...>(std::forward<F>(f), x...);
 }
 
 template<const ZombieConfig& cfg, typename F>
 inline auto bindZombieUnTyped(F&& f, const std::vector<EZombie<cfg>>& x) {
-  if constexpr (cfg.use_cps) {
-    return CPS::bindZombieUnTyped<cfg, F>(std::forward<F>(f), x);
-  }
-  else {
-    return ANF::bindZombieUnTyped<cfg, F>(std::forward<F>(f), x);
-  }
+  return ANF::bindZombieUnTyped<cfg, F>(std::forward<F>(f), x);
 }
 
 // TODO: remove Ret
 template<const ZombieConfig& cfg, typename Ret, typename F, typename... Args>
 inline auto bindZombieTC(F&& f, const Zombie<cfg, Args>& ...x) {
-  if constexpr (cfg.use_cps) {
-    return CPS::bindZombieTC<cfg, Ret, F, Args...>(std::forward<F>(f), x...);
-  }
-  else {
-    return ANF::bindZombieTC<cfg, Ret, F, Args...>(std::forward<F>(f), x...);
-  }
+  return ANF::bindZombieTC<cfg, Ret, F, Args...>(std::forward<F>(f), x...);
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Args>
 inline auto TailCall(F&& f, const Zombie<cfg, Args>& ...x) {
-  if constexpr (cfg.use_cps) {
-    return CPS::TailCall<cfg, F, Args...>(std::forward<F>(f), x...);
-  }
-  else {
-    return ANF::TailCall<cfg, F, Args...>(std::forward<F>(f), x...);
-  }
+  return ANF::TailCall<cfg, F, Args...>(std::forward<F>(f), x...);
 }
 
 } // end of namespace ZombieInternal

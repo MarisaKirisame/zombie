@@ -5,7 +5,7 @@
 #define EXPECT_TRUE(x) assert(x);
 #define EXPECT_FALSE(x) assert(!(x));
 
-constexpr ZombieConfig uf_cfg(/*use_cps=*/false, /*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
+constexpr ZombieConfig uf_cfg(/*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
 
 IMPORT_ZOMBIE(uf_cfg)
 
