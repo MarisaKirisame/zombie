@@ -208,7 +208,6 @@ struct SplayList {
   void insert(const K& k, const V& v) {
     Node* ptr = find_node_without_splay(k);
     if (ptr != nullptr) {
-      printf("k: %d\n", ptr->k);
       if (ptr->k < k) {
         assert(ptr->splay_children[1].get() == nullptr);
         ptr->splay_children[1] = std::make_unique<Node>(k, v, ptr->parent, ptr, ptr);
