@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdio>
 #include <iostream>
 #include <cassert>
 #include <functional>
@@ -60,9 +62,16 @@ struct SplayList {
       }
     }
 
-    void swap_children(size_t idx, std::unique_ptr<Node>& node) {
-      splay_children[idx].swap(node);
-      std::swap(splay_children[idx]->parent, node->parent);
+    void maintain_parent(size_t idx) {
+      if (splay_children[idx] != nullptr) {
+        splay_children[idx]->splay_parent = this;
+      }
+    }
+
+    void swap_children(size_t idx, Node* node, size_t nidx) {
+      std::swap(splay_children[idx], node->splay_children[nidx]);
+      maintain_parent(idx);
+      node->maintain_parent(nidx);
     }
 
     void remove(SplayList& tl) {
@@ -93,15 +102,16 @@ struct SplayList {
 
     void rotate(SplayList& tl) {
       assert(splay_parent != nullptr);
+      auto splay_parent_backup = splay_parent;
       size_t idx = idx_at_parent();
       if (splay_parent->splay_parent != nullptr) {
-        splay_parent->splay_parent->swap_children(splay_parent->idx_at_parent(), splay_parent->splay_children[idx]);
+        splay_parent->splay_parent->swap_children(splay_parent->idx_at_parent(), splay_parent, idx);
       } else {
         assert(splay_parent == tl.root_node.get());
         tl.root_node.swap(splay_parent->splay_children[idx]);
         splay_parent = nullptr;
       }
-      splay_parent->swap_children(idx, splay_children[idx^1]);
+      splay_parent_backup->swap_children(idx, this, idx^1);
     }
 
     void splay(SplayList& tl) {
@@ -120,25 +130,30 @@ struct SplayList {
   };
   mutable std::unique_ptr<Node> root_node;
 
-  // return largest node <= k, or smallest node >= k.
-  // note that when matching value found the two case collapse into one.
-  // on empty splay tree return nulllptr.
-  Node* find_node(const K& k) {
+  // for insert
+  // you have to insert the new node at the leaf before splay
+  Node* find_node_without_splay(const K& k) {
     Node* last_ptr = nullptr;
     Node* ptr = root_node.get();
     while (ptr != nullptr) {
       if (ptr->k == k) {
         return ptr;
       } else {
-        size_t idx = ptr->k < k ? 0 : 1;
+        size_t idx = k < ptr->k ? 0 : 1;
         last_ptr = ptr;
         ptr = ptr->splay_children[idx].get();
       }
     }
-    if (last_ptr != nullptr) {
-      last_ptr->splay(*this);
-    }
     return last_ptr;
+  }
+
+  // return largest node <= k, or smallest node >= k.
+  // note that when matching value found the two case collapse into one.
+  // on empty splay tree return nulllptr.
+  Node* find_node(const K& k) {
+    Node* ret = find_node_without_splay(k);
+    ret->splay(*this);
+    return ret;
   }
 
   // find the largest Node with start <= t.
@@ -158,12 +173,12 @@ struct SplayList {
 
   V* find(const K& k) {
     Node* ptr = find_smaller_node(k);
-    return ptr == nullptr ? nullptr : &(ptr->data);
+    return ptr == nullptr ? nullptr : &(ptr->v);
   }
 
   V* find_precise(const K& k) {
     Node* ptr = find_precise_node(k);
-    return ptr == nullptr ? nullptr : &(ptr->data);
+    return ptr == nullptr ? nullptr : &(ptr->v);
   }
 
   bool has(const K& k) {
@@ -191,20 +206,40 @@ struct SplayList {
   }
 
   void insert(const K& k, const V& v) {
-    Node* ptr = find_node();
+    Node* ptr = find_node_without_splay(k);
     if (ptr != nullptr) {
-      if (ptr->start < k) {
-        assert(ptr->splay_children[0].get() == nullptr);
-        ptr->splay_children[0] = std::make_unique<Node>(k, v, ptr->parent, ptr, ptr);
-      } else if (ptr->start > k) {
+      if (ptr->k < k) {
         assert(ptr->splay_children[1].get() == nullptr);
+        ptr->splay_children[1] = std::make_unique<Node>(k, v, ptr->parent, ptr, ptr);
+      } else if (k < ptr->k) {
+        assert(ptr->splay_children[0].get() == nullptr);
         ptr->splay_children[0] = std::make_unique<Node>(k, v, ptr, ptr->children, ptr);
       } else {
-        assert (ptr->start == k);
-        ptr->data = v;
+        assert (ptr->k == k);
+        ptr->v = v;
       }
+
+      ptr->splay(*this);
     } else {
       root_node = std::make_unique<Node>(k, v, nullptr, nullptr, nullptr);
     }
+  }
+
+  void debug_display_splay_helper(Node* node, int indent) {
+    for (int i = 0; i < indent; i++) {
+      putchar(' ');
+    }
+
+    if (node == nullptr) {
+      puts("null");
+    } else {
+      printf("%d\n", node->k);
+      debug_display_splay_helper(node->splay_children[0].get(), indent + 2);
+      debug_display_splay_helper(node->splay_children[1].get(), indent + 2);
+    }
+  }
+
+  void debug_display_splay() {
+    debug_display_splay_(root_node.get(), 0);
   }
 };
