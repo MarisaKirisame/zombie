@@ -50,7 +50,7 @@ void SplayTest() {
   // all the values and keys are in (0, 100)
   for (int i = 0; i < 100; i++) {
     auto it = std::lower_bound(data.begin(), data.end(), std::make_pair(-i, 0));
-    auto node = splay.find_smaller_node(i);
+    auto node = splay.find_lt_node(i);
 
     if (it == data.end()) {
       EXPECT_EQ(node, nullptr);
