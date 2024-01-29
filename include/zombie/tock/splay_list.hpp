@@ -152,12 +152,15 @@ struct SplayList {
   // on empty splay tree return nulllptr.
   Node* find_node(const K& k) {
     Node* ret = find_node_without_splay(k);
-    ret->splay(*this);
+    if (ret != nullptr) {
+      ret->splay(*this);
+    }
     return ret;
   }
 
   // find the largest Node with start <= t.
   Node* find_smaller_node(const K& k) {
+    std::cout << "find_smaller_node: " << k << std::endl;
     Node* ptr = find_node(k);
     if (ptr != nullptr && ptr->k > k) {
       return ptr->parent;

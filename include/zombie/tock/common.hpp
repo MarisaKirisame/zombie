@@ -4,6 +4,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <iostream>
 
 // start at 0.
 // a tock pass whenever a Computer start execution, or a Zombie is created.
@@ -50,6 +51,11 @@ struct std::numeric_limits<Tock> {
     return std::numeric_limits<decltype(std::declval<Tock>().tock)>::max();
   }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Tock& t) {
+  os << t.tock;
+  return os;
+}
 
 // open-close.
 struct TockRange {

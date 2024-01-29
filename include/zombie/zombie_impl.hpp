@@ -314,12 +314,24 @@ void MicroWavePtr<cfg>::replay() {
   t.book.push(std::make_unique<RecomputeLater<cfg>>((*this)->start_time, *this), (*this)->cost());
 }
 
+inline HeadExclusivePreContext::HeadExclusivePreContext(std::function<Trampoline::Output<Tock>(const std::vector<const void*>& in)> &&f, std::vector<Tock> &&inputs) : space_taken(0) {
+  assert(false);
+}
+
+template<const ZombieConfig& cfg>
+Tock current_tock() {
+  return Trailokya<cfg>::get_trailokya().current_tock;
+}
+
 // todo: when in recompute mode, once the needed value is computed, we can skip the rest of the computation, jumping straight up.
 template<const ZombieConfig& cfg>
 Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  Record saved = t.record.finish();
+  t.record = Record<cfg>(HeadExclusivePreContext(std::move(func), std::move(in)));
+  t.record = std::move(saved);
   assert(false);
   /*
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   auto default_path = [&](const Tock& min_end_time) {
     Tock start_time = t.current_tock++;
     std::tuple<Trampoline::Output<Tock>, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
@@ -394,7 +406,7 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(IsTCZombie<ret_type>::value, "should be TCZombie");
   return *static_cast<ret_type*>(nullptr);
   /*
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+    Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.current_tock++;
