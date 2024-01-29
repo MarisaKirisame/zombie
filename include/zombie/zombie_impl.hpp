@@ -28,11 +28,18 @@ inline size_t tock_to_index(const Tock& t, const Tock& context_created_time) {
 }
 
 template<const ZombieConfig& cfg>
-HeadContextNode<cfg>::HeadContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez) :
-  ContextNode<cfg>(std::move(ez)), last_accessed(Trailokya<cfg>::get_trailokya().meter.raw_time()) { }
+FullContextNode<cfg>::FullContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
+                                      std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                      std::vector<EZombie<cfg>>&& inputs,
+                                      const Tock& start_time) :
+  ContextNode<cfg>(std::move(ez)),
+  f(std::move(f)),
+  inputs(std::move(inputs)),
+  start_time(start_time),
+  last_accessed(Trailokya<cfg>::get_trailokya().meter.raw_time()) { }
 
 template<const ZombieConfig& cfg>
-void HeadContextNode<cfg>::accessed() {
+void FullContextNode<cfg>::accessed() {
   last_accessed = Trailokya<cfg>::get_trailokya().meter.raw_time();
   /* if (pool_index != -1) {
     assert(pool_index >= 0);
@@ -41,15 +48,42 @@ void HeadContextNode<cfg>::accessed() {
 }
 
 template<const ZombieConfig& cfg>
+void FullContextNode<cfg>::replay() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  Tock tock = t.current_tock;
+  Record<cfg> record = t.record;
+  bracket(
+    [&]() {
+      t.current_tock = start_time;
+      t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(inputs));
+      t.akasha.remove_precise(start_time);
+    },
+    [&]() {
+      t.record->play();
+    },
+    [&]() {
+      t.current_tock = tock;
+      t.record->complete();
+      t.record = record;
+    });
+  /* if (_set_parent != start_time) {
+       Tock root = root_of_set();
+       auto& t = Trailokya<cfg>::get_trailokya();
+       auto root_m = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(root).value);
+       root_m->_set_cost = root_m->_set_cost - time_taken;
+       _set_parent = start_time;
+     }*/
+}
+
+template<const ZombieConfig& cfg>
 std::shared_ptr<ContextNode<cfg>> EZombieNode<cfg>::get_context() const {
   auto ret = context_cache.lock();
   if (!ret) {
     auto& t = Trailokya<cfg>::get_trailokya();
     auto* node = t.akasha.find_lt_node(created_time);
-    if (node != nullptr) {
+    if (node != nullptr && tock_to_index(created_time, node->k) < node->v->ez.size()) {
       context_cache = node->v;
       ret = node->v;
-      assert(tock_to_index(created_time, node->k) < node->v->ez.size());
     }
   }
   return ret;
@@ -103,23 +137,15 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
   if (ret) {
     return ret;
   } else {
-    std::cout << created_time << std::endl;
-    assert(false);
-    /*
     auto& t = Trailokya<cfg>::get_trailokya();
-    if (!t.akasha.has_precise(created_time)) {
-      std::shared_ptr<EZombieNode<cfg>> strong;
-      typename Trailokya<cfg>::Tardis tardis = t.tardis;
-      bracket([&]() { t.tardis = typename Trailokya<cfg>::Tardis { this->created_time, &strong }; },
-              [&]() { std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(created_time).value).replay(); },
-              [&]() { t.tardis = tardis; });
-      ret = non_null(strong);
-    } else {
-      auto& n = t.akasha.get_precise_node(created_time);
-      ret = std::get<TockTreeElemKind::ZombieNode>(n.value);
-    }
+    std::shared_ptr<EZombieNode<cfg>> strong;
+    Replay replay = t.replay;
+    bracket([&]() { t.replay = Replay { created_time, &strong }; },
+            [&]() { t.meter.block([&](){ (*(t.akasha.find_lt(created_time)))->replay(); }); },
+            [&]() { t.replay = replay; });
+    ret = non_null(strong);
     ptr_cache = ret;
-    return ret;*/
+    return ret;
   }
 }
 
@@ -156,28 +182,6 @@ MicroWave<cfg>::MicroWave(std::function<Trampoline::Output<Tock>(const std::vect
     if (parent.index() == TockTreeElemKind::MicroWave) {
       std::get<TockTreeElemKind::MicroWave>(parent)->used_by.push_back(start_time);
     }
-    }*/
-}
-
-template<const ZombieConfig& cfg>
-void MicroWave<cfg>::replay() {
-  assert(false);
-  /*Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  Tock tock = t.current_tock;
-  t.meter.block([&]() {
-    bracket([&]() { t.current_tock = start_time; },
-            [&]() { ++t.current_tock; play(f, inputs); },
-            [&]() { t.current_tock = tock; });
-  });
-
-  evicted = false;
-
-  if (_set_parent != start_time) {
-    Tock root = root_of_set();
-    auto& t = Trailokya<cfg>::get_trailokya();
-    auto root_m = std::get<TockTreeElemKind::MicroWave>(t.akasha.get_node(root).value);
-    root_m->_set_cost = root_m->_set_cost - time_taken;
-    _set_parent = start_time;
     }*/
 }
 
@@ -298,9 +302,14 @@ void MicroWavePtr<cfg>::replay() {
 }
 
 template<const ZombieConfig& cfg>
-void RootRecordNode<cfg>::finish() {
+void RootRecordNode<cfg>::suspend() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   t.akasha.insert(this->t, std::make_shared<RootContextNode<cfg>>(std::move(this->ez)));
+}
+
+template<const ZombieConfig& cfg>
+void RootRecordNode<cfg>::complete() {
+  assert(false);
 }
 
 template<const ZombieConfig& cfg>
@@ -316,9 +325,17 @@ HeadRecordNode<cfg>::HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg
   start_time(Trailokya<cfg>::get_trailokya().meter.time()) { }
 
 template<const ZombieConfig& cfg>
-void HeadRecordNode<cfg>::finish() {
+void HeadRecordNode<cfg>::suspend() {
+  assert(false);
+}
+
+template<const ZombieConfig& cfg>
+void HeadRecordNode<cfg>::complete() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.akasha.insert(this->t, std::make_shared<HeadContextNode<cfg>>(std::move(this->ez)));
+  t.akasha.insert(this->t, std::make_shared<FullContextNode<cfg>>(std::move(this->ez),
+                                                                  std::move(f),
+                                                                  std::move(inputs),
+                                                                  this->t));
 }
 
 template<const ZombieConfig& cfg>
@@ -355,13 +372,13 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
     };
   std::vector<EZombie<cfg>> in = {x...};
 
-  t.record->finish();
+  t.record->suspend();
   Record<cfg> saved = t.record;
 
   t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::move(in));
   Trampoline::Output<EZombie<cfg>> o = t.record->play();
 
-  t.record->finish();
+  t.record->complete();
   t.record = saved->resume();
 
   return ret_type(dynamic_cast<Trampoline::ReturnNode<EZombie<cfg>>*>(o.get())->t);

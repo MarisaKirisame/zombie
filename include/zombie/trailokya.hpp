@@ -29,7 +29,8 @@ struct RecordNode {
   RecordNode() : t(tick<cfg>()) { }
   explicit RecordNode(Tock t) : t(t) { }
 
-  virtual void finish() = 0;
+  virtual void suspend() = 0;
+  virtual void complete() = 0;
   virtual std::shared_ptr<RecordNode<cfg>> resume() = 0;
   virtual void record_space(const Space&) = 0;
   virtual bool playable() = 0;
@@ -43,7 +44,8 @@ template<const ZombieConfig& cfg>
 struct RootRecordNode : RecordNode<cfg> {
   explicit RootRecordNode(const Tock& t) : RecordNode<cfg>(t) { }
   RootRecordNode() { }
-  void finish() override;
+  void suspend() override;
+  void complete() override;
   Record<cfg> resume() override;
   void record_space(const Space&) override { }
   bool playable() override { return false; }
@@ -60,7 +62,8 @@ struct HeadRecordNode : RecordNode<cfg> {
   Time start_time;
 
   HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
-  void finish() override;
+  void suspend() override;
+  void complete() override;
   Record<cfg> resume() override;
   void record_space(const Space& s) override { space_taken += s; }
   bool playable() override { return true; }
@@ -85,6 +88,7 @@ struct ContextNode : Object {
   virtual void accessed() = 0;
   virtual bool evictable() = 0;
   virtual void evict() = 0;
+  virtual void replay() = 0;
 };
 
 template<const ZombieConfig& cfg>
@@ -94,18 +98,26 @@ template<const ZombieConfig& cfg>
 struct RootContextNode : ContextNode<cfg> {
   explicit RootContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez) : ContextNode<cfg>(std::move(ez)) { }
   void accessed() override { }
-  bool evictable() { return false; }
-  void evict() { assert(false); }
+  bool evictable() override { return false; }
+  void evict() override { assert(false); }
+  void replay() override { assert(false); }
 };
 
 template<const ZombieConfig& cfg>
-struct HeadContextNode : ContextNode<cfg> {
+struct FullContextNode : ContextNode<cfg> {
+  std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
+  std::vector<EZombie<cfg>> inputs;
+  Tock start_time;
   mutable Time last_accessed;
 
-  explicit HeadContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez);
+  explicit FullContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
+                           std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                           std::vector<EZombie<cfg>>&& inputs,
+                           const Tock& start_time);
   void accessed() override;
-  bool evictable() { return true; }
-  void evict() { this->ez.clear(); }
+  bool evictable() override { return true; }
+  void evict() override { this->ez.clear(); }
+  void replay() override;
 };
 
 template<const ZombieConfig& cfg>
