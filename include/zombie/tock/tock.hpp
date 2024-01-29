@@ -4,8 +4,4 @@
 
 #include "../config.hpp"
 #include "common.hpp"
-#include "cache.hpp"
-#include "tree.hpp"
-
-template<const ZombieConfig& cfg, typename T, typename NotifyParentChanged>
-using TockTree = TockTreeImpls::ANF::TockTree<T, TockTreeCaches::SplayCache, NotifyParentChanged>;
+#include "splay_list.hpp"

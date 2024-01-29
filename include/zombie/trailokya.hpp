@@ -8,19 +8,45 @@
 #include "zombie_types.hpp"
 #include "heap/gd_heap.hpp"
 
-
 namespace ZombieInternal {
 
-namespace TockTreeElemKind {
-  static constexpr size_t Nothing = 0; /* should only occur at root */
-  static constexpr size_t MicroWave = 1;
-  static constexpr size_t ZombieNode = 2;
+template<typename T>
+struct UF {
+  std::shared_ptr<UF> parent;
+  T t; // only meaningful when parent.get() == nullptr
+};
+
+struct RootExclusivePreContext { };
+struct HeadExclusivePreContext {
+  // we dont really use the Tock return type, but this allow one less boxing.
+  std::function<Trampoline::Output<Tock>(const std::vector<const void*>& in)> f;
+  std::vector<Tock> inputs;
+
+  Space space_taken;
+  ns start_time;
+};
+struct SpineExclusivePreContext {
+  Tock head_t;
+  std::vector<Tock> inputs;
+
+  Space space_taken;
+  ns start_time;
+};
+
+struct Context {
+  
 };
 
 template<const ZombieConfig& cfg>
 struct Trailokya {
 public:
-  struct Tardis {
+  struct Record {
+    std::variant<RootExclusivePreContext, HeadExclusivePreContext, SpineExclusivePreContext> pre_context = RootExclusivePreContext();
+    Tock t = 0;
+    std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
+  };
+
+  struct Replay {
     Tock forward_at = std::numeric_limits<Tock>::max();
     std::shared_ptr<EZombieNode<cfg>>* forward_to = nullptr;
   };
@@ -30,11 +56,6 @@ public:
     MicroWavePtr<cfg>,
     std::shared_ptr<EZombieNode<cfg>>
   >;
-
-  struct NotifyParentChanged {
-    void operator()(const TockTreeData<TockTreeElem>& n, const TockTreeData<TockTreeElem>* parent) {
-    };
-  };
 
   struct NotifyIndexChanged {
     void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
@@ -49,9 +70,10 @@ public:
   struct Reaper;
 public:
   // Hold MicroWave and GraveYard.
-  TockTree<cfg, TockTreeElem, NotifyParentChanged> akasha;
+  SplayList<Tock, Context> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
-  Tardis tardis;
+  Record record;
+  Replay replay;
   Tock current_tock = 1;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
@@ -66,7 +88,7 @@ public:
   }
 
   // return the closest MicroWave holding [t]
-  std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {
+  std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {/*
     TockTreeElem elem = akasha.get_node(t).value;
     if (elem.index() == TockTreeElemKind::MicroWave) {
       return std::get<TockTreeElemKind::MicroWave>(elem);
@@ -78,7 +100,8 @@ public:
         assert (parent->value.index() == TockTreeElemKind::MicroWave);
         return std::get<TockTreeElemKind::MicroWave>(parent->value);
       }
-    }
+      }*/
+    assert(false);
   }
 
 public:

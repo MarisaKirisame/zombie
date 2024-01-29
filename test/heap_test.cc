@@ -28,7 +28,7 @@ void HeapTest() {
   }
 }
 
-TEST(HeapTest, Kinetic) {
+TEST(HeapTest, Normal) {
   HeapTest<MinHeap<Element<false>>, false>();
 }
 

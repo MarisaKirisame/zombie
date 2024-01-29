@@ -11,6 +11,8 @@
 
 namespace ZombieInternal {
 
+struct Context;
+
 template<typename T>
 struct TCZombie {
   Trampoline::Output<Tock> o;
@@ -22,7 +24,7 @@ template<const ZombieConfig &cfg>
 struct EZombieNode {
 public:
   Tock created_time;
-  mutable std::weak_ptr<MicroWave<cfg>> parent_cache;
+  mutable std::weak_ptr<Context> context_cache;
 
 public:
   EZombieNode(Tock create_time);
@@ -34,7 +36,7 @@ public:
 
   virtual const void* get_ptr() const = 0;
 
-  std::shared_ptr<MicroWave<cfg>> get_parent() const;
+  std::shared_ptr<Context> get_context() const;
 };
 
 // ZombieNode is the concrete implementation of EZombieNode,
@@ -105,8 +107,9 @@ struct EZombie {
   }
 
   bool evictable() const {
-    auto ptr = this->ptr().lock();
-    return ptr && ptr->get_parent() != nullptr;
+    assert(false);
+    /*auto ptr = this->ptr().lock();
+      return ptr && ptr->get_parent() != nullptr;*/
   }
 
   bool unique() const {

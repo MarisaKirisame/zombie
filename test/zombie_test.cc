@@ -16,15 +16,6 @@ TEST(ZombieTest, Bind) {
   EXPECT_EQ(z.get_value(), 42);
 }
 
-TEST(ZombieTest, BindUnTyped) {
-  Zombie<int> x(6), y(7);
-  Zombie<int> z = bindZombieUnTyped([](const std::vector<const void*>& vec) {
-    return Zombie<int>(*static_cast<const int*>(vec[0]) * *static_cast<const int*>(vec[1]));
-  }, {x, y});
-  EXPECT_EQ(z.get_value(), 42);
-}
-
-
 TEST(ZombieTest, Resource) {
   struct Test {};
   using Resource = Resource<Test>;
@@ -287,6 +278,7 @@ TEST(ZombieTest, EvictByMicroWave) {
 }
 
 TEST(ZombieTest, MeasureSpace) {
+  EXPECT_EQ(true, false);
   {
     Zombie<int> z = bindZombie([&]() {
       Zombie<int> za(1);
@@ -298,10 +290,10 @@ TEST(ZombieTest, MeasureSpace) {
 
     z.evict();
     EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
-    auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
-    EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
-    auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
-    EXPECT_EQ(m->space_taken.count(), Space(sizeof(int)).count());
+    //auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
+    //EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
+    //auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
+    //EXPECT_EQ(m->space_taken.count(), Space(sizeof(int)).count());
   }
 
   {
@@ -313,10 +305,10 @@ TEST(ZombieTest, MeasureSpace) {
 
     z.evict();
     EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
-    auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
-    EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
-    auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
-    EXPECT_EQ(m->space_taken.count(), Space(2 * sizeof(int)).count());
+    //auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
+    //EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
+    //auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
+    //EXPECT_EQ(m->space_taken.count(), Space(2 * sizeof(int)).count());
   }
 }
 

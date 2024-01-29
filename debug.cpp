@@ -5,9 +5,7 @@
 #define EXPECT_TRUE(x) assert(x);
 #define EXPECT_FALSE(x) assert(!(x));
 
-constexpr ZombieConfig uf_cfg(/*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
-
-IMPORT_ZOMBIE(uf_cfg)
+IMPORT_ZOMBIE(default_config)
 
 template<typename T, typename U>
 struct GetSize<std::pair<T, U>> {
@@ -17,11 +15,6 @@ struct GetSize<std::pair<T, U>> {
 };
 
 int main() {
-  Zombie<int> a(1);
-  Zombie<int> b = bindZombieTC<int>([&]() {
-    return TailCall([](int x){ return Result(Zombie<int>(x + 1)); }, a);
-  });
-  EXPECT_EQ(b.get_value(), 2);
-  b.evict();
-  EXPECT_EQ(b.get_value(), 2);
+  Zombie<int> x(42);
+  EXPECT_EQ(x.get_value(), 42);
 }
