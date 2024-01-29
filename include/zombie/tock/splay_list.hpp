@@ -240,6 +240,6 @@ struct SplayList {
   }
 
   void debug_display_splay() {
-    debug_display_splay_(root_node.get(), 0);
+    debug_display_splay_helper(root_node.get(), 0);
   }
 };
