@@ -23,13 +23,17 @@ void SplayTest() {
   Splay splay;
 
   for (int i = 0; i < keys.size(); i++) {
-    splay.insert(keys[i], E{values[i]});
+    splay.insert(keys[i], E{i});
   }
 
   auto rng = std::default_random_engine {};
   std::shuffle(ids.begin(), ids.end(), rng);
   for (int i : ids) {
     EXPECT_TRUE(splay.has_precise(keys[i]));
+  }
+
+  for (int i = 0; i < keys.size(); i++) {
+    splay.insert(keys[i], E{values[i]});
   }
 
   std::shuffle(ids.begin(), ids.end(), rng);
@@ -45,7 +49,6 @@ void SplayTest() {
   std::sort(data.begin(), data.end());
   // all the values and keys are in (0, 100)
   for (int i = 0; i < 100; i++) {
-    printf("%d\n", i);
     auto it = std::lower_bound(data.begin(), data.end(), std::make_pair(-i, 0));
     auto node = splay.find_smaller_node(i);
 
