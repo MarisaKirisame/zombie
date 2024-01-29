@@ -372,28 +372,19 @@ Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(co
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
-  assert(false);
   using ret_type = decltype(f(std::declval<Arg>()...));
-  return *static_cast<ret_type*>(nullptr);
-  /*
   static_assert(IsZombie<ret_type>::value, "should be zombie");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  // I hate we have the following partial-handling code at here, tc, and untyped.
-  assert(t.current_tock != t.tardis.forward_at);
-  if (t.current_tock > t.tardis.forward_at) {
-    t.current_tock++;
-    return ret_type(std::numeric_limits<Tock>::max());
-  } else {
-    std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)> func =
-      [f = std::forward<F>(f)](const std::vector<const void*> in) {
-        auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-        std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-        return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args)).o;
-      };
-    std::vector<Tock> in = {x.created_time...};
-    Trampoline::Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
-    return ret_type(dynamic_cast<Trampoline::ReturnNode<Tock>*>(o.get())->t);
-    }*/
+  assert(t.current_tock != t.replay.forward_at);
+  std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<const void*> in) {
+      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+      return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args)).o;
+    };
+  std::vector<Tock> in = {x.created_time...};
+  Trampoline::Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
+  return ret_type(dynamic_cast<Trampoline::ReturnNode<Tock>*>(o.get())->t);
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
