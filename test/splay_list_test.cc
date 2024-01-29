@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cstdio>
 #include <gtest/gtest.h>
 #include <memory>
+#include <utility>
 
 #include "common.hpp"
 #include "zombie/tock/splay_list.hpp"
@@ -33,6 +35,15 @@ void SplayTest() {
   std::shuffle(ids.begin(), ids.end(), rng);
   for (int i : ids) {
     EXPECT_EQ(splay.find_precise(keys[i])->get(), values[i]);
+  }
+
+  std::shuffle(ids.begin(), ids.end(), rng);
+  for (int i = 0; i < ids.size(); i++) {
+    splay.remove_precise(keys[ids[i]]);
+    EXPECT_FALSE(splay.has_precise(keys[ids[i]]));
+    for (int j = i + 1; j < ids.size(); j++) {
+      EXPECT_EQ(splay.find_precise(keys[ids[j]])->get(), values[ids[j]]);
+    }
   }
 }
 
