@@ -314,12 +314,24 @@ void MicroWavePtr<cfg>::replay() {
   t.book.push(std::make_unique<RecomputeLater<cfg>>((*this)->start_time, *this), (*this)->cost());
 }
 
+inline HeadExclusivePreContext::HeadExclusivePreContext(std::function<Trampoline::Output<Tock>(const std::vector<const void*>& in)> &&f, std::vector<Tock> &&inputs) : space_taken(0) {
+  assert(false);
+}
+
+template<const ZombieConfig& cfg>
+Tock current_tock() {
+  return Trailokya<cfg>::get_trailokya().current_tock;
+}
+
 // todo: when in recompute mode, once the needed value is computed, we can skip the rest of the computation, jumping straight up.
 template<const ZombieConfig& cfg>
 Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  Record saved = t.record.finish();
+  t.record = Record<cfg>(HeadExclusivePreContext(std::move(func), std::move(in)));
+  t.record = std::move(saved);
   assert(false);
   /*
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   auto default_path = [&](const Tock& min_end_time) {
     Tock start_time = t.current_tock++;
     std::tuple<Trampoline::Output<Tock>, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
@@ -372,28 +384,19 @@ Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(co
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
-  assert(false);
   using ret_type = decltype(f(std::declval<Arg>()...));
-  return *static_cast<ret_type*>(nullptr);
-  /*
   static_assert(IsZombie<ret_type>::value, "should be zombie");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  // I hate we have the following partial-handling code at here, tc, and untyped.
-  assert(t.current_tock != t.tardis.forward_at);
-  if (t.current_tock > t.tardis.forward_at) {
-    t.current_tock++;
-    return ret_type(std::numeric_limits<Tock>::max());
-  } else {
-    std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)> func =
-      [f = std::forward<F>(f)](const std::vector<const void*> in) {
-        auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-        std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-        return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args)).o;
-      };
-    std::vector<Tock> in = {x.created_time...};
-    Trampoline::Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
-    return ret_type(dynamic_cast<Trampoline::ReturnNode<Tock>*>(o.get())->t);
-    }*/
+  assert(t.current_tock != t.replay.forward_at);
+  std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<const void*> in) {
+      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+      return Result(std::apply([&](const Arg*... arg) { return f(*arg...); }, args)).o;
+    };
+  std::vector<Tock> in = {x.created_time...};
+  Trampoline::Output<Tock> o = bindZombieRaw<cfg>(std::move(func), std::move(in));
+  return ret_type(dynamic_cast<Trampoline::ReturnNode<Tock>*>(o.get())->t);
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
@@ -403,7 +406,7 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(IsTCZombie<ret_type>::value, "should be TCZombie");
   return *static_cast<ret_type*>(nullptr);
   /*
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+    Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.tardis.forward_at);
   if (t.current_tock > t.tardis.forward_at) {
     t.current_tock++;

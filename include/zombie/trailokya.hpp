@@ -24,6 +24,8 @@ struct HeadExclusivePreContext {
 
   Space space_taken;
   ns start_time;
+
+  HeadExclusivePreContext(std::function<Trampoline::Output<Tock>(const std::vector<const void*>& in)>&& f, std::vector<Tock>&& inputs);
 };
 struct SpineExclusivePreContext {
   Tock head_t;
@@ -38,25 +40,34 @@ struct Context {
 };
 
 template<const ZombieConfig& cfg>
+Tock current_tock();
+
+template<const ZombieConfig& cfg>
+struct Record {
+  std::variant<RootExclusivePreContext, HeadExclusivePreContext, SpineExclusivePreContext> pre_context;
+  Tock t;
+  std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
+
+  template<typename X>
+  Record(X&& pc) : pre_context(std::forward<X>(pc)), t(current_tock<cfg>()) { }
+
+  template<typename X>
+  Record(X&& pc, Tock t) : pre_context(std::forward<X>(pc)), t(t) { }
+
+  Record<cfg> finish() {
+    assert(false);
+  };
+};
+
+template<const ZombieConfig& cfg>
+struct Replay {
+  Tock forward_at = std::numeric_limits<Tock>::max();
+  std::shared_ptr<EZombieNode<cfg>>* forward_to = nullptr;
+};
+
+template<const ZombieConfig& cfg>
 struct Trailokya {
 public:
-  struct Record {
-    std::variant<RootExclusivePreContext, HeadExclusivePreContext, SpineExclusivePreContext> pre_context = RootExclusivePreContext();
-    Tock t = 0;
-    std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
-  };
-
-  struct Replay {
-    Tock forward_at = std::numeric_limits<Tock>::max();
-    std::shared_ptr<EZombieNode<cfg>>* forward_to = nullptr;
-  };
-
-  using TockTreeElem = std::variant<
-    std::monostate,
-    MicroWavePtr<cfg>,
-    std::shared_ptr<EZombieNode<cfg>>
-  >;
-
   struct NotifyIndexChanged {
     void operator()(const std::unique_ptr<Phantom>& p, size_t idx) {
       p->notify_index_changed(idx);
@@ -69,12 +80,11 @@ public:
 
   struct Reaper;
 public:
-  // Hold MicroWave and GraveYard.
+  Tock current_tock = 1;
   SplayList<Tock, Context> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
-  Record record;
-  Replay replay;
-  Tock current_tock = 1;
+  Record<cfg> record = Record<cfg>(RootExclusivePreContext(), 0);
+  Replay<cfg> replay;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
 
