@@ -37,6 +37,25 @@ void SplayTest() {
     EXPECT_EQ(splay.find_precise(keys[i])->get(), values[i]);
   }
 
+  std::vector<std::pair<int, int>> data;
+  for (int i = 0; i < keys.size(); i++) {
+    data.push_back({-keys[i], values[i]});
+  }
+
+  std::sort(data.begin(), data.end());
+  // all the values and keys are in (0, 100)
+  for (int i = 0; i < 100; i++) {
+    printf("%d\n", i);
+    auto it = std::lower_bound(data.begin(), data.end(), std::make_pair(-i, 0));
+    auto node = splay.find_smaller_node(i);
+
+    if (it == data.end()) {
+      EXPECT_EQ(node, nullptr);
+    } else {
+      EXPECT_EQ(node->v.get(), it->second);
+    }
+  }
+
   std::shuffle(ids.begin(), ids.end(), rng);
   for (int i = 0; i < ids.size(); i++) {
     splay.remove_precise(keys[ids[i]]);

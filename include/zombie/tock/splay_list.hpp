@@ -92,12 +92,12 @@ struct SplayList {
         tl.root_node = std::move(splay_children[0]);
         tl.root_node->splay_parent = nullptr;
       } else {
-        splay_children[0]->splay_parent = nullptr;
+        splay_children[1]->splay_parent = nullptr;
 
-        splay_children[0]->max_node()->splay(splay_children[0]);
-        splay_children[0]->splay_children[1] = std::move(splay_children[1]);
-        splay_children[0]->maintain_parent(1);
-        tl.root_node = std::move(splay_children[0]);
+        splay_children[1]->min_node()->splay(splay_children[1]);
+        splay_children[1]->splay_children[0] = std::move(splay_children[0]);
+        splay_children[1]->maintain_parent(0);
+        tl.root_node = std::move(splay_children[1]);
       }
     }
 
@@ -168,10 +168,18 @@ struct SplayList {
   // find the largest Node with start <= t.
   Node* find_smaller_node(const K& k) {
     Node* ptr = find_node(k);
-    if (ptr != nullptr && ptr->k > k) {
-      return ptr->parent;
-    } else {
+    if (ptr == nullptr) {
+      return nullptr;
+    } else if (ptr->k <= k) {
       return ptr;
+    } else {
+      if (ptr->splay_children[0] == nullptr) {
+        return nullptr;
+      } else {
+        auto ret = ptr->splay_children[0]->max_node();
+        ret->splay(root_node);
+        return ret;
+      }
     }
   }
 
