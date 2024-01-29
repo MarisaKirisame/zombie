@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cstdio>
 #include <gtest/gtest.h>
 #include <memory>
+#include <utility>
 
 #include "common.hpp"
 #include "zombie/tock/splay_list.hpp"
@@ -21,7 +23,7 @@ void SplayTest() {
   Splay splay;
 
   for (int i = 0; i < keys.size(); i++) {
-    splay.insert(keys[i], E{values[i]});
+    splay.insert(keys[i], E{i});
   }
 
   auto rng = std::default_random_engine {};
@@ -30,20 +32,46 @@ void SplayTest() {
     EXPECT_TRUE(splay.has_precise(keys[i]));
   }
 
+  for (int i = 0; i < keys.size(); i++) {
+    splay.insert(keys[i], E{values[i]});
+  }
+
   std::shuffle(ids.begin(), ids.end(), rng);
   for (int i : ids) {
     EXPECT_EQ(splay.find_precise(keys[i])->get(), values[i]);
+  }
+
+  std::vector<std::pair<int, int>> data;
+  for (int i = 0; i < keys.size(); i++) {
+    data.push_back({-keys[i], values[i]});
+  }
+
+  std::sort(data.begin(), data.end());
+  // all the values and keys are in (0, 100)
+  for (int i = 0; i < 100; i++) {
+    auto it = std::lower_bound(data.begin(), data.end(), std::make_pair(-i, 0));
+    auto node = splay.find_smaller_node(i);
+
+    if (it == data.end()) {
+      EXPECT_EQ(node, nullptr);
+    } else {
+      EXPECT_EQ(node->v.get(), it->second);
+    }
+  }
+
+  std::shuffle(ids.begin(), ids.end(), rng);
+  for (int i = 0; i < ids.size(); i++) {
+    splay.remove_precise(keys[ids[i]]);
+    EXPECT_FALSE(splay.has_precise(keys[ids[i]]));
+    for (int j = i + 1; j < ids.size(); j++) {
+      EXPECT_EQ(splay.find_precise(keys[ids[j]])->get(), values[ids[j]]);
+    }
   }
 }
 
 TEST(SplayTest, Normal) {
   using Splay = SplayList<int, Element<false>>;
   SplayTest<Splay, Splay::Node, false>();
-}
-
-TEST(SplayTest, EmptySplayTest) {
-  SplayList<int, int> sl;
-  EXPECT_FALSE(sl.has(0));
 }
 
 /*
