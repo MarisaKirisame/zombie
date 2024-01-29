@@ -20,8 +20,6 @@ public:
 
   mutable std::vector<Tock> used_by;
 
-  mutable Time last_accessed;
-
   mutable bool evicted = false;
   mutable ptrdiff_t pool_index = -1;
 

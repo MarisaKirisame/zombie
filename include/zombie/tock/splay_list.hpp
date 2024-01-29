@@ -166,7 +166,7 @@ struct SplayList {
   }
 
   // find the largest Node with start <= t.
-  Node* find_smaller_node(const K& k) {
+  Node* find_lt_node(const K& k) {
     Node* ptr = find_node(k);
     if (ptr == nullptr) {
       return nullptr;
@@ -188,8 +188,8 @@ struct SplayList {
     return (ptr == nullptr || ptr->k != k) ? nullptr : ptr;
   }
 
-  V* find(const K& k) {
-    Node* ptr = find_smaller_node(k);
+  V* find_lt(const K& k) {
+    Node* ptr = find_lt_node(k);
     return ptr == nullptr ? nullptr : &(ptr->v);
   }
 
@@ -198,8 +198,8 @@ struct SplayList {
     return ptr == nullptr ? nullptr : &(ptr->v);
   }
 
-  bool has(const K& k) {
-    Node* ptr = find_smaller_node(k);
+  bool has_lt(const K& k) {
+    Node* ptr = find_lt_node(k);
     return ptr != nullptr;
   }
 
@@ -208,8 +208,8 @@ struct SplayList {
     return ptr != nullptr && ptr->k == k;
   }
 
-  void remove(const K& k) {
-    Node* ptr = find_smaller_node(k);
+  void remove_lt(const K& k) {
+    Node* ptr = find_lt_node(k);
     if (ptr != nullptr) {
       ptr->remove(*this);
     }

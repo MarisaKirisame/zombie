@@ -15,7 +15,7 @@
   using Zombie = ZombieInternal::Zombie<cfg, T>;                                                   \
   using EZombie = ZombieInternal::EZombie<cfg>;                                                    \
   template<typename T>                                                                             \
-  using TCZombie = ZombieInternal::TCZombie<T>;                                                    \
+  using TCZombie = ZombieInternal::TCZombie<cfg, T>;                                               \
   using Trailokya = ZombieInternal::Trailokya<cfg>;                                                \
   template<typename F, typename... Args>                                                           \
   inline auto bindZombie(F&& f, const Zombie<Args>& ...x) {                                        \

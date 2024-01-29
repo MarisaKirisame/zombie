@@ -11,11 +11,18 @@
 
 namespace ZombieInternal {
 
-struct Context;
+template<const ZombieConfig& cfg>
+struct ContextNode;
 
-template<typename T>
+template<const ZombieConfig& cfg>
+using Context = std::shared_ptr<ContextNode<cfg>>;
+
+template<const ZombieConfig& cfg>
+struct EZombie;
+
+template<const ZombieConfig &cfg, typename T>
 struct TCZombie {
-  Trampoline::Output<Tock> o;
+  Trampoline::Output<EZombie<cfg>> o;
 };
 
 // EZombieNode is a type-erased interface to a computed value.
@@ -24,7 +31,7 @@ template<const ZombieConfig &cfg>
 struct EZombieNode {
 public:
   Tock created_time;
-  mutable std::weak_ptr<Context> context_cache;
+  mutable std::weak_ptr<ContextNode<cfg>> context_cache;
 
 public:
   EZombieNode(Tock create_time);
@@ -36,7 +43,7 @@ public:
 
   virtual const void* get_ptr() const = 0;
 
-  std::shared_ptr<Context> get_context() const;
+  std::shared_ptr<ContextNode<cfg>> get_context() const;
 };
 
 // ZombieNode is the concrete implementation of EZombieNode,
@@ -86,6 +93,9 @@ struct RecomputeLater : Phantom {
   }
 };
 
+template<const ZombieConfig& cfg, typename T>
+struct Zombie;
+
 // Note that this type do not have a virtual destructor.
 // Doing so save the pointer to the virtual method table,
 //   and a EZombie only contain two 64 bit field:
@@ -97,7 +107,9 @@ struct EZombie {
   Tock created_time;
   mutable std::weak_ptr<EZombieNode<cfg>> ptr_cache;
 
-  EZombie(Tock created_time) : created_time(created_time) { }
+  EZombie(const EZombie& ez) : created_time(ez.created_time), ptr_cache(ez.ptr_cache) { }
+  template<typename T>
+  EZombie(const Zombie<cfg, T>& ez) : created_time(ez.created_time), ptr_cache(ez.ptr_cache) { }
   EZombie() { }
 
   std::weak_ptr<EZombieNode<cfg>> ptr() const;
@@ -107,9 +119,13 @@ struct EZombie {
   }
 
   bool evictable() const {
-    assert(false);
-    /*auto ptr = this->ptr().lock();
-      return ptr && ptr->get_parent() != nullptr;*/
+    auto ptr = this->ptr().lock();
+    if (ptr != nullptr) {
+      auto ctx = ptr->get_context();
+      return ctx != nullptr && ctx->evictable();
+    } else {
+      return false;
+    }
   }
 
   bool unique() const {
@@ -137,11 +153,6 @@ struct EZombie {
 // While Zombie is mutable, the inside is immutable.
 // Note that when you have a Zombie of Zombie, the inside is immutable by the above rule.
 //
-// TODO: it could be a shared_ptr to skip registering in node.
-// when that happend, we gain both space and time,
-// at the lose of eviction granularity.
-//
-// the shared_ptr is stored in the evict list. when it evict something it simply drop the pointer.
 // T should manage it's own memory:
 // when T is destructed, only then all memory is released.
 // this mean T should not hold shared_ptr, as others might be sharing it.
@@ -153,12 +164,14 @@ struct Zombie : EZombie<cfg> {
   template<typename... Args>
   void construct(Args&&... args);
 
+  explicit Zombie(const EZombie<cfg>& z) : EZombie<cfg>(z) { }
+  explicit Zombie(EZombie<cfg>& z) : EZombie<cfg>(z) { }
+  explicit Zombie(EZombie<cfg>&& z) : EZombie<cfg>(std::move(z)) { }
+  explicit Zombie(const EZombie<cfg>&& z) : EZombie<cfg>(std::move(z)) { }
+
   Zombie(const Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
-
   Zombie(Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
-
   Zombie(Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
-
   Zombie(const Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
 
   template<typename... Arg>
@@ -174,12 +187,6 @@ struct Zombie : EZombie<cfg> {
   Zombie(T&& t) {
     construct(std::move(t));
   }
-
-  Zombie(Tock&& t) : EZombie<cfg>(t) { }
-
-  Zombie(const Tock& t) : EZombie<cfg>(t) { }
-
-  Zombie(Tock& t) : EZombie<cfg>(t) { }
 
   Zombie() = delete;
 
@@ -197,8 +204,8 @@ struct Zombie : EZombie<cfg> {
 };
 
 template<const ZombieConfig& cfg, typename T>
-TCZombie<T> Result(const Zombie<cfg, T>& z) {
-  return TCZombie<T> {std::make_shared<Trampoline::ReturnNode<Tock>>(z.created_time)};
+TCZombie<cfg, T> Result(const Zombie<cfg, T>& z) {
+  return TCZombie<cfg, T> {std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(z)};
 }
 
 template<typename F, size_t... Is>
@@ -220,8 +227,8 @@ struct IsZombie<Zombie<cfg, T>> : std::true_type { };
 template<typename T>
 struct IsTCZombie : std::false_type { };
 
-template<typename T>
-struct IsTCZombie<TCZombie<T>> : std::true_type { };
+template<const ZombieConfig& cfg, typename T>
+struct IsTCZombie<TCZombie<cfg, T>> : std::true_type { };
 
 } // end of namespace ZombieInternal
 

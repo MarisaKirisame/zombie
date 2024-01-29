@@ -37,14 +37,12 @@ struct ZombieClock {
   }
 };
 
-
 // In zombie, we want the time or bindZombie to not include that of recursive remat.
 // This class take care of that.
 struct ZombieMeter {
   struct Node {
     ns constructed_time = ZombieClock::singleton().time();
     ns skipping_time = ns(0);
-    size_t space = 0;
 
     ns time() {
       return ZombieClock::singleton().time() - skipping_time;
@@ -54,6 +52,10 @@ struct ZombieMeter {
   std::vector<Node> stack { Node() };
 
   ns time() {
+    return stack.back().time();
+  }
+
+  ns raw_time() const {
     return ZombieClock::singleton().time();
   }
 
@@ -61,22 +63,15 @@ struct ZombieMeter {
     ZombieClock::singleton().fast_forward(n);
   }
 
-  void add_space(size_t extra) {
-    stack.back().space += extra;
-  }
-
-
   template<typename F>
-  std::tuple<decltype(std::declval<F>()()), ns, size_t> measured(const F& f) {
+  std::pair<decltype(std::declval<F>()()), ns> measured(const F& f) {
     assert(!stack.empty());
     size_t ss = stack.size();
-    ns time_before = stack.back().time();
-    size_t space_before = stack.back().space;
+    ns time_before = time();
     auto t = f();
     assert(ss == stack.size());
-    ns time_after = stack.back().time();
-    size_t space_after = stack.back().space;
-    return {std::move(t), time_after - time_before, space_after - space_before};
+    ns time_after = time();
+    return {std::move(t), time_after - time_before};
   }
 
   template<typename F>

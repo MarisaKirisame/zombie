@@ -74,6 +74,11 @@ TEST(SplayTest, Normal) {
   SplayTest<Splay, Splay::Node, false>();
 }
 
+TEST(SplayTest, EmptySplayTest) {
+  SplayList<int, int> sl;
+  EXPECT_FALSE(sl.has_lt(0));
+}
+
 /*
 TEST(SplayTest, UniqueElement) {
   using Splay = SplayList<int, Element<true>>;

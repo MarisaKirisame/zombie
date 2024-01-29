@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "base.hpp"
 #include "tock/tock.hpp"
 #include "meter.hpp"
 #include "config.hpp"
@@ -16,48 +17,99 @@ struct UF {
   T t; // only meaningful when parent.get() == nullptr
 };
 
-struct RootExclusivePreContext { };
-struct HeadExclusivePreContext {
+template<const ZombieConfig& cfg>
+Tock tick();
+
+template<const ZombieConfig& cfg>
+struct RecordNode {
+  Tock t;
+  std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
+
+  ~RecordNode() { }
+  RecordNode() : t(tick<cfg>()) { }
+  explicit RecordNode(Tock t) : t(t) { }
+
+  virtual void finish() = 0;
+  virtual std::shared_ptr<RecordNode<cfg>> resume() = 0;
+  virtual void record_space(const Space&) = 0;
+  virtual bool playable() = 0;
+  virtual Trampoline::Output<EZombie<cfg>> play() = 0;
+};
+
+template<const ZombieConfig& cfg>
+using Record = std::shared_ptr<RecordNode<cfg>>;
+
+template<const ZombieConfig& cfg>
+struct RootRecordNode : RecordNode<cfg> {
+  explicit RootRecordNode(const Tock& t) : RecordNode<cfg>(t) { }
+  RootRecordNode() { }
+  void finish() override;
+  Record<cfg> resume() override;
+  void record_space(const Space&) override { }
+  bool playable() override { return false; }
+  Trampoline::Output<EZombie<cfg>> play() override { assert(false); }
+};
+
+template<const ZombieConfig& cfg>
+struct HeadRecordNode : RecordNode<cfg> {
   // we dont really use the Tock return type, but this allow one less boxing.
-  std::function<Trampoline::Output<Tock>(const std::vector<const void*>& in)> f;
-  std::vector<Tock> inputs;
+  std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
+  std::vector<EZombie<cfg>> inputs;
 
   Space space_taken;
-  ns start_time;
+  Time start_time;
 
-  HeadExclusivePreContext(std::function<Trampoline::Output<Tock>(const std::vector<const void*>& in)>&& f, std::vector<Tock>&& inputs);
+  HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
+  void finish() override;
+  Record<cfg> resume() override;
+  void record_space(const Space& s) override { space_taken += s; }
+  bool playable() override { return true; }
+  Trampoline::Output<EZombie<cfg>> play() override;
 };
-struct SpineExclusivePreContext {
+
+template<const ZombieConfig& cfg>
+struct SpineRecordNode : RecordNode<cfg> {
   Tock head_t;
   std::vector<Tock> inputs;
 
   Space space_taken;
-  ns start_time;
-};
-
-struct Context {
-  
+  Time start_time;
+  void record_space(const Space& s) override { space_taken += s; }
 };
 
 template<const ZombieConfig& cfg>
-Tock current_tock();
-
-template<const ZombieConfig& cfg>
-struct Record {
-  std::variant<RootExclusivePreContext, HeadExclusivePreContext, SpineExclusivePreContext> pre_context;
-  Tock t;
+struct ContextNode : Object {
   std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
 
-  template<typename X>
-  Record(X&& pc) : pre_context(std::forward<X>(pc)), t(current_tock<cfg>()) { }
-
-  template<typename X>
-  Record(X&& pc, Tock t) : pre_context(std::forward<X>(pc)), t(t) { }
-
-  Record<cfg> finish() {
-    assert(false);
-  };
+  explicit ContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez) : ez(std::move(ez)) { }
+  virtual void accessed() = 0;
+  virtual bool evictable() = 0;
+  virtual void evict() = 0;
 };
+
+template<const ZombieConfig& cfg>
+using Context = std::shared_ptr<ContextNode<cfg>>;
+
+template<const ZombieConfig& cfg>
+struct RootContextNode : ContextNode<cfg> {
+  explicit RootContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez) : ContextNode<cfg>(std::move(ez)) { }
+  void accessed() override { }
+  bool evictable() { return false; }
+  void evict() { assert(false); }
+};
+
+template<const ZombieConfig& cfg>
+struct HeadContextNode : ContextNode<cfg> {
+  mutable Time last_accessed;
+
+  explicit HeadContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez);
+  void accessed() override;
+  bool evictable() { return true; }
+  void evict() { this->ez.clear(); }
+};
+
+template<const ZombieConfig& cfg>
+struct SpineContextNode : ContextNode<cfg> { };
 
 template<const ZombieConfig& cfg>
 struct Replay {
@@ -81,9 +133,9 @@ public:
   struct Reaper;
 public:
   Tock current_tock = 1;
-  SplayList<Tock, Context> akasha;
+  SplayList<Tock, Context<cfg>> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
-  Record<cfg> record = Record<cfg>(RootExclusivePreContext(), 0);
+  Record<cfg> record = std::make_shared<RootRecordNode<cfg>>(Tock(0));
   Replay<cfg> replay;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);

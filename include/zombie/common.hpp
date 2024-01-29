@@ -77,6 +77,11 @@ struct Space {
     assert(bytes >= plank_space_in_bytes);
     return bytes / plank_space_in_bytes;
   }
+
+  Space& operator+=(const Space& rhs) {
+    bytes += rhs.bytes;
+    return *this;
+  }
 };
 
 
