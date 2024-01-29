@@ -341,44 +341,6 @@ Trampoline::Output<EZombie<cfg>> HeadRecordNode<cfg>::play() {
   return f(in);
 }
 
-template<const ZombieConfig& cfg>
-Trampoline::Output<Tock> bindZombieRaw(std::function<Trampoline::Output<Tock>(const std::vector<const void*>&)>&& func, std::vector<Tock>&& in) {
-  assert(false);
-  /*
-  auto default_path = [&](const Tock& min_end_time) {
-  Tock start_time = t.current_tock++;
-    std::tuple<Trampoline::Output<Tock>, ns, size_t> p = t.meter.measured([&](){ return MicroWave<cfg>::play(func, in); });
-    Trampoline::Output<Tock> out = std::get<0>(p);
-    ns time_taken = std::get<1>(p);
-    t.current_tock = std::max(min_end_time, t.current_tock);
-    bool is_tailcall = dynamic_cast<Trampoline::ReturnNode<Tock>*>(out.get()) == nullptr;
-    return out;
-  };
-  if (!t.akasha.has_precise(t.current_tock)) {
-    return default_path(std::numeric_limits<Tock>::min());
-  } else {
-    const TockTreeData<typename Trailokya<cfg>::TockTreeElem>& n = t.akasha.get_precise_node(t.current_tock);
-    std::shared_ptr<MicroWave<cfg>> mv = std::get<TockTreeElemKind::MicroWave>(n.value);
-    if (mv->state == MWState::Complete()) {
-      t.current_tock = n.range.end;
-      auto ret(mv->output);
-      // we choose call-by-need because it is more memory efficient.
-      return std::make_shared<Trampoline::ReturnNode<Tock>>(ret);
-    } else if (mv->state == MWState::TailCall()) {
-      // replaying. we will not finish because our result is partial. no need to update the MicroWave in such case.
-      Tock start_time = t.current_tock++;
-      return MicroWave<cfg>::play(func, in);
-    } else {
-      assert(mv->state == MWState::Partial());
-      // technically we dont need this, but I want to remove the shared_ptr. lets not setup trap for future us.
-      Tock min_end_time = mv->end_time;
-      t.akasha.remove_precise(t.current_tock);
-      return default_path(min_end_time);
-    }
-  }
-  */
-}
-
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
   using ret_type = decltype(f(std::declval<Arg>()...));
