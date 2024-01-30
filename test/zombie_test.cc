@@ -305,11 +305,11 @@ TEST(ZombieTest, MeasureSpace) {
 
     Trailokya& t = Trailokya::get_trailokya();
     EXPECT_FALSE(t.akasha.has_precise(z.created_time));
-    EXPECT_EQ((*t.akasha.find_lt(z.created_time))->space_taken, 2 * sizeof(int));
+    EXPECT_EQ((*t.akasha.find_le(z.created_time))->space_taken, 2 * sizeof(int));
 
     z.evict();
     EXPECT_FALSE(t.akasha.has_precise(z.created_time));
-    EXPECT_EQ((*t.akasha.find_lt(z.created_time))->space_taken, 1 * sizeof(int));
+    EXPECT_EQ((*t.akasha.find_le(z.created_time))->space_taken, 1 * sizeof(int));
   }
 }
 

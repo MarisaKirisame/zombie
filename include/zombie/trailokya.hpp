@@ -135,6 +135,9 @@ struct RecomputeLater : Phantom {
   void notify_index_changed(size_t idx) override {
     non_null(weak_ptr.lock())->pool_index = idx;
   }
+  void notify_element_removed() override {
+    non_null(weak_ptr.lock())->pool_index = -1;
+  }
 };
 
 template<const ZombieConfig& cfg>
@@ -156,7 +159,9 @@ public:
   };
 
   struct NotifyElementRemoved {
-    void operator()(const std::unique_ptr<Phantom>& p) { }
+    void operator()(const std::unique_ptr<Phantom>& p) {
+      p->notify_element_removed();
+    }
   };
 
   struct Reaper;

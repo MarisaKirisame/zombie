@@ -63,10 +63,12 @@ void FullContextNode<cfg>::accessed() {
 template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::evict() {
   this->ez.clear();
-  assert(pool_index >= 0);
-  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.book.heap.remove(pool_index);
-  pool_index = -1;
+  if (pool_index != -1) {
+    assert(pool_index >= 0);
+    Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+    t.book.heap.remove(pool_index);
+    pool_index = -1;
+  }
 }
 
 template<const ZombieConfig& cfg>
