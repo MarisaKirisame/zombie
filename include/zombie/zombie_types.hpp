@@ -21,8 +21,18 @@ template<const ZombieConfig& cfg>
 struct EZombie;
 
 template<const ZombieConfig &cfg, typename T>
+struct Zombie;
+
+template<const ZombieConfig &cfg, typename T>
 struct TCZombie {
   Trampoline::Output<EZombie<cfg>> o;
+  explicit TCZombie(std::function<Trampoline::Output<EZombie<cfg>>()>&& f);
+
+  explicit TCZombie(const EZombie<cfg>& z);
+  explicit TCZombie(EZombie<cfg>&& z);
+
+  explicit TCZombie(const Zombie<cfg, T>& z);
+  explicit TCZombie(Zombie<cfg, T>&& z);
 };
 
 // EZombieNode is a type-erased interface to a computed value.
@@ -165,18 +175,19 @@ struct Zombie : EZombie<cfg> {
   void construct(Args&&... args);
 
   explicit Zombie(const EZombie<cfg>& z) : EZombie<cfg>(z) { }
+  explicit Zombie(const EZombie<cfg>&& z) : EZombie<cfg>(std::move(z)) { }
   explicit Zombie(EZombie<cfg>& z) : EZombie<cfg>(z) { }
   explicit Zombie(EZombie<cfg>&& z) : EZombie<cfg>(std::move(z)) { }
-  explicit Zombie(const EZombie<cfg>&& z) : EZombie<cfg>(std::move(z)) { }
 
   Zombie(const Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
+  Zombie(const Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
   Zombie(Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
   Zombie(Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
-  Zombie(const Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
 
   template<typename... Arg>
   Zombie(Arg&&... arg) {
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Zombie<cfg, T>>>::value, "should not match this constructor");
+    static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<EZombie<cfg>>>::value, "should not match this constructor");
     construct(std::forward<Arg>(arg)...);
   }
 
@@ -205,7 +216,7 @@ struct Zombie : EZombie<cfg> {
 
 template<const ZombieConfig& cfg, typename T>
 TCZombie<cfg, T> Result(const Zombie<cfg, T>& z) {
-  return TCZombie<cfg, T> {std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(z)};
+  return TCZombie<cfg, T>(z);
 }
 
 template<typename F, size_t... Is>
@@ -229,6 +240,12 @@ struct IsTCZombie : std::false_type { };
 
 template<const ZombieConfig& cfg, typename T>
 struct IsTCZombie<TCZombie<cfg, T>> : std::true_type { };
+
+template<typename T>
+struct TCZombieInner { };
+
+template<const ZombieConfig& cfg, typename T>
+struct TCZombieInner<TCZombie<cfg, T>> { using type_t = T; };
 
 } // end of namespace ZombieInternal
 

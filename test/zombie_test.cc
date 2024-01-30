@@ -314,7 +314,7 @@ TEST(ZombieTest, MeasureSpace) {
 
 TEST(ZombieTest, TailCall) {
   Zombie<int> a(1);
-  Zombie<int> b = bindZombieTC<int>([&]() {
+  Zombie<int> b = bindZombieTC([&]() {
     return TailCall([](int x){ return Result(Zombie<int>(x + 1)); }, a);
   });
   EXPECT_EQ(b.get_value(), 2);

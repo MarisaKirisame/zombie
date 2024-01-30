@@ -21,9 +21,9 @@
   inline auto bindZombie(F&& f, const Zombie<Args>& ...x) {                                        \
     return ZombieInternal::bindZombie<cfg, F, Args...>(std::forward<F>(f), x...);                  \
   }                                                                                                \
-  template<typename Ret, typename F, typename... Args>                                             \
+  template<typename F, typename... Args>                                             \
   inline auto bindZombieTC(F&& f, const Zombie<Args>& ...x) {                                      \
-    return ZombieInternal::bindZombieTC<cfg, Ret, F, Args...>(std::forward<F>(f), x...);           \
+    return ZombieInternal::bindZombieTC<cfg, F, Args...>(std::forward<F>(f), x...);           \
   }                                                                                                \
   template<typename F, typename... Args>                                                           \
   inline auto TailCall(F&& f, const Zombie<Args>& ...x) {                                          \

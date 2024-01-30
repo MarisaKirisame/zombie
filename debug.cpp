@@ -8,13 +8,11 @@
 IMPORT_ZOMBIE(default_config)
 
 int main() {
-  Zombie<int> x(3);
-  auto y = bindZombie([](const int& x) { return Zombie<int>(x * 2); }, x);
-  EXPECT_FALSE(y.evicted());
-  y.force_unique_evict();
-  EXPECT_TRUE(y.evicted());
-  EXPECT_EQ(y.get_value(), 6);
-  assert(y.evictable());
-  y.force_unique_evict();
-  EXPECT_EQ(y.get_value(), 6);
+  Zombie<int> a(1);
+  Zombie<int> b = bindZombieTC([&]() {
+    return TailCall([](int x){ return Result(Zombie<int>(x + 1)); }, a);
+  });
+  EXPECT_EQ(b.get_value(), 2);
+  b.evict();
+  EXPECT_EQ(b.get_value(), 2);
 }
