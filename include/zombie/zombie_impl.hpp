@@ -94,6 +94,11 @@ void FullContextNode<cfg>::replay() {
 }
 
 template<const ZombieConfig& cfg>
+cost_t FullContextNode<cfg>::cost() {
+  return cfg.metric(time_taken, time_taken, Space(this->space_taken));
+}
+
+template<const ZombieConfig& cfg>
 std::shared_ptr<ContextNode<cfg>> EZombieNode<cfg>::get_context() const {
   auto ret = context_cache.lock();
   if (!ret) {
@@ -197,12 +202,6 @@ MicroWave<cfg>::MicroWave(std::function<Trampoline::Output<Tock>(const std::vect
       std::get<TockTreeElemKind::MicroWave>(parent)->used_by.push_back(start_time);
     }
     }*/
-}
-
-template<const ZombieConfig& cfg>
-cost_t MicroWave<cfg>::cost() const {
-  assert(false);
-  return cfg.metric(time_taken, cost_of_set(), space_taken);
 }
 
 template<const ZombieConfig& cfg>

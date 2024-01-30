@@ -120,7 +120,7 @@ struct FullContextNode : ContextNode<cfg> {
   bool evictable() override { return true; }
   void evict() override;
   void replay() override;
-  cost_t cost() { return time_taken.count(); }
+  cost_t cost();
 };
 
 // RecomputeLater holds a weak pointer to a MicroWave,
