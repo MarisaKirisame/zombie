@@ -91,21 +91,6 @@ struct Phantom {
   virtual void notify_index_changed(size_t new_index) = 0;
 };
 
-// RecomputeLater holds a weak pointer to a MicroWave,
-// and is stored in Trailokya::book for eviction.
-template<const ZombieConfig& cfg>
-struct RecomputeLater : Phantom {
-  Tock created_time;
-  std::weak_ptr<MicroWave<cfg>> weak_ptr;
-
-  RecomputeLater(const Tock& created_time, const std::shared_ptr<MicroWave<cfg>>& ptr) : created_time(created_time), weak_ptr(ptr) { }
-  cost_t cost() const override;
-  void evict() override;
-  void notify_index_changed(size_t idx) override {
-    non_null(weak_ptr.lock())->pool_index = idx;
-  }
-};
-
 template<const ZombieConfig& cfg, typename T>
 struct Zombie;
 

@@ -21,7 +21,6 @@ public:
   mutable std::vector<Tock> used_by;
 
   mutable bool evicted = false;
-  mutable ptrdiff_t pool_index = -1;
 
   // [_set_parent == start_time] when [*this] is a UF root
   mutable Tock _set_parent;

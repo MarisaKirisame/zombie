@@ -278,7 +278,6 @@ TEST(ZombieTest, EvictByMicroWave) {
 }
 
 TEST(ZombieTest, MeasureSpace) {
-  EXPECT_EQ(true, false);
   {
     Zombie<int> z = bindZombie([&]() {
       Zombie<int> za(1);
@@ -290,6 +289,7 @@ TEST(ZombieTest, MeasureSpace) {
 
     z.evict();
     EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
+    EXPECT_FALSE(true);
     //auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
     //EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
     //auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
@@ -303,12 +303,13 @@ TEST(ZombieTest, MeasureSpace) {
       return zb;
     });
 
+    Trailokya& t = Trailokya::get_trailokya();
+    EXPECT_FALSE(t.akasha.has_precise(z.created_time));
+    EXPECT_EQ((*t.akasha.find_lt(z.created_time))->space_taken, 2 * sizeof(int));
+
     z.evict();
-    EXPECT_FALSE(Trailokya::get_trailokya().akasha.has_precise(z.created_time));
-    //auto value = Trailokya::get_trailokya().akasha.get_node(z.created_time).value;
-    //EXPECT_EQ(value.index(), ZombieInternal::TockTreeElemKind::MicroWave);
-    //auto& m = std::get<ZombieInternal::TockTreeElemKind::MicroWave>(value);
-    //EXPECT_EQ(m->space_taken.count(), Space(2 * sizeof(int)).count());
+    EXPECT_FALSE(t.akasha.has_precise(z.created_time));
+    EXPECT_EQ((*t.akasha.find_lt(z.created_time))->space_taken, 1 * sizeof(int));
   }
 }
 

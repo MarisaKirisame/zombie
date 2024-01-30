@@ -24,6 +24,7 @@ template<const ZombieConfig& cfg>
 struct RecordNode {
   Tock t;
   std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
+  size_t space_taken = 0;
 
   ~RecordNode() { }
   RecordNode() : t(tick<cfg>()) { }
@@ -32,7 +33,6 @@ struct RecordNode {
   virtual void suspend() = 0;
   virtual void complete() = 0;
   virtual std::shared_ptr<RecordNode<cfg>> resume() = 0;
-  virtual void record_space(const Space&) = 0;
   virtual bool playable() = 0;
   virtual Trampoline::Output<EZombie<cfg>> play() = 0;
 };
@@ -47,7 +47,6 @@ struct RootRecordNode : RecordNode<cfg> {
   void suspend() override;
   void complete() override;
   Record<cfg> resume() override;
-  void record_space(const Space&) override { }
   bool playable() override { return false; }
   Trampoline::Output<EZombie<cfg>> play() override { assert(false); }
 };
@@ -58,14 +57,12 @@ struct HeadRecordNode : RecordNode<cfg> {
   std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
   std::vector<EZombie<cfg>> inputs;
 
-  Space space_taken;
   Time start_time;
 
   HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
   void suspend() override;
   void complete() override;
   Record<cfg> resume() override;
-  void record_space(const Space& s) override { space_taken += s; }
   bool playable() override { return true; }
   Trampoline::Output<EZombie<cfg>> play() override;
 };
@@ -75,16 +72,15 @@ struct SpineRecordNode : RecordNode<cfg> {
   Tock head_t;
   std::vector<Tock> inputs;
 
-  Space space_taken;
   Time start_time;
-  void record_space(const Space& s) override { space_taken += s; }
 };
 
 template<const ZombieConfig& cfg>
 struct ContextNode : Object {
   std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
+  size_t space_taken;
 
-  explicit ContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez) : ez(std::move(ez)) { }
+  explicit ContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez, const size_t& sp) : ez(std::move(ez)), space_taken(sp) { }
   virtual void accessed() = 0;
   virtual bool evictable() = 0;
   virtual void evict() = 0;
@@ -96,7 +92,7 @@ using Context = std::shared_ptr<ContextNode<cfg>>;
 
 template<const ZombieConfig& cfg>
 struct RootContextNode : ContextNode<cfg> {
-  explicit RootContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez) : ContextNode<cfg>(std::move(ez)) { }
+  explicit RootContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez, const size_t& sp) : ContextNode<cfg>(std::move(ez), sp) { }
   void accessed() override { }
   bool evictable() override { return false; }
   void evict() override { assert(false); }
@@ -108,16 +104,37 @@ struct FullContextNode : ContextNode<cfg> {
   std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
   std::vector<EZombie<cfg>> inputs;
   Tock start_time;
+
+  Time time_taken;
   mutable Time last_accessed;
 
+  mutable ptrdiff_t pool_index = -1;
+
   explicit FullContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
+                           const size_t& sp,
+                           const Time& time_taken,
                            std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
                            std::vector<EZombie<cfg>>&& inputs,
                            const Tock& start_time);
   void accessed() override;
   bool evictable() override { return true; }
-  void evict() override { this->ez.clear(); }
+  void evict() override;
   void replay() override;
+  cost_t cost() { return time_taken.count(); }
+};
+
+// RecomputeLater holds a weak pointer to a MicroWave,
+// and is stored in Trailokya::book for eviction.
+template<const ZombieConfig& cfg>
+struct RecomputeLater : Phantom {
+  std::weak_ptr<FullContextNode<cfg>> weak_ptr;
+
+  RecomputeLater(const std::shared_ptr<FullContextNode<cfg>>& ptr) : weak_ptr(ptr) { }
+  cost_t cost() const override;
+  void evict() override;
+  void notify_index_changed(size_t idx) override {
+    non_null(weak_ptr.lock())->pool_index = idx;
+  }
 };
 
 template<const ZombieConfig& cfg>
@@ -139,7 +156,7 @@ public:
   };
 
   struct NotifyElementRemoved {
-    void operator()(const std::unique_ptr<Phantom>&) { }
+    void operator()(const std::unique_ptr<Phantom>& p) { }
   };
 
   struct Reaper;

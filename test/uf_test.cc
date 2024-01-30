@@ -59,7 +59,6 @@ TEST(ZombieUFTest, CalculateTotalCost) {
   EXPECT_EQ(z3_cost.count() / Time(1s).count(), 20);
 }
 
-
 // TEST(ZombieUFTest, ReplayChangeCost) {
 //   using namespace UF;
 //   auto& t = Trailokya::get_trailokya();
@@ -109,8 +108,6 @@ TEST(ZombieUFTest, CalculateTotalCost) {
 //   EXPECT_EQ(m4->cost_of_set().count() / Time(1s).count(), 26);
 // }
 
-
-
 // TEST(ZombieUFTest, CompareWithLocal) {
 // #define EXAMPLE_CODE                            \
 //   auto& t = Trailokya::get_trailokya();         \
@@ -145,9 +142,6 @@ TEST(ZombieUFTest, CalculateTotalCost) {
 //     EXPECT_FALSE(z2.evicted());
 //   }
 // }
-
-
-
 
 // access a list of zombies with linear dependency, first from beginning to end,
 // then from end to beginning.
@@ -206,11 +200,6 @@ unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsign
   return work_done;
 }
 
-
-
-
-
-
 double r_square(const std::vector<double>& data, std::function<double(unsigned int)> f) {
   double x_avg = 0, y_avg = 0, xy_avg = 0, x2_avg = 0, y2_avg = 0;
   for (unsigned int i = 0; i < data.size(); ++i) {
@@ -245,8 +234,6 @@ TEST(ZombieUFTest, SqrtSpaceLinearTime) {
   EXPECT_LT(0.9, r2);
   EXPECT_LT(r2, 1.0);
 }
-
-
 
 TEST(ZombieUFTest, LogSpaceNLogNTime) {
   struct Test {};

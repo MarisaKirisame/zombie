@@ -71,7 +71,7 @@ struct Space {
   Space() = delete;
   // an ad hoc hack because we need test to run.
   // TODO: fix this by having plank constant configurable
-  Space(size_t bytes) : bytes(bytes + plank_space_in_bytes) { }
+  explicit Space(size_t bytes) : bytes(bytes + plank_space_in_bytes) { }
 
   size_t count() {
     assert(bytes >= plank_space_in_bytes);
@@ -82,6 +82,8 @@ struct Space {
     bytes += rhs.bytes;
     return *this;
   }
+
+  bool operator==(const Space& rhs) { return bytes == rhs.bytes; }
 };
 
 
