@@ -33,6 +33,9 @@ struct TCZombie {
 
   explicit TCZombie(const Zombie<cfg, T>& z);
   explicit TCZombie(Zombie<cfg, T>&& z);
+
+  explicit TCZombie(const Tock& t);
+  explicit TCZombie(Tock&& t);
 };
 
 // EZombieNode is a type-erased interface to a computed value.
@@ -121,6 +124,7 @@ struct EZombie {
   template<typename T>
   EZombie(const Zombie<cfg, T>& ez) : created_time(ez.created_time), ptr_cache(ez.ptr_cache) { }
   EZombie() { }
+  explicit EZombie(const Tock& t) : created_time(t) { }
 
   std::weak_ptr<EZombieNode<cfg>> ptr() const;
 
@@ -184,10 +188,16 @@ struct Zombie : EZombie<cfg> {
   Zombie(Zombie<cfg, T>& z) : EZombie<cfg>(z) { }
   Zombie(Zombie<cfg, T>&& z) : EZombie<cfg>(std::move(z)) { }
 
+  explicit Zombie(const Tock& t) : EZombie<cfg>(t) { }
+  explicit Zombie(const Tock&& t) : EZombie<cfg>(std::move(t)) { }
+  explicit Zombie(Tock& t) : EZombie<cfg>(t) { }
+  explicit Zombie(Tock&& t) : EZombie<cfg>(std::move(t)) { }
+
   template<typename... Arg>
   Zombie(Arg&&... arg) {
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Zombie<cfg, T>>>::value, "should not match this constructor");
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<EZombie<cfg>>>::value, "should not match this constructor");
+    static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Tock>>::value, "should not match this constructor");
     construct(std::forward<Arg>(arg)...);
   }
 
