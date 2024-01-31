@@ -441,6 +441,7 @@ auto bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
 
   while(!trampoline->is_return()) {
     trampoline = trampoline->from_tailcall()();
+    t.each_tc();
   }
 
   t.record = saved->resume();
