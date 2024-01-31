@@ -17,7 +17,13 @@ template<const ZombieConfig &cfg, typename T>
 TCZombie<cfg, T>::TCZombie(const Zombie<cfg, T>& z) : o(std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(z)) { }
 
 template<const ZombieConfig &cfg, typename T>
+TCZombie<cfg, T>::TCZombie(Zombie<cfg, T>&& z) : o(std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(EZombie<cfg>(std::move(z)))) { }
+
+template<const ZombieConfig &cfg, typename T>
 TCZombie<cfg, T>::TCZombie(Tock&& t) : o(std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(EZombie<cfg>(std::move(t)))) { }
+
+template<const ZombieConfig &cfg, typename T>
+TCZombie<cfg, T>::TCZombie(const Tock& t) : o(std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(EZombie<cfg>(t))) { }
 
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
@@ -375,9 +381,29 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
   }
 }
 
+template<const ZombieConfig& cfg, typename T>
+TCZombie<cfg, T> ToTC(TCZombie<cfg, T>&& t) {
+  return t;
+}
+
+template<const ZombieConfig& cfg, typename T>
+TCZombie<cfg, T> ToTC(const TCZombie<cfg, T>& t) {
+  return t;
+}
+
+template<const ZombieConfig& cfg, typename T>
+TCZombie<cfg, T> ToTC(Zombie<cfg, T>&& t) {
+  return Result(t);
+}
+
+template<const ZombieConfig& cfg, typename T>
+TCZombie<cfg, T> ToTC(const Zombie<cfg, T>& t) {
+  return Result(t);
+}
+
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
-  using result_type = decltype(f(std::declval<Arg>()...));
+  using result_type = decltype(ToTC(f(std::declval<Arg>()...)));
   static_assert(IsTCZombie<result_type>::value, "should be TCZombie");
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
@@ -388,7 +414,7 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
         [f = std::move(f)](const std::vector<const void*> in) {
           auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
           std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-          return std::apply([&](const Arg*... arg) { return f(*arg...); }, args).o;
+          return std::apply([&](const Arg*... arg) { return ToTC(f(*arg...)); }, args).o;
         };
       Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
       t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::vector<EZombie<cfg>>{x...});
@@ -404,7 +430,7 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
-  using result_type = decltype(f(std::declval<Arg>()...));
+  using result_type = decltype(ToTC(f(std::declval<Arg>()...)));
   static_assert(IsTCZombie<result_type>::value, "result must be be TCZombie");
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();

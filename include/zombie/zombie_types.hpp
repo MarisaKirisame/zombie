@@ -31,8 +31,8 @@ struct TCZombie {
   explicit TCZombie(const EZombie<cfg>& z);
   explicit TCZombie(EZombie<cfg>&& z);
 
-  explicit TCZombie(const Zombie<cfg, T>& z);
-  explicit TCZombie(Zombie<cfg, T>&& z);
+  TCZombie(const Zombie<cfg, T>& z);
+  TCZombie(Zombie<cfg, T>&& z);
 
   explicit TCZombie(const Tock& t);
   explicit TCZombie(Tock&& t);
@@ -182,6 +182,7 @@ struct Zombie : EZombie<cfg> {
   template<typename... Arg>
   Zombie(Arg&&... arg) {
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Zombie<cfg, T>>>::value, "should not match this constructor");
+    static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<TCZombie<cfg, T>>>::value, "should not match this constructor");
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<EZombie<cfg>>>::value, "should not match this constructor");
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Tock>>::value, "should not match this constructor");
     construct(std::forward<Arg>(arg)...);

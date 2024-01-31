@@ -19,7 +19,7 @@ struct SplayList {
     Node* children;
 
     Node* splay_parent;
-    mutable std::array<std::unique_ptr<Node>, 2> splay_children;
+    mutable std::array<Node*, 2> splay_children = {nullptr, nullptr};
 
     Node(const K& k, const V& v, Node* parent, Node* children, Node* splay_parent) :
       k(k), v(v), parent(parent), children(children), splay_parent(splay_parent) {
@@ -32,34 +32,26 @@ struct SplayList {
         children->parent = this;
       }
     }
+
     size_t idx_at_parent() const {
       assert(splay_parent != nullptr);
-      return splay_parent->splay_children[0].get() == this ? 0 : 1;
+      return splay_parent->splay_children[0] == this ? 0 : 1;
     }
 
     Node* max_node() {
       Node* ptr = this;
-      while (ptr->splay_children[1].get() != nullptr) {
-        ptr = ptr->splay_children[1].get();
+      while (ptr->splay_children[1] != nullptr) {
+        ptr = ptr->splay_children[1];
       }
       return ptr;
     }
 
     Node* min_node() {
       Node* ptr = this;
-      while (ptr->splay_children[0].get() != nullptr) {
-        ptr = ptr->splay_children[0].get();
+      while (ptr->splay_children[0] != nullptr) {
+        ptr = ptr->splay_children[0];
       }
       return ptr;
-    }
-
-    std::unique_ptr<Node>& self_ptr(SplayList& tl) {
-      if (splay_parent != nullptr) {
-        return splay_parent->splay_children[idx_at_parent()];
-      } else {
-        assert(this == tl.root_node.get());
-        return tl.root_node;
-      }
     }
 
     void maintain_parent(size_t idx) {
@@ -99,23 +91,25 @@ struct SplayList {
         splay_children[1]->maintain_parent(0);
         tl.root_node = std::move(splay_children[1]);
       }
+
+      delete this;
     }
 
-    void rotate(std::unique_ptr<Node>& root_node) {
+    void rotate(Node*& root_node) {
       assert(splay_parent != nullptr);
       auto splay_parent_backup = splay_parent;
       size_t idx = idx_at_parent();
       if (splay_parent->splay_parent != nullptr) {
         splay_parent->splay_parent->swap_children(splay_parent->idx_at_parent(), splay_parent, idx);
       } else {
-        assert(splay_parent == root_node.get());
-        root_node.swap(splay_parent->splay_children[idx]);
+        assert(splay_parent == root_node);
+        std::swap(root_node, splay_parent->splay_children[idx]);
         splay_parent = nullptr;
       }
       splay_parent_backup->swap_children(idx, this, idx^1);
     }
 
-    void splay(std::unique_ptr<Node>& root_node) {
+    void splay(Node*& root_node) {
       while (splay_parent != nullptr) {
         if (splay_parent->splay_parent != nullptr) {
           if (idx_at_parent() == splay_parent->idx_at_parent()) {
@@ -127,11 +121,27 @@ struct SplayList {
         rotate(root_node);
       }
 
-      assert(this == root_node.get());
+      assert(this == root_node);
     }
 
   };
-  mutable std::unique_ptr<Node> root_node;
+  mutable Node* root_node = nullptr;
+
+  ~SplayList() {
+    if (root_node != nullptr) {
+      for (Node* left_ptr = root_node->parent; left_ptr != nullptr;) {
+        Node* to_delete = left_ptr;
+        left_ptr = left_ptr->parent;
+        delete to_delete;
+      }
+      for (Node* right_ptr = root_node->children; right_ptr != nullptr;) {
+        Node* to_delete = right_ptr;
+        right_ptr = right_ptr->children;
+        delete to_delete;
+      }
+      delete root_node;
+    }
+  }
 
   // for insert
   // you have to insert the new node at the leaf before splay
@@ -141,14 +151,14 @@ struct SplayList {
     }
 
     Node* last_ptr = nullptr;
-    Node* ptr = root_node.get();
+    Node* ptr = root_node;
     while (ptr != nullptr) {
       if (ptr->k == k) {
         return ptr;
       } else {
         size_t idx = k < ptr->k ? 0 : 1;
         last_ptr = ptr;
-        ptr = ptr->splay_children[idx].get();
+        ptr = ptr->splay_children[idx];
       }
     }
     return last_ptr;
@@ -226,11 +236,11 @@ struct SplayList {
     Node* ptr = find_node_without_splay(k);
     if (ptr != nullptr) {
       if (ptr->k < k) {
-        assert(ptr->splay_children[1].get() == nullptr);
-        ptr->splay_children[1] = std::make_unique<Node>(k, v, ptr->parent, ptr, ptr);
+        assert(ptr->splay_children[1] == nullptr);
+        ptr->splay_children[1] = new Node(k, v, ptr->parent, ptr, ptr);
       } else if (k < ptr->k) {
-        assert(ptr->splay_children[0].get() == nullptr);
-        ptr->splay_children[0] = std::make_unique<Node>(k, v, ptr, ptr->children, ptr);
+        assert(ptr->splay_children[0] == nullptr);
+        ptr->splay_children[0] = new Node(k, v, ptr, ptr->children, ptr);
       } else {
         assert (ptr->k == k);
         ptr->v = v;
@@ -238,7 +248,7 @@ struct SplayList {
 
       ptr->splay(this->root_node);
     } else {
-      root_node = std::make_unique<Node>(k, v, nullptr, nullptr, nullptr);
+      root_node = new Node(k, v, nullptr, nullptr, nullptr);
     }
   }
 
@@ -251,12 +261,12 @@ struct SplayList {
       puts("null");
     } else {
       printf("%d\n", node->k);
-      debug_display_splay_helper(node->splay_children[0].get(), indent + 2);
-      debug_display_splay_helper(node->splay_children[1].get(), indent + 2);
+      debug_display_splay_helper(node->splay_children[0], indent + 2);
+      debug_display_splay_helper(node->splay_children[1], indent + 2);
     }
   }
 
   void debug_display_splay() {
-    debug_display_splay_helper(root_node.get(), 0);
+    debug_display_splay_helper(root_node, 0);
   }
 };
