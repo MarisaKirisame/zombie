@@ -163,7 +163,7 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
     auto& t = Trailokya<cfg>::get_trailokya();
     std::shared_ptr<EZombieNode<cfg>> strong;
     Replay replay = t.replay;
-    bracket([&]() { t.replay = Replay { created_time, &strong }; },
+    bracket([&]() { t.replay = Replay<cfg> { created_time, &strong }; },
             [&]() { t.meter.block([&](){ (*(t.akasha.find_le(created_time)))->replay(); }); },
             [&]() { t.replay = replay; });
     ret = non_null(strong);
