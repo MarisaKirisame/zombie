@@ -344,9 +344,11 @@ Tock tick() {
 template<const ZombieConfig& cfg>
 Trampoline::Output<EZombie<cfg>> HeadRecordNode<cfg>::play() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  std::vector<std::shared_ptr<EZombieNode<cfg>>> storage;
   std::vector<const void*> in;
   for (const EZombie<cfg>& input : inputs) {
-    in.push_back(input.shared_ptr()->get_ptr());
+    storage.push_back(input.shared_ptr());
+    in.push_back(storage.back()->get_ptr());
   }
   return f(in);
 }
@@ -409,20 +411,32 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(t.current_tock != t.replay.forward_at);
   if (t.current_tock < t.replay.forward_at) {
-    std::function<Trampoline::Output<EZombie<cfg>>()> o = [f = std::forward<F>(f), x...]() {
-      std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>&)> func =
-        [f = std::move(f)](const std::vector<const void*> in) {
-          auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-          std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-          return std::apply([&](const Arg*... arg) { return ToTC(f(*arg...)); }, args).o;
-        };
-      Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-      t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::vector<EZombie<cfg>>{x...});
-      auto ret = t.record->play();
-      t.record->complete();
-      return ret;
-    };
-    return result_type(std::move(o));
+    assert(t.record->t < t.current_tock);
+    if (t.record->t - t.current_tock < 16) {
+      std::function<Trampoline::Output<EZombie<cfg>>()> o = [f = std::forward<F>(f), x...]() {
+        // std::vector<std::shared_ptr<EZombieNode<cfg>>> storage = {x.shared_ptr()...};
+        // note that we do not need the above as it's lifetime is extended until execution finished.
+        // this is very tricky, so I had decided to keep the commented code and talk about it -
+        // basically we are doing a very subtle optimization.
+        return ToTC(f(x.shared_ptr()->get_ref()...)).o;
+      };
+      return result_type(std::move(o));
+    } else {
+      std::function<Trampoline::Output<EZombie<cfg>>()> o = [f = std::forward<F>(f), x...]() {
+        std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>&)> func =
+          [f = std::move(f)](const std::vector<const void*> in) {
+            auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+            std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+            return std::apply([&](const Arg*... arg) { return ToTC(f(*arg...)); }, args).o;
+          };
+        Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+        t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::vector<EZombie<cfg>>{x...});
+        auto ret = t.record->play();
+        t.record->complete();
+        return ret;
+      };
+      return result_type(std::move(o));
+    }
   } else {
     return result_type(std::numeric_limits<Tock>::max());
   }
