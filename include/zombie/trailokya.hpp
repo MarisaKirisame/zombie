@@ -179,7 +179,7 @@ public:
   Replay<cfg> replay;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
-  std::function<void()> each_tc;
+  std::function<void()> each_tc = [](){};
 
 public:
   Trailokya() { }
