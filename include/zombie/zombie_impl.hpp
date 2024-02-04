@@ -25,6 +25,12 @@ TCZombie<cfg, T>::TCZombie(Tock&& t) : o(std::make_shared<Trampoline::ReturnNode
 template<const ZombieConfig &cfg, typename T>
 TCZombie<cfg, T>::TCZombie(const Tock& t) : o(std::make_shared<Trampoline::ReturnNode<EZombie<cfg>>>(EZombie<cfg>(t))) { }
 
+template<const ZombieConfig &cfg, typename T>
+TCZombie<cfg, T>::TCZombie(const Trampoline::Output<EZombie<cfg>>& o) : o(o) { }
+
+template<const ZombieConfig &cfg, typename T>
+TCZombie<cfg, T>::TCZombie(Trampoline::Output<EZombie<cfg>>&& o) : o(std::move(o)) { }
+
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
   : created_time(created_time) { }
@@ -95,21 +101,27 @@ template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::replay() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   Tock tock = t.current_tock;
-  Record<cfg> record = t.record;
+  assert(this->t < t.replay.forward_at);
   bracket(
     [&]() {
       t.current_tock = this->t;
-      t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(inputs));
+      t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(inputs)));
       // be careful! this code will delete this.
       t.akasha.remove_precise(this->t);
     },
     [&]() {
-      t.record->play();
+      auto trampoline = t.records.back()->play();
+      while (t.current_tock <= t.replay.forward_at) {
+        assert(!trampoline->is_return());
+        trampoline = trampoline->from_tailcall()();
+      }
+      assert(*(t.replay.forward_to) != nullptr);
     },
     [&]() {
+      t.records.back()->completed();
+      t.records.pop_back();
+      // must go after completed(), as it do stuff to current_tock
       t.current_tock = tock;
-      t.record->complete();
-      t.record = record;
     });
 }
 
@@ -153,12 +165,18 @@ std::weak_ptr<EZombieNode<cfg>> EZombie<cfg>::ptr() const {
 
 template<const ZombieConfig& cfg>
 cost_t RecomputeLater<cfg>::cost() const {
-  return non_null(weak_ptr.lock())->cost();
+  if (auto ptr = weak_ptr.lock()) {
+    return ptr->cost();
+  } else {
+    return 0;
+  }
 }
 
 template<const ZombieConfig& cfg>
 void RecomputeLater<cfg>::evict() {
-  non_null(weak_ptr.lock())->evict();
+  if (auto ptr = weak_ptr.lock()) {
+    ptr->evict();
+  }
 }
 
 template<const ZombieConfig& cfg>
@@ -194,9 +212,10 @@ void Zombie<cfg, T>::construct(Args&&... args) {
   if (this->created_time <= t.replay.forward_at) {
     auto shared = std::make_shared<ZombieNode<cfg, T>>(this->created_time, std::forward<Args>(args)...);
     this->ptr_cache = shared;
-    assert(tock_to_index(this->created_time, t.record->t) == t.record->ez.size());
-    t.record->ez.push_back(shared);
-    t.record->space_taken += GetSize<T>()(shared->t);
+    auto& record = t.records.back();
+    assert(tock_to_index(this->created_time, record->t) == record->ez.size());
+    record->ez.push_back(shared);
+    record->space_taken += GetSize<T>()(shared->t);
     if (this->created_time == t.replay.forward_at) {
       *t.replay.forward_to = shared;
     }
@@ -302,20 +321,38 @@ void MicroWave<cfg>::merge_with(Tock other_tock) {
 }
 
 template<const ZombieConfig& cfg>
-void RootRecordNode<cfg>::suspend() {
+void RecordNode<cfg>::suspend(const std::shared_ptr<RecordNode<cfg>>& rec) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  assert(this->t < t.replay.forward_at);
+  this->suspended();
+  t.records.push_back(rec);
+}
+
+template<const ZombieConfig& cfg>
+void RecordNode<cfg>::complete() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  this->completed();
+  t.records.pop_back();
+  t.records.back()->resumed();
+}
+
+template<const ZombieConfig& cfg>
+void RecordNode<cfg>::replay_finished() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  this->completed();
+  t.records.pop_back();
+}
+
+template<const ZombieConfig& cfg>
+void RootRecordNode<cfg>::suspended() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   t.akasha.insert(this->t, std::make_shared<RootContextNode<cfg>>(std::move(this->ez), this->space_taken));
 }
 
 template<const ZombieConfig& cfg>
-void RootRecordNode<cfg>::complete() {
-  assert(false);
-}
-
-template<const ZombieConfig& cfg>
-Record<cfg> RootRecordNode<cfg>::resume() {
-  return std::make_shared<RootRecordNode<cfg>>();
+void RootRecordNode<cfg>::resumed() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  assert(this->ez.empty());
+  this->t = tick<cfg>();
 }
 
 template<const ZombieConfig& cfg>
@@ -325,15 +362,10 @@ HeadRecordNode<cfg>::HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg
   start_time(Trailokya<cfg>::get_trailokya().meter.time()) { }
 
 template<const ZombieConfig& cfg>
-void HeadRecordNode<cfg>::suspend() {
-  assert(false);
-}
-
-template<const ZombieConfig& cfg>
-void HeadRecordNode<cfg>::complete() {
+void HeadRecordNode<cfg>::completed() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(this->t != t.replay.forward_at);
-  if (this->t < t.replay.forward_at) {
+  if (this->t < t.replay.forward_at) { // otherwise it might be partial.
     auto fc = std::make_shared<FullContextNode<cfg>>(std::move(this->ez),
                                                      this->space_taken,
                                                      Time(Trailokya<cfg>::get_trailokya().meter.time()) - start_time,
@@ -343,11 +375,6 @@ void HeadRecordNode<cfg>::complete() {
     t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
     t.akasha.insert(this->t, fc);
   }
-}
-
-template<const ZombieConfig& cfg>
-Record<cfg> HeadRecordNode<cfg>::resume() {
-  assert(false);
 }
 
 template<const ZombieConfig& cfg>
@@ -382,15 +409,9 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
       };
     std::vector<EZombie<cfg>> in = {x...};
 
-    t.record->suspend();
-    Record<cfg> saved = t.record;
-
-    t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::move(in));
-    Trampoline::Output<EZombie<cfg>> o = t.record->play();
-
-    t.record->complete();
-    t.record = saved->resume();
-
+    t.records.back()->suspend(std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::move(in)));
+    Trampoline::Output<EZombie<cfg>> o = t.records.back()->play();
+    t.records.back()->complete();
     return ret_type(dynamic_cast<Trampoline::ReturnNode<EZombie<cfg>>*>(o.get())->t);
   } else {
     return ret_type(std::numeric_limits<Tock>::max());
@@ -418,38 +439,55 @@ TCZombie<cfg, T> ToTC(const Zombie<cfg, T>& t) {
 }
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
+Record<cfg> InitTailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
+  using result_type = decltype(ToTC(f(std::declval<Arg>()...)));
+  static_assert(IsTCZombie<result_type>::value, "should be TCZombie");
+  std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>&)> func =
+    [f = std::forward<F>(f)](const std::vector<const void*> in) {
+      auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+      std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+      return std::apply([&](const Arg*... arg) { return ToTC(f(*arg...)); }, args).o;
+    };
+  return std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::vector<EZombie<cfg>>{x...});
+}
+
+template<const ZombieConfig& cfg>
+Trampoline::Output<EZombie<cfg>> HeadRecordNode<cfg>::tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                                               std::vector<EZombie<cfg>>&& in) {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  this->completed();
+  t.records.back() = std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(in));
+  return std::make_shared<Trampoline::TCNode<EZombie<cfg>>>([](){
+    Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+    return t.records.back()->play();
+  });
+}
+
+template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   using result_type = decltype(ToTC(f(std::declval<Arg>()...)));
   static_assert(IsTCZombie<result_type>::value, "should be TCZombie");
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  assert(t.current_tock != t.replay.forward_at);
-  if (t.current_tock < t.replay.forward_at) {
-    assert(t.record->t < t.current_tock);
-    if (false && t.record->is_tailcall() && t.current_tock - t.record->t < 32) {
-      std::cout << "unrolling" << std::endl;
+  if (t.current_tock <= t.replay.forward_at) {
+    assert(t.records.back()->t < t.current_tock);
+    if (t.records.back()->is_tailcall() && t.current_tock - t.records.back()->t < 32) {
+      // this code does not live in tailcall() member function because we have to do multiple dispatch to do so.
       // note we cannot trampoline this code - doing so make complete() excute when it cannot.
-      std::vector<std::shared_ptr<EZombieNode<cfg>>> storage = {x.shared_ptr()...};
+      // std::vector<std::shared_ptr<EZombieNode<cfg>>> storage = {x.shared_ptr()...};
       // note that we do not need the above as it's lifetime is extended until execution finished.
       // this is very tricky, so I had decided to keep the commented code and talk about it -
       // basically we are doing a very subtle optimization.
       return ToTC(f(x.shared_ptr()->get_ref()...));
     } else {
-      std::cout << "tailcalling" << std::endl;
-      std::function<Trampoline::Output<EZombie<cfg>>()> o = [f = std::forward<F>(f), x...]() {
-        std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>&)> func =
-          [f = std::move(f)](const std::vector<const void*> in) {
-            auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
-            std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
-            return std::apply([&](const Arg*... arg) { return ToTC(f(*arg...)); }, args).o;
-          };
-        Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-        t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(func), std::vector<EZombie<cfg>>{x...});
-        auto ret = t.record->play();
-        t.record->complete();
-        return ret;
-      };
-      return result_type(std::move(o));
+      assert(t.current_tock != t.replay.forward_at);
+      std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>&)> func =
+        [f = std::forward<F>(f)](const std::vector<const void*> in) {
+          auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
+          std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
+          return std::apply([&](const Arg*... arg) { return ToTC(f(*arg...)); }, args).o;
+        };
+      return result_type(t.records.back()->tailcall(std::move(func), std::vector<EZombie<cfg>>{x...}));
     }
   } else {
     return result_type(std::numeric_limits<Tock>::max());
@@ -462,18 +500,18 @@ auto bindZombieTC(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(IsTCZombie<result_type>::value, "result must be be TCZombie");
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.record->suspend();
-  Record<cfg> saved = t.record;
+  Record<cfg> record = InitTailCall<cfg>(std::forward<F>(f), x...);
+  t.records.back()->suspend(record);
 
-  auto trampoline = TailCall(std::forward<F>(f), x...).o;
+  auto trampoline = t.records.back()->play();
 
   while(!trampoline->is_return()) {
     trampoline = trampoline->from_tailcall()();
     t.each_tc();
   }
 
-  t.record = saved->resume();
-
+  Trampoline::Output<EZombie<cfg>> o = t.records.back()->play();
+  t.records.back()->complete();
   return Zombie<cfg, typename TCZombieInner<result_type>::type_t>(trampoline->from_return());
 }
 

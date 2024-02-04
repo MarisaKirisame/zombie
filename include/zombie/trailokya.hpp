@@ -30,12 +30,16 @@ struct RecordNode {
   RecordNode() : t(tick<cfg>()) { }
   explicit RecordNode(Tock t) : t(t) { }
 
-  virtual void suspend() = 0;
-  virtual void complete() = 0;
-  virtual std::shared_ptr<RecordNode<cfg>> resume() = 0;
-  virtual bool playable() = 0;
-  virtual Trampoline::Output<EZombie<cfg>> play() = 0;
+  void suspend(const std::shared_ptr<RecordNode<cfg>>& rec);
+  void complete();
+  void replay_finished();
+  virtual void suspended() = 0;
+  virtual void completed() = 0;
+  virtual void resumed() = 0;
   virtual bool is_tailcall() { return false; }
+  virtual Trampoline::Output<EZombie<cfg>> tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                                    std::vector<EZombie<cfg>>&& in) = 0;
+  virtual Trampoline::Output<EZombie<cfg>> play() = 0;
 };
 
 template<const ZombieConfig& cfg>
@@ -45,10 +49,11 @@ template<const ZombieConfig& cfg>
 struct RootRecordNode : RecordNode<cfg> {
   explicit RootRecordNode(const Tock& t) : RecordNode<cfg>(t) { }
   RootRecordNode() { }
-  void suspend() override;
-  void complete() override;
-  Record<cfg> resume() override;
-  bool playable() override { return false; }
+  void suspended() override;
+  void completed() override { assert(false); }
+  void resumed() override;
+  Trampoline::Output<EZombie<cfg>> tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                            std::vector<EZombie<cfg>>&& in) override { assert(false); }
   Trampoline::Output<EZombie<cfg>> play() override { assert(false); }
 };
 
@@ -61,12 +66,14 @@ struct HeadRecordNode : RecordNode<cfg> {
   Time start_time;
 
   HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
-  void suspend() override;
-  void complete() override;
-  Record<cfg> resume() override;
-  bool playable() override { return true; }
-  Trampoline::Output<EZombie<cfg>> play() override;
+
+  void suspended() { assert(false); }
+  void completed() override;
+  void resumed() override { assert(false); }
   bool is_tailcall() override { return true; }
+  Trampoline::Output<EZombie<cfg>> tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                            std::vector<EZombie<cfg>>&& in) override;
+  Trampoline::Output<EZombie<cfg>> play() override;
 };
 
 template<const ZombieConfig& cfg>
@@ -175,7 +182,7 @@ public:
   Tock current_tock = 1;
   SplayList<Tock, Context<cfg>> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
-  Record<cfg> record = std::make_shared<RootRecordNode<cfg>>(Tock(0));
+  std::vector<Record<cfg>> records = {std::make_shared<RootRecordNode<cfg>>(Tock(0))};
   Replay<cfg> replay;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);

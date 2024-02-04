@@ -36,6 +36,9 @@ struct TCZombie {
 
   explicit TCZombie(const Tock& t);
   explicit TCZombie(Tock&& t);
+
+  TCZombie(const Trampoline::Output<EZombie<cfg>>& o);
+  TCZombie(Trampoline::Output<EZombie<cfg>>&& o);
 };
 
 // EZombieNode is a type-erased interface to a computed value.
