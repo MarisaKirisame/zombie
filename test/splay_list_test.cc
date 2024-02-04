@@ -7,6 +7,16 @@
 #include "common.hpp"
 #include "zombie/tock/splay_list.hpp"
 
+template<typename Splay>
+void splayOrderTest(Splay &splay) {
+  auto node = splay.root_node->min_node();
+
+  while (node->children != nullptr) {
+    EXPECT_LE(node->k, node->children->k);
+    node = node->children;
+  }
+}
+
 template<typename Splay, typename Node, bool is_unique>
 void SplayTest() {
   using E = Element<is_unique>;
@@ -34,6 +44,7 @@ void SplayTest() {
 
   for (int i = 0; i < keys.size(); i++) {
     splay.insert(keys[i], E{values[i]});
+    splayOrderTest(splay);
   }
 
   std::shuffle(ids.begin(), ids.end(), rng);
@@ -51,6 +62,8 @@ void SplayTest() {
   for (int i = 0; i < 100; i++) {
     auto it = std::lower_bound(data.begin(), data.end(), std::make_pair(-i, 0));
     auto node = splay.find_le_node(i);
+
+    splayOrderTest(splay);
 
     if (it == data.end()) {
       EXPECT_EQ(node, nullptr);
