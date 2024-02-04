@@ -89,7 +89,6 @@ struct Phantom {
   virtual cost_t cost() const = 0;
   virtual void evict() = 0;
   virtual void notify_index_changed(size_t new_index) = 0;
-  virtual void notify_element_removed() = 0;
 };
 
 template<const ZombieConfig& cfg, typename T>

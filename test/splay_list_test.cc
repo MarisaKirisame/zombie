@@ -79,6 +79,19 @@ TEST(SplayTest, EmptySplayTest) {
   EXPECT_FALSE(sl.has_le(0));
 }
 
+TEST(SplayTest, ListTest) {
+  SplayList<int, int> splay;
+  splay.insert(0, 0);
+  splay.insert(1, 1);
+  EXPECT_TRUE(splay.root_node != nullptr);
+  if (splay.root_node->parent != nullptr) {
+    assert(splay.root_node->k > splay.root_node->parent->k);
+  }
+  if (splay.root_node->children != nullptr) {
+    assert(splay.root_node->k < splay.root_node->children->k);
+  }
+}
+
 /*
 TEST(SplayTest, UniqueElement) {
   using Splay = SplayList<int, Element<true>>;

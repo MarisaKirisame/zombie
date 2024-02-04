@@ -48,13 +48,23 @@ FullContextNode<cfg>::FullContextNode(std::vector<std::shared_ptr<EZombieNode<cf
                                       const Time& time_taken,
                                       std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
                                       std::vector<EZombie<cfg>>&& inputs,
-                                      const Tock& start_time) :
+                                      const Tock& t) :
   ContextNode<cfg>(std::move(ez), sp),
   time_taken(time_taken),
   f(std::move(f)),
   inputs(std::move(inputs)),
-  start_time(start_time),
+  t(t),
   last_accessed(Trailokya<cfg>::get_trailokya().meter.raw_time()) { }
+
+template<const ZombieConfig& cfg>
+FullContextNode<cfg>::~FullContextNode() {
+  // if (pool_index != -1) {
+  //   assert(pool_index >= 0);
+  //   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  //   t.book.heap.remove(pool_index);
+  // }
+  // we decided to not do this. instead pool_index might hold stale pointers.
+}
 
 template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::accessed() {
@@ -68,13 +78,17 @@ void FullContextNode<cfg>::accessed() {
 
 template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::evict() {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   this->ez.clear();
-  if (pool_index != -1) {
-    assert(pool_index >= 0);
-    Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-    t.book.heap.remove(pool_index);
-    pool_index = -1;
+  auto* self = t.akasha.find_precise_node(this->t);
+  if (self->parent->v->is_tailcall()) {
+    t.akasha.remove_precise(this->t);
   }
+}
+
+template<const ZombieConfig& cfg>
+void FullContextNode<cfg>::evict_individual(const Tock& t) {
+  this->ez[tock_to_index(t, this->t)].reset();
 }
 
 template<const ZombieConfig& cfg>
@@ -84,10 +98,10 @@ void FullContextNode<cfg>::replay() {
   Record<cfg> record = t.record;
   bracket(
     [&]() {
-      t.current_tock = start_time;
+      t.current_tock = this->t;
       t.record = std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(inputs));
       // be careful! this code will delete this.
-      t.akasha.remove_precise(start_time);
+      t.akasha.remove_precise(this->t);
     },
     [&]() {
       t.record->play();
@@ -150,7 +164,7 @@ void RecomputeLater<cfg>::evict() {
 template<const ZombieConfig& cfg>
 void EZombie<cfg>::evict() {
   if (evictable()) {
-    this->ptr().lock()->get_context()->evict();
+    this->ptr().lock()->get_context()->evict_individual(this->created_time);
   }
 }
 
@@ -180,7 +194,7 @@ void Zombie<cfg, T>::construct(Args&&... args) {
   if (this->created_time <= t.replay.forward_at) {
     auto shared = std::make_shared<ZombieNode<cfg, T>>(this->created_time, std::forward<Args>(args)...);
     this->ptr_cache = shared;
-    assert(tock_to_index(this->created_time, t.record->t) ==  + t.record->ez.size());
+    assert(tock_to_index(this->created_time, t.record->t) == t.record->ez.size());
     t.record->ez.push_back(shared);
     t.record->space_taken += GetSize<T>()(shared->t);
     if (this->created_time == t.replay.forward_at) {
@@ -412,16 +426,16 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   assert(t.current_tock != t.replay.forward_at);
   if (t.current_tock < t.replay.forward_at) {
     assert(t.record->t < t.current_tock);
-    if (t.record->t - t.current_tock < 16) {
-      std::function<Trampoline::Output<EZombie<cfg>>()> o = [f = std::forward<F>(f), x...]() {
-        // std::vector<std::shared_ptr<EZombieNode<cfg>>> storage = {x.shared_ptr()...};
-        // note that we do not need the above as it's lifetime is extended until execution finished.
-        // this is very tricky, so I had decided to keep the commented code and talk about it -
-        // basically we are doing a very subtle optimization.
-        return ToTC(f(x.shared_ptr()->get_ref()...)).o;
-      };
-      return result_type(std::move(o));
+    if (false && t.record->is_tailcall() && t.current_tock - t.record->t < 32) {
+      std::cout << "unrolling" << std::endl;
+      // note we cannot trampoline this code - doing so make complete() excute when it cannot.
+      std::vector<std::shared_ptr<EZombieNode<cfg>>> storage = {x.shared_ptr()...};
+      // note that we do not need the above as it's lifetime is extended until execution finished.
+      // this is very tricky, so I had decided to keep the commented code and talk about it -
+      // basically we are doing a very subtle optimization.
+      return ToTC(f(x.shared_ptr()->get_ref()...));
     } else {
+      std::cout << "tailcalling" << std::endl;
       std::function<Trampoline::Output<EZombie<cfg>>()> o = [f = std::forward<F>(f), x...]() {
         std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>&)> func =
           [f = std::move(f)](const std::vector<const void*> in) {

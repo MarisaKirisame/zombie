@@ -35,6 +35,7 @@ struct RecordNode {
   virtual std::shared_ptr<RecordNode<cfg>> resume() = 0;
   virtual bool playable() = 0;
   virtual Trampoline::Output<EZombie<cfg>> play() = 0;
+  virtual bool is_tailcall() { return false; }
 };
 
 template<const ZombieConfig& cfg>
@@ -65,6 +66,7 @@ struct HeadRecordNode : RecordNode<cfg> {
   Record<cfg> resume() override;
   bool playable() override { return true; }
   Trampoline::Output<EZombie<cfg>> play() override;
+  bool is_tailcall() override { return true; }
 };
 
 template<const ZombieConfig& cfg>
@@ -84,7 +86,9 @@ struct ContextNode : Object {
   virtual void accessed() = 0;
   virtual bool evictable() = 0;
   virtual void evict() = 0;
+  virtual void evict_individual(const Tock& t) = 0;
   virtual void replay() = 0;
+  virtual bool is_tailcall() { return false; }
 };
 
 template<const ZombieConfig& cfg>
@@ -96,6 +100,7 @@ struct RootContextNode : ContextNode<cfg> {
   void accessed() override { }
   bool evictable() override { return false; }
   void evict() override { assert(false); }
+  void evict_individual(const Tock& t) override { assert(false); }
   void replay() override { assert(false); }
 };
 
@@ -103,7 +108,7 @@ template<const ZombieConfig& cfg>
 struct FullContextNode : ContextNode<cfg> {
   std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
   std::vector<EZombie<cfg>> inputs;
-  Tock start_time;
+  Tock t;
 
   Time time_taken;
   mutable Time last_accessed;
@@ -115,12 +120,16 @@ struct FullContextNode : ContextNode<cfg> {
                            const Time& time_taken,
                            std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
                            std::vector<EZombie<cfg>>&& inputs,
-                           const Tock& start_time);
+                           const Tock& t);
+  ~FullContextNode();
+
   void accessed() override;
   bool evictable() override { return true; }
   void evict() override;
+  void evict_individual(const Tock& t) override;
   void replay() override;
   cost_t cost();
+  bool is_tailcall() override { return true; }
 };
 
 // RecomputeLater holds a weak pointer to a MicroWave,
@@ -133,10 +142,9 @@ struct RecomputeLater : Phantom {
   cost_t cost() const override;
   void evict() override;
   void notify_index_changed(size_t idx) override {
-    non_null(weak_ptr.lock())->pool_index = idx;
-  }
-  void notify_element_removed() override {
-    non_null(weak_ptr.lock())->pool_index = -1;
+    if (auto ptr = weak_ptr.lock()) {
+      ptr->pool_index = idx;
+    }
   }
 };
 
@@ -159,9 +167,7 @@ public:
   };
 
   struct NotifyElementRemoved {
-    void operator()(const std::unique_ptr<Phantom>& p) {
-      p->notify_element_removed();
-    }
+    void operator()(const std::unique_ptr<Phantom>& p) { }
   };
 
   struct Reaper;

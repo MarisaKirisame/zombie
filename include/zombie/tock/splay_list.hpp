@@ -25,10 +25,12 @@ struct SplayList {
       k(k), v(v), parent(parent), children(children), splay_parent(splay_parent) {
       if (parent != nullptr) {
         assert(parent->children == children);
+        assert(parent->k <= k);
         parent->children = this;
       }
       if (children != nullptr) {
         assert(children->parent == parent);
+        assert(children->k >= k);
         children->parent = this;
       }
     }
@@ -237,15 +239,14 @@ struct SplayList {
     if (ptr != nullptr) {
       if (ptr->k < k) {
         assert(ptr->splay_children[1] == nullptr);
-        ptr->splay_children[1] = new Node(k, v, ptr->parent, ptr, ptr);
+        ptr->splay_children[1] = new Node(k, v, ptr, ptr->children, ptr);
       } else if (k < ptr->k) {
         assert(ptr->splay_children[0] == nullptr);
-        ptr->splay_children[0] = new Node(k, v, ptr, ptr->children, ptr);
+        ptr->splay_children[0] = new Node(k, v, ptr->parent, ptr, ptr);
       } else {
         assert (ptr->k == k);
         ptr->v = v;
       }
-
       ptr->splay(this->root_node);
     } else {
       root_node = new Node(k, v, nullptr, nullptr, nullptr);
