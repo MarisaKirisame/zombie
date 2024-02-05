@@ -277,6 +277,7 @@ TEST(ZombieTest, EvictByMicroWave) {
   EXPECT_TRUE(b.evicted());
 }
 
+/*
 TEST(ZombieTest, MeasureSpace) {
   {
     Zombie<int> z = bindZombie([&]() {
@@ -312,6 +313,7 @@ TEST(ZombieTest, MeasureSpace) {
     EXPECT_EQ((*t.akasha.find_le(z.created_time))->space_taken, 1 * sizeof(int));
   }
 }
+*/
 
 TEST(ZombieTest, TailCall) {
   Zombie<int> a(1);

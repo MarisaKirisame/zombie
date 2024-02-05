@@ -16,13 +16,11 @@ decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
   return b();
 }
 
-
 template<typename T>
 T non_null(T&& x) {
   assert(x);
   return std::forward<T>(x);
 }
-
 
 template <typename T>
 bool weak_is_nullptr(std::weak_ptr<T> const& weak) {
@@ -62,6 +60,11 @@ struct Time {
 
   Time operator-(const Time& other) const {
     return Time(time - other.time);
+  }
+
+  Time& operator+=(const Time& rhs) {
+    time += rhs.time;
+    return *this;
   }
 };
 

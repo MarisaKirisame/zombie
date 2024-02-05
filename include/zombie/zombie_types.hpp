@@ -7,9 +7,14 @@
 #include "tock/tock.hpp"
 #include "config.hpp"
 #include "trampoline.hpp"
-#include "microwave.hpp"
 
 namespace ZombieInternal {
+
+template<const ZombieConfig &cfg, typename T>
+struct ExternalZombie;
+
+template<const ZombieConfig &cfg>
+struct ExternalEZombie;
 
 template<const ZombieConfig& cfg>
 struct ContextNode;
@@ -25,20 +30,23 @@ struct Zombie;
 
 template<const ZombieConfig &cfg, typename T>
 struct TCZombie {
-  Trampoline::Output<EZombie<cfg>> o;
-  explicit TCZombie(std::function<Trampoline::Output<EZombie<cfg>>()>&& f);
+  Trampoline::Output<ExternalEZombie<cfg>> o;
+  explicit TCZombie(std::function<Trampoline::Output<ExternalEZombie<cfg>>()>&& f);
 
-  explicit TCZombie(const EZombie<cfg>& z);
-  explicit TCZombie(EZombie<cfg>&& z);
+  explicit TCZombie(const ExternalEZombie<cfg>& z);
+  explicit TCZombie(ExternalEZombie<cfg>&& z);
 
   TCZombie(const Zombie<cfg, T>& z);
   TCZombie(Zombie<cfg, T>&& z);
 
+  TCZombie(const ExternalZombie<cfg, T>& z);
+  TCZombie(ExternalZombie<cfg, T>&& z);
+
   explicit TCZombie(const Tock& t);
   explicit TCZombie(Tock&& t);
 
-  TCZombie(const Trampoline::Output<EZombie<cfg>>& o);
-  TCZombie(Trampoline::Output<EZombie<cfg>>&& o);
+  TCZombie(const Trampoline::Output<ExternalEZombie<cfg>>& o);
+  TCZombie(Trampoline::Output<ExternalEZombie<cfg>>&& o);
 };
 
 // EZombieNode is a type-erased interface to a computed value.
@@ -112,6 +120,12 @@ struct EZombie {
   template<typename T>
   EZombie(const Zombie<cfg, T>& ez) : created_time(ez.created_time), ptr_cache(ez.ptr_cache) { }
   EZombie() { }
+
+  //template<typename T>
+  //EZombie(ExternalZombie<cfg, T>&& z) : EZombie(std::move(z.z)) {
+  //  z.a->evict = false;
+  //}
+
   explicit EZombie(const Tock& t) : created_time(t) { }
 
   std::weak_ptr<EZombieNode<cfg>> ptr() const;
@@ -182,11 +196,14 @@ struct Zombie : EZombie<cfg> {
   explicit Zombie(Tock&& t) : EZombie<cfg>(std::move(t)) { }
 
   template<typename... Arg>
-  Zombie(Arg&&... arg) {
+  explicit Zombie(Arg&&... arg) {
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Zombie<cfg, T>>>::value, "should not match this constructor");
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<TCZombie<cfg, T>>>::value, "should not match this constructor");
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<EZombie<cfg>>>::value, "should not match this constructor");
     static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<Tock>>::value, "should not match this constructor");
+    static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<ExternalZombie<cfg, T>>>::value, "should not match this constructor");
+    static_assert(!std::is_same<std::tuple<std::remove_cvref_t<Arg>...>, std::tuple<ExternalEZombie<cfg>>>::value, "should not match this constructor");
+
     construct(std::forward<Arg>(arg)...);
   }
 
@@ -218,6 +235,61 @@ TCZombie<cfg, T> Result(const Zombie<cfg, T>& z) {
   return TCZombie<cfg, T>(z);
 }
 
+template<const ZombieConfig& cfg, typename T>
+TCZombie<cfg, T> Result(const ExternalZombie<cfg, T>& z) {
+  return TCZombie<cfg, T>(z);
+}
+
+template<const ZombieConfig& cfg>
+struct Assassin {
+  EZombie<cfg> z;
+  ~Assassin() {
+    z.evict();
+  }
+};
+
+template<const ZombieConfig &cfg>
+struct ExternalEZombie {
+  EZombie<cfg> ez;
+  std::shared_ptr<Assassin<cfg>> a;
+  template<typename T>
+  ExternalEZombie(ExternalZombie<cfg, T>&& z) : ez(std::move(z.z)), a(std::move(z.a)) { }
+  template<typename T>
+  ExternalEZombie(const ExternalZombie<cfg, T>&& z) : ez(std::move(z.z)), a(std::move(z.a)) { }
+  template<typename T>
+  ExternalEZombie(const ExternalZombie<cfg, T>& z) : ez(z.z), a(z.a) { }
+  template<typename T>
+  ExternalEZombie(ExternalZombie<cfg, T>& z) : ez(z.z), a(z.a) { }
+  template<typename... Arg>
+  explicit ExternalEZombie(Arg&&... arg) : ez(std::forward<Arg>(arg)...), a(std::make_shared<Assassin<cfg>>(ez)) { }
+};
+
+template<const ZombieConfig &cfg, typename T>
+struct ExternalZombie {
+  std::shared_ptr<ZombieNode<cfg, T>> shared_ptr() const {
+    return z.shared_ptr();
+  }
+  bool evicted() const {
+    return z.evicted();
+  }
+  Zombie<cfg, T> z;
+  std::shared_ptr<Assassin<cfg>> a;
+  T get_value() const { return z.get_value(); }
+  void force_unique_evict() { z.force_unique_evict(); }
+  bool evictable() { return z.evictable(); }
+  void evict() { z.evict(); }
+  ExternalZombie(const ExternalZombie<cfg, T>& z) = default;
+  ExternalZombie(ExternalZombie<cfg, T>& z) : z(z.z), a(z.a) { }
+  ExternalZombie(ExternalZombie<cfg, T>&& z) = default;
+  ExternalZombie(const ExternalZombie<cfg, T>&& z) : z(std::move(z.z)), a(std::move(z.a)) { }
+  explicit ExternalZombie(ExternalEZombie<cfg>& ez) : z(ez.ez), a(ez.a) { }
+  explicit ExternalZombie(const ExternalEZombie<cfg>& ez) : z(ez.ez), a(ez.a) { }
+  explicit ExternalZombie(ExternalEZombie<cfg>&& ez) : z(std::move(ez.ez)), a(std::move(ez.a)) { }
+  explicit ExternalZombie(const ExternalEZombie<cfg>&& ez) : z(std::move(ez.ez)), a(std::move(ez.a)) { }
+  template<typename... Arg>
+  explicit ExternalZombie(Arg&&... arg) : z(std::forward<Arg>(arg)...), a(std::make_shared<Assassin<cfg>>(z)) { }
+};
+
 template<typename F, size_t... Is>
 auto gen_tuple_impl(F func, std::index_sequence<Is...>) {
   return std::make_tuple(func(Is)...);
@@ -233,6 +305,12 @@ struct IsZombie : std::false_type { };
 
 template<const ZombieConfig& cfg, typename T>
 struct IsZombie<Zombie<cfg, T>> : std::true_type { };
+
+template<typename T>
+struct IsExternalZombie : std::false_type { };
+
+template<const ZombieConfig& cfg, typename T>
+struct IsExternalZombie<ExternalZombie<cfg, T>> : std::true_type { };
 
 template<typename T>
 struct IsTCZombie : std::false_type { };
@@ -251,6 +329,13 @@ struct TCZombieInner<TCZombie<cfg, T>> { using type_t = T; };
 template<const ZombieConfig& cfg, typename T>
 struct GetSize<ZombieInternal::Zombie<cfg, T>> {
   size_t operator()(const ZombieInternal::Zombie<cfg, T>& z) {
+    return sizeof(z); // note that this does not care about T - it is merely 'what is the size of this struct'
+  }
+};
+
+template<const ZombieConfig& cfg, typename T>
+struct GetSize<ZombieInternal::ExternalZombie<cfg, T>> {
+  size_t operator()(const ZombieInternal::ExternalZombie<cfg, T>& z) {
     return sizeof(z); // note that this does not care about T - it is merely 'what is the size of this struct'
   }
 };

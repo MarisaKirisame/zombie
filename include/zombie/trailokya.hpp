@@ -8,14 +8,9 @@
 #include "config.hpp"
 #include "zombie_types.hpp"
 #include "heap/gd_heap.hpp"
+#include "uf.hpp"
 
 namespace ZombieInternal {
-
-template<typename T>
-struct UF {
-  std::shared_ptr<UF> parent;
-  T t; // only meaningful when parent.get() == nullptr
-};
 
 template<const ZombieConfig& cfg>
 Tock tick();
@@ -37,9 +32,9 @@ struct RecordNode {
   virtual void completed() = 0;
   virtual void resumed() = 0;
   virtual bool is_tailcall() { return false; }
-  virtual Trampoline::Output<EZombie<cfg>> tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
-                                                    std::vector<EZombie<cfg>>&& in) = 0;
-  virtual Trampoline::Output<EZombie<cfg>> play() = 0;
+  virtual Trampoline::Output<ExternalEZombie<cfg>> tailcall(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                                            std::vector<EZombie<cfg>>&& in) = 0;
+  virtual Trampoline::Output<ExternalEZombie<cfg>> play() = 0;
 };
 
 template<const ZombieConfig& cfg>
@@ -52,28 +47,28 @@ struct RootRecordNode : RecordNode<cfg> {
   void suspended() override;
   void completed() override { assert(false); }
   void resumed() override;
-  Trampoline::Output<EZombie<cfg>> tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
-                                            std::vector<EZombie<cfg>>&& in) override { assert(false); }
-  Trampoline::Output<EZombie<cfg>> play() override { assert(false); }
+  Trampoline::Output<ExternalEZombie<cfg>> tailcall(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                                    std::vector<EZombie<cfg>>&& in) override { assert(false); }
+  Trampoline::Output<ExternalEZombie<cfg>> play() override { assert(false); }
 };
 
 template<const ZombieConfig& cfg>
 struct HeadRecordNode : RecordNode<cfg> {
   // we dont really use the Tock return type, but this allow one less boxing.
-  std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
+  std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)> f;
   std::vector<EZombie<cfg>> inputs;
 
   Time start_time;
 
-  HeadRecordNode(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
+  HeadRecordNode(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
 
   void suspended() { assert(false); }
   void completed() override;
   void resumed() override { assert(false); }
   bool is_tailcall() override { return true; }
-  Trampoline::Output<EZombie<cfg>> tailcall(std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
-                                            std::vector<EZombie<cfg>>&& in) override;
-  Trampoline::Output<EZombie<cfg>> play() override;
+  Trampoline::Output<ExternalEZombie<cfg>> tailcall(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                                                    std::vector<EZombie<cfg>>&& in) override;
+  Trampoline::Output<ExternalEZombie<cfg>> play() override;
 };
 
 template<const ZombieConfig& cfg>
@@ -96,6 +91,8 @@ struct ContextNode : Object {
   virtual void evict_individual(const Tock& t) = 0;
   virtual void replay() = 0;
   virtual bool is_tailcall() { return false; }
+  virtual void dependency_evicted(UF<Time>& t) = 0;
+  virtual UF<Time> get_evicted_dependencies() = 0;
 };
 
 template<const ZombieConfig& cfg>
@@ -109,11 +106,13 @@ struct RootContextNode : ContextNode<cfg> {
   void evict() override { assert(false); }
   void evict_individual(const Tock& t) override { assert(false); }
   void replay() override { assert(false); }
+  void dependency_evicted(UF<Time>& t) override { }
+  UF<Time> get_evicted_dependencies() override { return UF<Time>(Time(ns(0))); }
 };
 
 template<const ZombieConfig& cfg>
 struct FullContextNode : ContextNode<cfg> {
-  std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)> f;
+  std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)> f;
   std::vector<EZombie<cfg>> inputs;
   Tock t;
 
@@ -122,10 +121,16 @@ struct FullContextNode : ContextNode<cfg> {
 
   mutable ptrdiff_t pool_index = -1;
 
+  // if X is evicted, and recomputing depend on this node,
+  // X should merge the UF representation of itself with this UF.
+  // note that as FullContextNode can be evicted, when that happens
+  // the UF rep have to be merged with the FullContextNode's evicted_dependencies before it.
+  UF<Time> evicted_dependencies = UF<Time>(time_taken);
+
   explicit FullContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
                            const size_t& sp,
                            const Time& time_taken,
-                           std::function<Trampoline::Output<EZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                           std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
                            std::vector<EZombie<cfg>>&& inputs,
                            const Tock& t);
   ~FullContextNode();
@@ -137,6 +142,8 @@ struct FullContextNode : ContextNode<cfg> {
   void replay() override;
   cost_t cost();
   bool is_tailcall() override { return true; }
+  void dependency_evicted(UF<Time>& t) override { evicted_dependencies.merge(t); }
+  UF<Time> get_evicted_dependencies() override { return evicted_dependencies; }
 };
 
 // RecomputeLater holds a weak pointer to a MicroWave,
@@ -195,23 +202,6 @@ public:
   static Trailokya& get_trailokya() {
     static Trailokya t;
     return t;
-  }
-
-  // return the closest MicroWave holding [t]
-  std::shared_ptr<MicroWave<cfg>> get_microwave(const Tock& t) {/*
-    TockTreeElem elem = akasha.get_node(t).value;
-    if (elem.index() == TockTreeElemKind::MicroWave) {
-      return std::get<TockTreeElemKind::MicroWave>(elem);
-    } else {
-      auto parent = akasha.get_parent(t);
-      if (! parent || parent->value.index() == TockTreeElemKind::Nothing) {
-        return nullptr;
-      } else {
-        assert (parent->value.index() == TockTreeElemKind::MicroWave);
-        return std::get<TockTreeElemKind::MicroWave>(parent->value);
-      }
-      }*/
-    assert(false);
   }
 
 public:

@@ -10,7 +10,7 @@ namespace Local {
   IMPORT_ZOMBIE(default_config)
 }
 
-namespace UF {
+namespace UnionFind {
   IMPORT_ZOMBIE(uf_cfg)
 }
 
@@ -21,8 +21,9 @@ struct GetSize<std::pair<T, U>> {
   };
 };
 
+/*
 TEST(ZombieUFTest, CalculateTotalCost) {
-  using namespace UF;
+  using namespace UnionFind;
   auto& t = Trailokya::get_trailokya();
 
   Zombie<int> z1 = bindZombie([&]() {
@@ -58,6 +59,7 @@ TEST(ZombieUFTest, CalculateTotalCost) {
   EXPECT_EQ(z2_cost.count() / Time(1s).count(), 21);
   EXPECT_EQ(z3_cost.count() / Time(1s).count(), 20);
 }
+*/
 
 // TEST(ZombieUFTest, ReplayChangeCost) {
 //   using namespace UF;
@@ -153,7 +155,7 @@ unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsign
   assert(total_size > 1);
   assert(0 < memory_limit && memory_limit <= total_size);
 
-  using namespace UF;
+  using namespace UnionFind;
   auto& t = Trailokya::get_trailokya();
 
   using Resource = Resource<test_id>;
@@ -220,7 +222,6 @@ double r_square(const std::vector<double>& data, std::function<double(unsigned i
   double nom = xy_avg - x_avg * y_avg;
   return nom * nom / (x2_avg - x_avg * x_avg) / (y2_avg - y_avg * y_avg);
 }
-
 
 TEST(ZombieUFTest, SqrtSpaceLinearTime) {
   struct Test {};

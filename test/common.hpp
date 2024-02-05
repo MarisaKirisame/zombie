@@ -31,7 +31,6 @@ struct Element<true> {
   bool operator==(const Element<true> &other) const { return get() == other.get(); }
 };
 
-
 template<bool is_unique>
 struct NotifyHeapIndexChanged<Element<is_unique>> {
   void operator()(const Element<is_unique>& n, const size_t& idx) { }
@@ -42,15 +41,10 @@ struct NotifyHeapElementRemoved<Element<is_unique>> {
   void operator()(const Element<is_unique>& i) { }
 };
 
-
 template<bool is_unique>
 struct NotifyIndexChanged {
   void operator()(const Element<is_unique>&, const size_t&) { }
 };
-
-
-
-
 
 template<>
 struct GetSize<int> {
@@ -58,8 +52,6 @@ struct GetSize<int> {
     return sizeof(int);
   }
 };
-
-
 
 // [test_id] is used to separate different tests
 template<typename test_id>
@@ -79,7 +71,6 @@ unsigned int Resource<test_id>::count = 0;
 
 template<typename test_id>
 unsigned int Resource<test_id>::destructor_count = 0;
-
 
 template<typename test_id>
 struct GetSize<Resource<test_id>> {

@@ -130,13 +130,15 @@ struct SplayList {
   mutable Node* root_node = nullptr;
 
   ~SplayList() {
-    if (root_node != nullptr) {
-      for (Node* left_ptr = root_node->parent; left_ptr != nullptr;) {
+    Node* root_node_copy = root_node;
+    root_node = nullptr;
+    if (root_node_copy != nullptr) {
+      for (Node* left_ptr = root_node_copy->parent; left_ptr != nullptr;) {
         Node* to_delete = left_ptr;
         left_ptr = left_ptr->parent;
         delete to_delete;
       }
-      for (Node* right_ptr = root_node->children; right_ptr != nullptr;) {
+      for (Node* right_ptr = root_node_copy->children; right_ptr != nullptr;) {
         Node* to_delete = right_ptr;
         right_ptr = right_ptr->children;
         delete to_delete;
