@@ -87,14 +87,11 @@ void FullContextNode<cfg>::evict() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   this->ez.clear();
   evicted_dependencies.increase(time_taken);
-  //std::cout << this->t << " evicted, input: ";
   for (const auto& input: inputs) {
-    //std::cout << t.akasha.find_le_node(input.created_time)->k << ", ";
     (*(t.akasha.find_le(input.created_time)))->dependency_evicted(evicted_dependencies);
   }
   auto* parent_node = t.akasha.find_precise_node(this->t)->parent;
   auto parent_context = parent_node->v;
-  //std::cout << "cost: " << (evicted_dependencies.value().count() >> 22) << std::endl;
   if (parent_context->is_tailcall()) {
     parent_context->dependency_evicted(evicted_dependencies);
     // this line delete this;

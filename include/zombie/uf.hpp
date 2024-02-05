@@ -19,7 +19,7 @@ struct UFNode : std::enable_shared_from_this<UFNode<T>> {
     auto lhs = get_root(), rhs = _rhs->get_root();
     if (lhs != rhs) {
       lhs->parent = rhs;
-      lhs->t += rhs->t;
+      rhs->t += lhs->t;
     }
   }
   explicit UFNode(const T& t) : t(t) { }

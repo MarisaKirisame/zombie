@@ -240,28 +240,19 @@ TCZombie<cfg, T> Result(const ExternalZombie<cfg, T>& z) {
   return TCZombie<cfg, T>(z);
 }
 
-template<const ZombieConfig& cfg>
-struct Assassin {
-  EZombie<cfg> z;
-  ~Assassin() {
-    z.evict();
-  }
-};
-
 template<const ZombieConfig &cfg>
 struct ExternalEZombie {
   EZombie<cfg> ez;
-  std::shared_ptr<Assassin<cfg>> a;
   template<typename T>
-  ExternalEZombie(ExternalZombie<cfg, T>&& z) : ez(std::move(z.z)), a(std::move(z.a)) { }
+  ExternalEZombie(ExternalZombie<cfg, T>&& z) : ez(std::move(z.z)) { }
   template<typename T>
-  ExternalEZombie(const ExternalZombie<cfg, T>&& z) : ez(std::move(z.z)), a(std::move(z.a)) { }
+  ExternalEZombie(const ExternalZombie<cfg, T>&& z) : ez(std::move(z.z)) { }
   template<typename T>
-  ExternalEZombie(const ExternalZombie<cfg, T>& z) : ez(z.z), a(z.a) { }
+  ExternalEZombie(const ExternalZombie<cfg, T>& z) : ez(z.z) { }
   template<typename T>
-  ExternalEZombie(ExternalZombie<cfg, T>& z) : ez(z.z), a(z.a) { }
+  ExternalEZombie(ExternalZombie<cfg, T>& z) : ez(z.z) { }
   template<typename... Arg>
-  explicit ExternalEZombie(Arg&&... arg) : ez(std::forward<Arg>(arg)...), a(std::make_shared<Assassin<cfg>>(ez)) { }
+  explicit ExternalEZombie(Arg&&... arg) : ez(std::forward<Arg>(arg)...) { }
 };
 
 template<const ZombieConfig &cfg, typename T>
@@ -273,21 +264,20 @@ struct ExternalZombie {
     return z.evicted();
   }
   Zombie<cfg, T> z;
-  std::shared_ptr<Assassin<cfg>> a;
   T get_value() const { return z.get_value(); }
   void force_unique_evict() { z.force_unique_evict(); }
   bool evictable() { return z.evictable(); }
   void evict() { z.evict(); }
   ExternalZombie(const ExternalZombie<cfg, T>& z) = default;
-  ExternalZombie(ExternalZombie<cfg, T>& z) : z(z.z), a(z.a) { }
+  ExternalZombie(ExternalZombie<cfg, T>& z) : z(z.z) { }
   ExternalZombie(ExternalZombie<cfg, T>&& z) = default;
-  ExternalZombie(const ExternalZombie<cfg, T>&& z) : z(std::move(z.z)), a(std::move(z.a)) { }
-  explicit ExternalZombie(ExternalEZombie<cfg>& ez) : z(ez.ez), a(ez.a) { }
-  explicit ExternalZombie(const ExternalEZombie<cfg>& ez) : z(ez.ez), a(ez.a) { }
-  explicit ExternalZombie(ExternalEZombie<cfg>&& ez) : z(std::move(ez.ez)), a(std::move(ez.a)) { }
-  explicit ExternalZombie(const ExternalEZombie<cfg>&& ez) : z(std::move(ez.ez)), a(std::move(ez.a)) { }
+  ExternalZombie(const ExternalZombie<cfg, T>&& z) : z(std::move(z.z)) { }
+  explicit ExternalZombie(ExternalEZombie<cfg>& ez) : z(ez.ez) { }
+  explicit ExternalZombie(const ExternalEZombie<cfg>& ez) : z(ez.ez) { }
+  explicit ExternalZombie(ExternalEZombie<cfg>&& ez) : z(std::move(ez.ez)) { }
+  explicit ExternalZombie(const ExternalEZombie<cfg>&& ez) : z(std::move(ez.ez)) { }
   template<typename... Arg>
-  explicit ExternalZombie(Arg&&... arg) : z(std::forward<Arg>(arg)...), a(std::make_shared<Assassin<cfg>>(z)) { }
+  explicit ExternalZombie(Arg&&... arg) : z(std::forward<Arg>(arg)...) { }
 };
 
 template<typename F, size_t... Is>
