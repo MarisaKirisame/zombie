@@ -28,8 +28,8 @@ unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsign
   assert(0 < memory_limit);
   //assert(memory_limit <= total_size);
 
-  //using namespace UnionFind;
-  using namespace Local;
+  using namespace UnionFind;
+  //using namespace Local;
   auto& t = Trailokya::get_trailokya();
 
   using Resource = Resource<test_id>;
@@ -105,10 +105,12 @@ void SqrtSpaceLinearTime() {
   struct Test {};
 
   std::vector<double> work;
-  for (int i = 8; i < 20; ++i) {
-  //{ int i = 20;
-    auto v = LinearDependencyForwardBackwardTest<Test>(i * i, 2 * i);
-    std::cout << i * i << ": " << v << std::endl;
+  //for (int i = 8; i < 20; ++i) {
+  { int i = 50;
+    int time = i * i;
+    int memory = 3 * i;
+    auto v = LinearDependencyForwardBackwardTest<Test>(time, memory);
+    std::cout << time << ", " << memory << ": " << v << std::endl;
     work.push_back(v);
   }
 
@@ -137,6 +139,6 @@ void LogSpaceNLogNTime() {
 }
 
 int main() {
-  //SqrtSpaceLinearTime();
-  LogSpaceNLogNTime();
+  SqrtSpaceLinearTime();
+  //LogSpaceNLogNTime();
 }
