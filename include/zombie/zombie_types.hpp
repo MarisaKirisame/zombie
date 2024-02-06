@@ -28,25 +28,12 @@ struct EZombie;
 template<const ZombieConfig &cfg, typename T>
 struct Zombie;
 
+// a phantom type
 template<const ZombieConfig &cfg, typename T>
 struct TCZombie {
-  Trampoline::Output<ExternalEZombie<cfg>> o;
-  explicit TCZombie(std::function<Trampoline::Output<ExternalEZombie<cfg>>()>&& f);
-
-  explicit TCZombie(const ExternalEZombie<cfg>& z);
-  explicit TCZombie(ExternalEZombie<cfg>&& z);
-
-  TCZombie(const Zombie<cfg, T>& z);
-  TCZombie(Zombie<cfg, T>&& z);
-
-  TCZombie(const ExternalZombie<cfg, T>& z);
-  TCZombie(ExternalZombie<cfg, T>&& z);
-
-  explicit TCZombie(const Tock& t);
-  explicit TCZombie(Tock&& t);
-
-  TCZombie(const Trampoline::Output<ExternalEZombie<cfg>>& o);
-  TCZombie(Trampoline::Output<ExternalEZombie<cfg>>&& o);
+  TCZombie() = default;
+  TCZombie(const ExternalZombie<cfg, T>&);
+  TCZombie(ExternalZombie<cfg, T>&&);
 };
 
 // EZombieNode is a type-erased interface to a computed value.
@@ -230,16 +217,6 @@ struct Zombie : EZombie<cfg> {
   }
 };
 
-template<const ZombieConfig& cfg, typename T>
-TCZombie<cfg, T> Result(const Zombie<cfg, T>& z) {
-  return TCZombie<cfg, T>(z);
-}
-
-template<const ZombieConfig& cfg, typename T>
-TCZombie<cfg, T> Result(const ExternalZombie<cfg, T>& z) {
-  return TCZombie<cfg, T>(z);
-}
-
 template<const ZombieConfig &cfg>
 struct ExternalEZombie {
   EZombie<cfg> ez;
@@ -312,7 +289,7 @@ template<typename T>
 struct TCZombieInner { };
 
 template<const ZombieConfig& cfg, typename T>
-struct TCZombieInner<TCZombie<cfg, T>> { using type_t = T; };
+struct TCZombieInner<TCZombie<cfg, T>> { using type = T; };
 
 } // end of namespace ZombieInternal
 

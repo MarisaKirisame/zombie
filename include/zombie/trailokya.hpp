@@ -16,6 +16,9 @@ template<const ZombieConfig& cfg>
 Tock tick();
 
 template<const ZombieConfig& cfg>
+using replay_func = std::function<void(const std::vector<const void*>& in)>;
+
+template<const ZombieConfig& cfg>
 struct RecordNode {
   Tock t;
   std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
@@ -32,9 +35,11 @@ struct RecordNode {
   virtual void completed() = 0;
   virtual void resumed() = 0;
   virtual bool is_tailcall() { return false; }
-  virtual Trampoline::Output<ExternalEZombie<cfg>> tailcall(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
-                                                            std::vector<EZombie<cfg>>&& in) = 0;
-  virtual Trampoline::Output<ExternalEZombie<cfg>> play() = 0;
+  virtual void tailcall(std::shared_ptr<replay_func<cfg>>&& f,
+                        std::vector<EZombie<cfg>>&& in) { assert(false); }
+  virtual void play() { assert(false); }
+  virtual bool is_value() { return false; }
+  virtual ExternalEZombie<cfg> get_value() { assert(false); }
 };
 
 template<const ZombieConfig& cfg>
@@ -47,28 +52,40 @@ struct RootRecordNode : RecordNode<cfg> {
   void suspended() override;
   void completed() override { assert(false); }
   void resumed() override;
-  Trampoline::Output<ExternalEZombie<cfg>> tailcall(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
-                                                    std::vector<EZombie<cfg>>&& in) override { assert(false); }
-  Trampoline::Output<ExternalEZombie<cfg>> play() override { assert(false); }
+};
+
+template<const ZombieConfig& cfg>
+struct ValueRecordNode : RecordNode<cfg> {
+  ExternalEZombie<cfg> eez;
+
+  ValueRecordNode(ExternalEZombie<cfg>&& eez) : eez(std::move(eez)) { }
+
+  void suspended() override { assert(false); }
+  void completed() override { }
+  void resumed() override { assert(false); }
+  bool is_value() override { return true; }
+  ExternalEZombie<cfg> get_value() override { return eez; }
 };
 
 template<const ZombieConfig& cfg>
 struct HeadRecordNode : RecordNode<cfg> {
   // we dont really use the Tock return type, but this allow one less boxing.
-  std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)> f;
+  std::shared_ptr<replay_func<cfg>> f;
   std::vector<EZombie<cfg>> inputs;
+  bool played = false;
 
   Time start_time;
 
-  HeadRecordNode(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f, std::vector<EZombie<cfg>>&& inputs);
+  HeadRecordNode(std::shared_ptr<replay_func<cfg>>&& f, std::vector<EZombie<cfg>>&& inputs);
+  HeadRecordNode(const std::shared_ptr<replay_func<cfg>>& f, const std::vector<EZombie<cfg>>& inputs);
 
   void suspended() { assert(false); }
   void completed() override;
   void resumed() override { assert(false); }
   bool is_tailcall() override { return true; }
-  Trampoline::Output<ExternalEZombie<cfg>> tailcall(std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
-                                                    std::vector<EZombie<cfg>>&& in) override;
-  Trampoline::Output<ExternalEZombie<cfg>> play() override;
+  void tailcall(std::shared_ptr<replay_func<cfg>>&& f,
+                std::vector<EZombie<cfg>>&& in) override;
+  void play() override;
 };
 
 template<const ZombieConfig& cfg>
@@ -112,9 +129,10 @@ struct RootContextNode : ContextNode<cfg> {
 
 template<const ZombieConfig& cfg>
 struct FullContextNode : ContextNode<cfg> {
-  std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)> f;
-  std::vector<EZombie<cfg>> inputs;
-  Tock t;
+  std::shared_ptr<replay_func<cfg>> f, next_f;
+  std::vector<EZombie<cfg>> inputs, next_inputs;
+  Tock start_t;
+  Tock end_t; // open-close
 
   Time time_taken;
   mutable Time last_accessed;
@@ -130,7 +148,7 @@ struct FullContextNode : ContextNode<cfg> {
   explicit FullContextNode(std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
                            const size_t& sp,
                            const Time& time_taken,
-                           std::function<Trampoline::Output<ExternalEZombie<cfg>>(const std::vector<const void*>& in)>&& f,
+                           std::shared_ptr<replay_func<cfg>>&& f,
                            std::vector<EZombie<cfg>>&& inputs,
                            const Tock& t);
   ~FullContextNode();
@@ -193,7 +211,7 @@ public:
   Replay<cfg> replay;
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
-  std::function<void()> each_tc = [](){};
+  std::function<void()> each_step = [](){};
 
 public:
   Trailokya() { }

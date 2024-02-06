@@ -1,6 +1,7 @@
 #include "test/common.hpp"
 #include "zombie/zombie.hpp"
 
+#define TEST(L, R) void R()
 #define EXPECT_EQ(x, y) assert((x) == (y));
 #define EXPECT_LT(x, y) assert((x) < (y));
 #define EXPECT_TRUE(x) assert(x);
@@ -10,11 +11,15 @@ constexpr ZombieConfig local_cfg(/*metric=*/&local_metric, /*approx_factor=*/{1,
 constexpr ZombieConfig uf_cfg(/*metric=*/&uf_metric, /*approx_factor=*/{1, 1});
 
 namespace Local {
-  IMPORT_ZOMBIE(default_config)
+  IMPORT_ZOMBIE(local_cfg)
 }
 
 namespace UnionFind {
   IMPORT_ZOMBIE(uf_cfg)
+}
+
+namespace Default {
+  IMPORT_ZOMBIE(default_config)
 }
 
 // access a list of zombies with linear dependency, first from beginning to end,
@@ -59,8 +64,6 @@ unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsign
       return Zombie<Resource>(x.value + 1);
     }, zs[i - 1]));
   }
-
-  std::cout << "backward mode at " << t.current_tock << "!" << std::endl;
 
   // backward
   for (int i = total_size - 1; i >= 0; --i) {
@@ -125,8 +128,9 @@ void LogSpaceNLogNTime() {
   std::vector<double> work;
   for (int i = 8; i < 25; ++i) {
     int time = pow(2, 0.5 * i);
+    int memory = i * 2;
     auto v = LinearDependencyForwardBackwardTest<Test>(time, i * 2);
-    std::cout << time << ", " << i * 2 << ": " << v << std::endl;
+    std::cout << time << ", " << memory << ": " << v << std::endl;
     work.push_back(v);
   }
 
@@ -138,7 +142,19 @@ void LogSpaceNLogNTime() {
   EXPECT_LT(r2, 1.0);
 }
 
+TEST(ZombieTest, TailCall) {
+  using namespace Default;
+  Zombie<int> a(1);
+  Zombie<int> b = bindZombieTC([&]() {
+    return TailCall([](int x){ return Zombie<int>(x + 1); }, a);
+  });
+  EXPECT_EQ(b.get_value(), 2);
+  b.evict();
+  EXPECT_EQ(b.get_value(), 2);
+}
+
 int main() {
-  SqrtSpaceLinearTime();
+  TailCall();
+  //SqrtSpaceLinearTime();
   //LogSpaceNLogNTime();
 }

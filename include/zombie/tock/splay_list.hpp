@@ -128,6 +128,7 @@ struct SplayList {
 
   };
   mutable Node* root_node = nullptr;
+  size_t size = 0;
 
   ~SplayList() {
     Node* root_node_copy = root_node;
@@ -226,6 +227,7 @@ struct SplayList {
     Node* ptr = find_le_node(k);
     if (ptr != nullptr) {
       ptr->remove(*this);
+      --size;
     }
   }
 
@@ -233,6 +235,7 @@ struct SplayList {
     Node* ptr = find_precise_node(k);
     if (ptr != nullptr) {
       ptr->remove(*this);
+      --size;
     }
   }
 
@@ -242,9 +245,11 @@ struct SplayList {
       if (ptr->k < k) {
         assert(ptr->splay_children[1] == nullptr);
         ptr->splay_children[1] = new Node(k, v, ptr, ptr->children, ptr);
+        ++size;
       } else if (k < ptr->k) {
         assert(ptr->splay_children[0] == nullptr);
         ptr->splay_children[0] = new Node(k, v, ptr->parent, ptr, ptr);
+        ++size;
       } else {
         assert (ptr->k == k);
         ptr->v = v;
@@ -252,6 +257,7 @@ struct SplayList {
       ptr->splay(this->root_node);
     } else {
       root_node = new Node(k, v, nullptr, nullptr, nullptr);
+      ++size;
     }
   }
 
