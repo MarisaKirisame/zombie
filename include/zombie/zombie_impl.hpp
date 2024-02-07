@@ -117,54 +117,32 @@ void FullContextNode<cfg>::replay() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   Tock tock = t.current_tock;
   assert(this->start_t < t.replay.forward_at);
-  if (next_f != nullptr && this->end_t <= t.replay.forward_at) {
-    //std::cout << "good" << std::endl;
-    bracket(
-      [&]() {
-        t.current_tock = this->end_t;
-        t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(next_f, next_inputs));
-      },
-      [&]() {
-        while(*(t.replay.forward_to) == nullptr) {
-          assert(t.current_tock <= t.replay.forward_at);
-          Tock old_tock = t.current_tock;
-          t.records.back()->play();
-          assert(old_tock < t.current_tock);
-          t.each_step();
-        }
-      },
-      [&]() {
-        t.records.back()->completed();
-        t.records.pop_back();
-        // must go after completed(), as it do stuff to current_tock
-        t.current_tock = tock;
-      });
-  } else {
-    //std::cout << "bad " << this->start_t << std::endl;
-    bracket(
-      [&]() {
-        t.current_tock = this->start_t;
-        t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(inputs)));
-        // be careful! this code will delete this.
-        t.akasha.remove_precise(this->start_t);
-      },
-      [&]() {
-        while(*(t.replay.forward_to) == nullptr) {
-          assert(t.current_tock <= t.replay.forward_at);
-          Tock old_tock = t.current_tock;
-          t.records.back()->play();
-          assert(old_tock < t.current_tock);
-          t.each_step();
-        }
-        assert(*(t.replay.forward_to) != nullptr);
-      },
-      [&]() {
-        t.records.back()->completed();
-        t.records.pop_back();
-        // must go after completed(), as it do stuff to current_tock
-        t.current_tock = tock;
-      });
-  }
+  bool good = next_f != nullptr && this->end_t <= t.replay.forward_at;
+  Tock from = good ? this->end_t : this->start_t;
+  std::cout << (good ? "replaying(good) from " : "replaying(bad) from ") << from
+            << " to " << t.replay.forward_at
+            << " diff(/32) " << (t.replay.forward_at - from).tock / 32 + 1
+            << " requested at " << t.current_tock << std::endl;
+  bracket(
+    [&]() {
+      t.current_tock = from;
+      t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(next_f, next_inputs));
+    },
+    [&]() {
+      while(*(t.replay.forward_to) == nullptr) {
+        assert(t.current_tock <= t.replay.forward_at);
+        Tock old_tock = t.current_tock;
+        t.records.back()->play();
+        assert(old_tock < t.current_tock);
+        t.each_step();
+      }
+    },
+    [&]() {
+      t.records.back()->replay_finished();
+      // must go after completed(), as it do stuff to current_tock
+      t.current_tock = tock;
+    });
+  std::cout << "replaying done!" << std::endl;
 }
 
 template<const ZombieConfig& cfg>
@@ -276,6 +254,14 @@ void RecordNode<cfg>::complete() {
 }
 
 template<const ZombieConfig& cfg>
+void RecordNode<cfg>::complete_to(const std::shared_ptr<RecordNode<cfg>>& rec) {
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  this->completed();
+  // this line delete this;
+  t.records.back() = rec;
+}
+
+template<const ZombieConfig& cfg>
 void RecordNode<cfg>::replay_finished() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   this->completed();
@@ -313,7 +299,6 @@ HeadRecordNode<cfg>::HeadRecordNode(const std::shared_ptr<replay_func<cfg>>& f,
 template<const ZombieConfig& cfg>
 void HeadRecordNode<cfg>::completed() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  assert(this->t != t.replay.forward_at);
   assert(this->t < t.replay.forward_at);
   auto fc = std::make_shared<FullContextNode<cfg>>(std::move(this->ez),
                                                    this->space_taken,
@@ -357,8 +342,7 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
         auto in_t = gen_tuple<sizeof...(Arg)>([&](size_t i) { return in[i]; });
         std::tuple<const Arg*...> args = std::apply([](auto... v) { return std::make_tuple<>(static_cast<const Arg*>(v)...); }, in_t);
         ExternalEZombie<cfg> eez(std::apply([&](const Arg*... arg) { return f(*arg...); }, args));
-        t.records.back()->completed();
-        t.records.back() = std::make_shared<ValueRecordNode<cfg>>(std::move(eez));
+        t.records.back()->complete_to(std::make_shared<ValueRecordNode<cfg>>(std::move(eez)));
       };
     std::vector<EZombie<cfg>> in = {x...};
 
@@ -375,15 +359,13 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
 template<const ZombieConfig& cfg, typename T>
 TCZombie<cfg, T>::TCZombie(const ExternalZombie<cfg, T>& z) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.records.back()->completed();
-  t.records.back() = std::make_shared<ValueRecordNode<cfg>>(z);
+  t.records.back()->complete_to(std::make_shared<ValueRecordNode<cfg>>(z));
 }
 
 template<const ZombieConfig& cfg, typename T>
 TCZombie<cfg, T>::TCZombie(ExternalZombie<cfg, T>&& z) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  t.records.back()->completed();
-  t.records.back() = std::make_shared<ValueRecordNode<cfg>>(std::move(z));
+  t.records.back()->complete_to(std::make_shared<ValueRecordNode<cfg>>(std::move(z)));
 }
 
 template<const ZombieConfig& cfg, typename T>
@@ -423,13 +405,20 @@ template<const ZombieConfig& cfg>
 void HeadRecordNode<cfg>::tailcall(std::shared_ptr<replay_func<cfg>>&& f,
                                    std::vector<EZombie<cfg>>&& in) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  this->completed();
   // this line delete this;
-  t.records.back() = std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(in));
+  t.records.back()->complete_to(std::make_shared<HeadRecordNode<cfg>>(std::move(f), std::move(in)));
 }
+
+template<typename T>
+struct CaptureGuard {
+  // technically one can still capture a boolean, but no big deal!
+  // we only dont want (transitive) capturing of zombie, and possibly other big objects.
+  static_assert(sizeof(std::remove_reference_t<T>) == 1);
+};
 
 template<const ZombieConfig& cfg, typename F, typename... Arg>
 auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
+  //CaptureGuard<F> no_capture;
   using result_type = decltype(ToTC(f(std::declval<Arg>()...)));
   static_assert(IsTCZombie<result_type>::value, "should be TCZombie");
 

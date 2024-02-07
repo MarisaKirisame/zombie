@@ -31,6 +31,7 @@ struct RecordNode {
   void suspend(const std::shared_ptr<RecordNode<cfg>>& rec);
   void complete();
   void replay_finished();
+  void complete_to(const std::shared_ptr<RecordNode<cfg>>& rec);
   virtual void suspended() = 0;
   virtual void completed() = 0;
   virtual void resumed() = 0;

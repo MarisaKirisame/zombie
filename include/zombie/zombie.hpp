@@ -26,6 +26,6 @@
   }                                                                                                \
   template<typename F, typename... Args>                                                           \
   inline auto TailCall(F&& f, const Zombie<Args>& ...x) {                                          \
-    return ZombieInternal::TailCall<cfg, F, Args...>(std::forward<F>(f), (x.z)...);                \
+    return ZombieInternal::TailCall<cfg>(std::forward<F>(f), (x.z)...);                \
   }                                                                                                \
   ;
