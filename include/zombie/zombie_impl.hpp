@@ -126,7 +126,11 @@ void FullContextNode<cfg>::replay() {
   bracket(
     [&]() {
       t.current_tock = from;
-      t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(next_f, next_inputs));
+      if (good) {
+        t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(next_f, next_inputs));
+      } else {
+        t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(f, inputs));
+      }
     },
     [&]() {
       while(*(t.replay.forward_to) == nullptr) {
@@ -317,6 +321,7 @@ Tock tick() {
 
 template<const ZombieConfig& cfg>
 void HeadRecordNode<cfg>::play() {
+  std::cout << "playing " << this->t << std::endl;
   assert(!played);
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   std::vector<std::shared_ptr<EZombieNode<cfg>>> storage;

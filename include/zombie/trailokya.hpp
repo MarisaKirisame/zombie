@@ -28,17 +28,21 @@ struct RecordNode {
   RecordNode() : t(tick<cfg>()) { }
   explicit RecordNode(Tock t) : t(t) { }
 
+  // a record's function can only be called via records.back()->xxx(...).
   void suspend(const std::shared_ptr<RecordNode<cfg>>& rec);
+  virtual void suspended() = 0;
+  virtual void resumed() = 0;
+  virtual void completed() = 0;
+  virtual bool is_tailcall() { return false; }
+
+  // can only be called once, deleting this in the process
   void complete();
   void replay_finished();
   void complete_to(const std::shared_ptr<RecordNode<cfg>>& rec);
-  virtual void suspended() = 0;
-  virtual void completed() = 0;
-  virtual void resumed() = 0;
-  virtual bool is_tailcall() { return false; }
   virtual void tailcall(std::shared_ptr<replay_func<cfg>>&& f,
                         std::vector<EZombie<cfg>>&& in) { assert(false); }
   virtual void play() { assert(false); }
+
   virtual bool is_value() { return false; }
   virtual ExternalEZombie<cfg> get_value() { assert(false); }
 };
