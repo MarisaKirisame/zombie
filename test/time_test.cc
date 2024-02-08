@@ -7,12 +7,12 @@ TEST(ZombieRawClockTest, Time) {
   ZombieClock& zc = ZombieClock::singleton();
   auto a = zc.time();
   auto b = zc.time();
-  EXPECT_GT(b, a);
+  EXPECT_TRUE(b >= a);
   zc.fast_forward(1s);
   auto c = zc.time();
-  EXPECT_GT(c, b);
-  EXPECT_GE((c - b), 1s);
-  EXPECT_LT((c - b), 2s);
+  EXPECT_TRUE(c > b);
+  EXPECT_TRUE((c - b) >= 1s);
+  EXPECT_TRUE((c - b) < 2s);
 }
 
 TEST(ZombieClockTest, Time) {
@@ -32,8 +32,8 @@ TEST(ZombieClockTest, Time) {
           return Unit();
         });
         auto t = std::get<1>(p);
-        EXPECT_GE(t, 2s);
-        EXPECT_LT(t, 3s);
+        EXPECT_TRUE(t >= 2s);
+        EXPECT_TRUE(t < 3s);
       }
     }
   };
@@ -50,8 +50,8 @@ TEST(ZombieClockTest, Time) {
           return Unit();
         });
         auto t = std::get<1>(p);
-        EXPECT_GE(t, i * 2s);
-        EXPECT_LT(t, i * 2s + 1s);
+        EXPECT_TRUE(t > i * 2s);
+        EXPECT_TRUE(t < i * 2s + 1s);
       }
     }
   };

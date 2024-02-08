@@ -48,8 +48,9 @@ struct Time {
 
   Time() = delete;
   Time(ns time) : time(time) { }
+  Time(int x) : time(0) { assert(x == 0); }
 
-  int64_t count() {
+  int64_t count() const {
     assert(time.count() >= plank_time_in_nanoseconds);
     return time.count() / plank_time_in_nanoseconds;
   }
@@ -66,7 +67,19 @@ struct Time {
     time += rhs.time;
     return *this;
   }
+
+  bool operator<(const Time& rhs) {
+    return time < rhs.time;
+  }
+
+  bool operator>(const Time& rhs) {
+    return time > rhs.time;
+  }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Time& t) {
+  return os << t.count();
+}
 
 struct Space {
   size_t bytes;

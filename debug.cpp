@@ -153,8 +153,15 @@ TEST(ZombieTest, TailCall) {
   EXPECT_EQ(b.get_value(), 2);
 }
 
+TEST(ZombieTest, Bind) {
+  using namespace Default;
+  Zombie<int> x(6), y(7);
+  Zombie<int> z = bindZombie([](int x, int y) { return Zombie<int>(x * y); }, x, y);
+  EXPECT_EQ(z.get_value(), 42);
+}
+
 int main() {
-  TailCall();
-  //SqrtSpaceLinearTime();
+  //TailCall();
+  SqrtSpaceLinearTime();
   //LogSpaceNLogNTime();
 }

@@ -16,6 +16,13 @@ TEST(ZombieTest, Bind) {
   EXPECT_EQ(z.get_value(), 42);
 }
 
+TEST(ZombieTest, NoExpire) {
+  Zombie<int> x(6), y(7);
+  Zombie<int> z = bindZombie([](int x, int y) { return Zombie<int>(x * y); }, x, y);
+  EXPECT_TRUE(z.z.ptr_cache.lock() != nullptr);
+  EXPECT_EQ(z.get_value(), 42);
+}
+
 TEST(ZombieTest, Resource) {
   struct Test {};
   using Resource = Resource<Test>;
