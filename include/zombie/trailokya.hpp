@@ -113,6 +113,11 @@ struct ContextNode : Object {
   size_t space_taken;
   Replayer<cfg> end_rep;
 
+  // this live up here, but evicted_data_dependent live down there,
+  // because compute dependencies is about the next checkpoint,
+  // while data dependencies is about this checkpoint.
+  UF<Time> evicted_compute_dependents = UF<Time>(Time(0));
+
   explicit ContextNode(const Tock& start_t, const Tock& end_t,
                        std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
                        const size_t& sp,
@@ -133,8 +138,6 @@ struct ContextNode : Object {
   virtual void evict_individual(const Tock& t) = 0;
   void replay();
   virtual bool is_tailcall() { return false; }
-  virtual void dependency_evicted(UF<Time>& t) = 0;
-  virtual UF<Time> get_evicted_dependencies() = 0;
 };
 
 template<const ZombieConfig& cfg>
@@ -150,8 +153,6 @@ struct RootContextNode : ContextNode<cfg> {
   bool evictable() override { return false; }
   void evict() override { assert(false); }
   void evict_individual(const Tock& t) override { assert(false); }
-  void dependency_evicted(UF<Time>& t) override { }
-  UF<Time> get_evicted_dependencies() override { return UF<Time>(Time(ns(0))); }
 };
 
 template<const ZombieConfig& cfg>
@@ -162,12 +163,7 @@ struct FullContextNode : ContextNode<cfg> {
 
   mutable ptrdiff_t pool_index = -1;
 
-  // if X is evicted, and recomputing depend on this node,
-  // X should merge the UF representation of itself with this UF.
-  // note that as FullContextNode can be evicted, when that happens
-  // the UF rep have to be merged with the FullContextNode's evicted_dependencies before it.
-  UF<Time> evicted_dependents = UF<Time>(time_taken);
-
+  UFSet<Time> evicted_data_dependents;
   explicit FullContextNode(const Tock& start_t,
                            const Tock& end_t,
                            std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
@@ -183,8 +179,6 @@ struct FullContextNode : ContextNode<cfg> {
   void evict_individual(const Tock& t) override;
   cost_t cost();
   bool is_tailcall() override { return true; }
-  void dependency_evicted(UF<Time>& t) override { evicted_dependents.merge(t); }
-  UF<Time> get_evicted_dependencies() override { return evicted_dependents; }
 };
 
 // RecomputeLater holds a weak pointer to a MicroWave,

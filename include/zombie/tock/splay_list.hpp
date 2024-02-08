@@ -133,6 +133,7 @@ struct SplayList {
   ~SplayList() {
     Node* root_node_copy = root_node;
     root_node = nullptr;
+    size = 0;
     if (root_node_copy != nullptr) {
       for (Node* left_ptr = root_node_copy->parent; left_ptr != nullptr;) {
         Node* to_delete = left_ptr;

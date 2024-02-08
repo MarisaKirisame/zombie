@@ -68,12 +68,16 @@ struct Time {
     return *this;
   }
 
-  bool operator<(const Time& rhs) {
+  bool operator<(const Time& rhs) const {
     return time < rhs.time;
   }
 
-  bool operator>(const Time& rhs) {
+  bool operator>(const Time& rhs) const {
     return time > rhs.time;
+  }
+
+  Time operator/(const size_t& rhs) const {
+    return Time(time / rhs);
   }
 };
 

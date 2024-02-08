@@ -52,17 +52,29 @@ void FullContextNode<cfg>::evict() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   size_t s = this->ez.size();
   this->ez.clear();
-  evicted_dependents.increase(time_taken);
+  UF<Time> cost(time_taken);
+  cost.merge(this->evicted_compute_dependents);
+  evicted_data_dependents.merge(cost);
+
   for (const Tock& input: dependencies) {
     auto* n = t.akasha.find_le_node(input);
-    if (n->v->end_t < input) {
-      n->v->dependency_evicted(evicted_dependents);
+    if (n->v->end_t > input) {
+      // we found the node. it is a data dependency.
+      if (auto* ptr = dynamic_cast<FullContextNode<cfg>*>(n->v.get())) {
+        ptr->evicted_data_dependents.insert(cost);
+      }
+    } else {
+      // the node is evicted.
+      // so there is a compute dependency between the node and the node that hold this value.
+      n->v->evicted_compute_dependents.merge(cost);
     }
   }
+
   auto* parent_node = t.akasha.find_precise_node(this->start_t)->parent;
   auto parent_context = parent_node->v;
-  parent_context->dependency_evicted(evicted_dependents);
-  std::cout << "evicting " << this->start_t << ", cost: " << evicted_dependents.value().count() << " gd heap size: " << t.book.size() << std::endl;
+  parent_context->evicted_compute_dependents.merge(cost);
+
+  //std::cout << "evicting " << this->start_t << ", cost: " << cost.value().count() << " gd heap size: " << t.book.size() << std::endl;
   // this line delete this;
   t.akasha.remove_precise(this->start_t);
 }
@@ -70,12 +82,11 @@ void FullContextNode<cfg>::evict() {
 template<const ZombieConfig& cfg>
 cost_t FullContextNode<cfg>::cost() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  std::set<UF<Time>> roots;
-  Time cost = time_taken + evicted_dependents.value();
+  std::unordered_set<UF<Time>> counted = {this->evicted_compute_dependents};
+  Time cost = time_taken + this->evicted_compute_dependents.value() + evicted_data_dependents.sum(counted);
   for (const Tock& input: dependencies) {
-    auto uf = (*(t.akasha.find_le(input)))->get_evicted_dependencies();
-    if (roots.find(uf) == roots.end()) {
-      roots.insert(uf);
+    auto uf = (*(t.akasha.find_le(input)))->evicted_compute_dependents;
+    if (counted.insert(uf).second) {
       cost += uf.value();
     }
   }
@@ -89,14 +100,16 @@ void FullContextNode<cfg>::evict_individual(const Tock& t) {
 
 template<const ZombieConfig& cfg>
 void ContextNode<cfg>::replay() {
+  Time cost = evicted_compute_dependents.value();
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   Tock tock = t.current_tock;
   assert(this->end_t < t.replay.forward_at);
   Tock from = this->end_t;
-  std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
+  /*std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
             << " to " << t.replay.forward_at
             << " diff(/32) " << (t.replay.forward_at - from).tock / 32 + 1
-            << " requested at " << t.current_tock << std::endl;
+            << " requested at " << t.current_tock
+            << ", cost " << cost.count() << std::endl;*/
   bracket(
     [&]() {
       t.current_tock = from;
@@ -117,7 +130,10 @@ void ContextNode<cfg>::replay() {
       t.records.pop_back();
       t.current_tock = tock;
     });
-  std::cout << "replaying done!" << std::endl;
+  // this does not look absolutely right, but the problem seems super complex.
+  // lets come back later.
+  evicted_compute_dependents.update([](const Time& t){ return t/2; });
+  //std::cout << "replaying done!" << std::endl;
 }
 
 template<const ZombieConfig& cfg>
@@ -290,15 +306,17 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
   for (const auto& i : this->rep->in) {
     deps.push_back(i.created_time);
   }
+  auto time_taken = Time(Trailokya<cfg>::get_trailokya().meter.time()) - start_time;
+  // std::cout << time_taken.count() << std::endl;
   auto fc = std::make_shared<FullContextNode<cfg>>(this->t,
                                                    t.current_tock,
                                                    std::move(this->ez),
                                                    this->space_taken,
-                                                   Time(Trailokya<cfg>::get_trailokya().meter.time()) - start_time,
+                                                   time_taken,
                                                    rep,
                                                    std::move(deps));
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
-  std::cout << "inserting " << this->t << std::endl;
+  //std::cout << "inserting: " << this->t << ", cost: " << fc->cost() << std::endl;
   t.akasha.insert(this->t, fc);
 }
 

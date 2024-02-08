@@ -56,8 +56,8 @@ struct GetSize<int> {
 // [test_id] is used to separate different tests
 template<typename test_id>
 struct Resource {
-  static unsigned int count;
-  static unsigned int destructor_count;
+  static size_t count;
+  static size_t destructor_count;
 
   int value;
 
@@ -67,10 +67,10 @@ struct Resource {
 };
 
 template<typename test_id>
-unsigned int Resource<test_id>::count = 0;
+size_t Resource<test_id>::count = 0;
 
 template<typename test_id>
-unsigned int Resource<test_id>::destructor_count = 0;
+size_t Resource<test_id>::destructor_count = 0;
 
 template<typename test_id>
 struct GetSize<Resource<test_id>> {
