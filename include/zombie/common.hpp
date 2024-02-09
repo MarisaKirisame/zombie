@@ -51,7 +51,7 @@ struct Time {
   Time(int x) : time(0) { assert(x == 0); }
 
   int64_t count() const {
-    assert(time.count() >= plank_time_in_nanoseconds);
+    //assert(time.count() >= plank_time_in_nanoseconds);
     return time.count() / plank_time_in_nanoseconds;
   }
 

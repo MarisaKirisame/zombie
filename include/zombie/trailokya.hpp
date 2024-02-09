@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_set>
 
 #include "base.hpp"
 #include "tock/tock.hpp"
@@ -33,6 +34,12 @@ struct RecordNode {
   Tock t;
   std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
   size_t space_taken = 0;
+  std::unordered_set<Tock> dependencies;
+  void register_unrolled(const Tock& tock) {
+    if (tock < t) {
+      dependencies.insert(tock);
+    }
+  }
 
   ~RecordNode() { }
   RecordNode() : t(tick<cfg>()) { }
@@ -121,17 +128,8 @@ struct ContextNode : Object {
   explicit ContextNode(const Tock& start_t, const Tock& end_t,
                        std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
                        const size_t& sp,
-                       const Replayer<cfg>& rep) :
-    start_t(start_t),
-    end_t(end_t),
-    ez(std::move(ez)),
-    space_taken(sp),
-    end_rep(rep) {
-    if (start_t + this->ez.size() + 1 != end_t) {
-      std::cout << start_t << " " << this->ez.size() << " " << end_t << std::endl;
-    }
-    assert(start_t + this->ez.size() + 1 == end_t);
-  }
+                       const Replayer<cfg>& rep);
+
   virtual void accessed() = 0;
   virtual bool evictable() = 0;
   virtual void evict() = 0;
@@ -196,9 +194,6 @@ struct RecomputeLater : Phantom {
     }
   }
 };
-
-template<const ZombieConfig& cfg>
-struct SpineContextNode : ContextNode<cfg> { };
 
 template<const ZombieConfig& cfg>
 struct Replay {

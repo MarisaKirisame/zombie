@@ -52,6 +52,13 @@ struct std::numeric_limits<Tock> {
   }
 };
 
+template<>
+struct std::hash<Tock> {
+  std::size_t operator()(const Tock& t) const {
+    return std::hash<int64_t>()(t.tock);
+  }
+};
+
 inline std::ostream& operator<<(std::ostream& os, const Tock& t) {
   os << t.tock;
   return os;

@@ -99,6 +99,31 @@ void FullContextNode<cfg>::evict_individual(const Tock& t) {
 }
 
 template<const ZombieConfig& cfg>
+ContextNode<cfg>::ContextNode(const Tock& start_t, const Tock& end_t,
+                              std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
+                              const size_t& sp,
+                              const Replayer<cfg>& rep) :
+  start_t(start_t),
+  end_t(end_t),
+  ez(std::move(ez)),
+  space_taken(sp),
+  end_rep(rep) {
+  if (start_t + this->ez.size() + 1 != end_t) {
+    std::cout << start_t << " " << this->ez.size() << " " << end_t << std::endl;
+  }
+  assert(start_t + this->ez.size() + 1 == end_t);
+
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+  auto* n = t.akasha.find_le(start_t);
+  if (n != nullptr && (*n)->end_t == start_t) {
+    (*n)->evicted_compute_dependents = UF<Time>(0);
+  } else {
+    // this happens when n is a nullptr, it is a rootrecordnode, or when it's parent was freshly-evicted.
+    // std::cout << "weird but possible" << std::endl;
+  }
+}
+
+template<const ZombieConfig& cfg>
 void ContextNode<cfg>::replay() {
   Time cost = evicted_compute_dependents.value();
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
@@ -110,6 +135,9 @@ void ContextNode<cfg>::replay() {
             << " diff(/32) " << (t.replay.forward_at - from).tock / 32 + 1
             << " requested at " << t.current_tock
             << ", cost " << cost.count() << std::endl;*/
+  // this does not look absolutely right, but the problem seems super complex.
+  // lets come back later.
+  // also have to goes before actual playing as that steal.
   bracket(
     [&]() {
       t.current_tock = from;
@@ -130,9 +158,6 @@ void ContextNode<cfg>::replay() {
       t.records.pop_back();
       t.current_tock = tock;
     });
-  // this does not look absolutely right, but the problem seems super complex.
-  // lets come back later.
-  evicted_compute_dependents.update([](const Time& t){ return t/2; });
   //std::cout << "replaying done!" << std::endl;
 }
 
@@ -303,8 +328,11 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   assert(this->t < t.replay.forward_at);
   std::vector<Tock> deps;
-  for (const auto& i : this->rep->in) {
-    deps.push_back(i.created_time);
+  for (const auto& i: this->rep->in) {
+    this->dependencies.insert(i.created_time);
+  }
+  for (const auto& i: this->dependencies) {
+    deps.push_back(i);
   }
   auto time_taken = Time(Trailokya<cfg>::get_trailokya().meter.time()) - start_time;
   // std::cout << time_taken.count() << std::endl;
@@ -432,6 +460,9 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   if (t.records.back()->is_tailcall() && t.current_tock - t.records.back()->t < 32) {
+    for (const Tock& tock: std::vector<Tock>{x.created_time...}) {
+      t.records.back()->register_unrolled(tock);
+    }
     // this code does not live in tailcall() member function because we have to do multiple dispatch to do so.
     // note we cannot trampoline this code - doing so make complete() excute when it cannot.
     // std::vector<std::shared_ptr<EZombieNode<cfg>>> storage = {x.shared_ptr()...};

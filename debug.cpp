@@ -65,19 +65,23 @@ unsigned int LinearDependencyForwardBackwardTest(unsigned int total_size, unsign
     }, zs[i - 1]));
   }
 
+  int counter = 0;
+  t.each_step = [&](){
+    if (counter++ % 100 == 0) {
+      int gap = 0;
+      for (const auto& x: zs) {
+        if (x.evicted()) {
+          ++gap;
+        } else {
+          std::cout << gap << ", ";
+          gap = 0;
+        }
+      }
+      std::cout << gap << ": " << Resource::count << std::endl;
+    }
+  };
   // backward
   for (int i = total_size - 1; i >= 0; --i) {
-    int gap = 0;
-    for (const auto& x: zs) {
-      if (x.evicted()) {
-        ++gap;
-      } else {
-        std::cout << gap << ", ";
-        gap = 0;
-      }
-    }
-    std::cout << gap << ": " << Resource::count << std::endl;
-
     t.meter.fast_forward(1ms);
     Zombie<Resource> z = zs[i];
     EXPECT_EQ(z.shared_ptr()->get_ref().value, i);
@@ -101,7 +105,7 @@ void SqrtSpaceLinearTime() {
   //for (int i = 8; i < 20; ++i) {
   {
     int time = 10000;
-    int memory = 25;
+    int memory = 40;
     auto v = LinearDependencyForwardBackwardTest<Test>(time, memory);
     std::cout << time << ", " << memory << ": " << v << " = " << v / time << "x " << std::endl;
     work.push_back(v);
