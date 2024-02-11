@@ -175,6 +175,7 @@ struct FullContextNode : ContextNode<cfg> {
   bool evictable() override { return true; }
   void evict() override;
   void evict_individual(const Tock& t) override;
+  Time time_cost();
   cost_t cost();
   bool is_tailcall() override { return true; }
 };

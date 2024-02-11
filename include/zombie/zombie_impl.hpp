@@ -49,6 +49,7 @@ void FullContextNode<cfg>::accessed() {
 
 template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::evict() {
+  Time pre_calculated = time_cost();
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   size_t s = this->ez.size();
   this->ez.clear();
@@ -74,23 +75,36 @@ void FullContextNode<cfg>::evict() {
   auto parent_context = parent_node->v;
   parent_context->evicted_compute_dependents.merge(cost);
 
-  //std::cout << "evicting " << this->start_t << ", cost: " << cost.value().count() << " gd heap size: " << t.book.size() << std::endl;
+  std::cout << "evicting " << this->start_t << ", cost: " << cost.value().count() << "-" << pre_calculated.count() << " gd heap size: " << t.book.size() << std::endl;
   // this line delete this;
   t.akasha.remove_precise(this->start_t);
 }
 
 template<const ZombieConfig& cfg>
-cost_t FullContextNode<cfg>::cost() {
+Time FullContextNode<cfg>::time_cost() {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   std::unordered_set<UF<Time>> counted = {this->evicted_compute_dependents};
   Time cost = time_taken + this->evicted_compute_dependents.value() + evicted_data_dependents.sum(counted);
   for (const Tock& input: dependencies) {
-    auto uf = (*(t.akasha.find_le(input)))->evicted_compute_dependents;
-    if (counted.insert(uf).second) {
-      cost += uf.value();
+    auto *n = t.akasha.find_le_node(input);
+    if (n->v->end_t <= input) {
+      auto uf = n->v->evicted_compute_dependents;
+      if (counted.insert(uf).second) {
+        cost += uf.value();
+      }
     }
   }
-  return cfg.metric(time_taken, cost, Space(this->space_taken));
+  auto* parent_node = t.akasha.find_precise_node(this->start_t)->parent;
+  auto uf = parent_node->v->evicted_compute_dependents;
+  if (counted.insert(uf).second) {
+    cost += uf.value();
+  }
+  return cost;
+}
+
+template<const ZombieConfig& cfg>
+cost_t FullContextNode<cfg>::cost() {
+  return cfg.metric(time_taken, time_cost(), Space(this->space_taken));
 }
 
 template<const ZombieConfig& cfg>
@@ -130,11 +144,11 @@ void ContextNode<cfg>::replay() {
   Tock tock = t.current_tock;
   assert(this->end_t < t.replay.forward_at);
   Tock from = this->end_t;
-  /*std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
+  std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
             << " to " << t.replay.forward_at
             << " diff(/32) " << (t.replay.forward_at - from).tock / 32 + 1
             << " requested at " << t.current_tock
-            << ", cost " << cost.count() << std::endl;*/
+            << ", cost " << cost.count() << std::endl;
   // this does not look absolutely right, but the problem seems super complex.
   // lets come back later.
   // also have to goes before actual playing as that steal.
@@ -158,7 +172,7 @@ void ContextNode<cfg>::replay() {
       t.records.pop_back();
       t.current_tock = tock;
     });
-  //std::cout << "replaying done!" << std::endl;
+  std::cout << "replaying done!" << std::endl;
 }
 
 template<const ZombieConfig& cfg>
@@ -343,9 +357,9 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
                                                    time_taken,
                                                    rep,
                                                    std::move(deps));
-  t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
-  //std::cout << "inserting: " << this->t << ", cost: " << fc->cost() << std::endl;
   t.akasha.insert(this->t, fc);
+  std::cout << "inserting: " << this->t << ", cost: " << fc->cost() << std::endl;
+  t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
 }
 
 template<const ZombieConfig& cfg>
