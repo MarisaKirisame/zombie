@@ -142,13 +142,14 @@ void ContextNode<cfg>::replay() {
   Time cost = evicted_compute_dependents.value();
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   Tock tock = t.current_tock;
-  assert(this->end_t < t.replay.forward_at);
+  assert(this->end_t < t.replays.back().forward_at);
   Tock from = this->end_t;
   std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
-            << " to " << t.replay.forward_at
-            << " diff(/32) " << (t.replay.forward_at - from).tock / 32 + 1
+            << " to " << t.replays.back().forward_at
+            << " diff(/32) " << (t.replays.back().forward_at - from).tock / 32 + 1
             << " requested at " << t.current_tock
-            << ", cost " << cost.count() << std::endl;
+            << ", cost " << cost.count()
+            << ", depth " << t.replays.size() << std::endl;
   // this does not look absolutely right, but the problem seems super complex.
   // lets come back later.
   // also have to goes before actual playing as that steal.
@@ -158,8 +159,8 @@ void ContextNode<cfg>::replay() {
       t.records.push_back(std::make_shared<HeadRecordNode<cfg>>(this->end_rep));
     },
     [&]() {
-      while(*(t.replay.forward_to) == nullptr) {
-        assert(t.current_tock <= t.replay.forward_at);
+      while(*(t.replays.back().forward_to) == nullptr) {
+        assert(t.current_tock <= t.replays.back().forward_at);
         Tock old_tock = t.current_tock;
         t.records.back()->play();
         assert(old_tock < t.current_tock);
@@ -239,8 +240,7 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
   } else {
     auto& t = Trailokya<cfg>::get_trailokya();
     std::shared_ptr<EZombieNode<cfg>> strong;
-    Replay replay = t.replay;
-    bracket([&]() { t.replay = Replay<cfg> { created_time, &strong }; },
+    bracket([&]() { t.replays.push_back(Replay<cfg> { created_time, &strong }); },
             [&]() { t.meter.block([&](){
               auto* n = t.akasha.find_le_node(created_time);
               if (!(n->v->end_t < created_time)) {
@@ -248,7 +248,7 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
               }
               n->v->replay();
             }); },
-            [&]() { t.replay = replay; });
+            [&]() { t.replays.pop_back(); });
     ret = non_null(strong);
     ptr_cache = ret;
     return ret;
@@ -267,8 +267,8 @@ void Zombie<cfg, T>::construct(Args&&... args) {
     assert(tock_to_index(this->created_time, record->t) == record->ez.size());
     record->ez.push_back(shared);
     record->space_taken += GetSize<T>()(shared->t);
-    if (this->created_time == t.replay.forward_at) {
-      *t.replay.forward_to = shared;
+    if (this->created_time == t.replays.back().forward_at) {
+      *t.replays.back().forward_to = shared;
     }
   }
 }
@@ -340,7 +340,7 @@ void RootRecordNode<cfg>::suspended(const Replayer<cfg>& rep) {
 template<const ZombieConfig& cfg>
 void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  assert(this->t < t.replay.forward_at);
+  assert(this->t < t.replays.back().forward_at);
   std::vector<Tock> deps;
   for (const auto& i: this->rep->in) {
     this->dependencies.insert(i.created_time);
@@ -358,7 +358,7 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
                                                    rep,
                                                    std::move(deps));
   t.akasha.insert(this->t, fc);
-  std::cout << "inserting: " << this->t << ", cost: " << fc->cost() << std::endl;
+  std::cout << "inserting: " << this->t << ", cost: " << fc->time_cost() << std::endl;
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
 }
 
@@ -386,8 +386,8 @@ auto bindZombie(F&& f, const Zombie<cfg, Arg>& ...x) {
   using ret_type = decltype(f(std::declval<Arg>()...));
   static_assert(IsExternalZombie<ret_type>::value, "should be zombie");
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  assert(t.current_tock != t.replay.forward_at);
-  if (t.current_tock < t.replay.forward_at) {
+  assert(t.current_tock != t.replays.back().forward_at);
+  if (t.current_tock < t.replays.back().forward_at) {
     replay_func<cfg> func =
       [f = std::forward<F>(f)](const std::vector<const void*> in) {
         Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();

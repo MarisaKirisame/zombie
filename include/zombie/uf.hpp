@@ -7,7 +7,17 @@
 
 template<typename T>
 struct UFNode : std::enable_shared_from_this<UFNode<T>> {
-  T& get_largest() {
+  static int& get_uf_root_count() {
+    static int uf_root_count = 0;
+    return uf_root_count;
+  }
+
+  static int& get_uf_node_count() {
+    static int uf_node_count = 0;
+    return uf_node_count;
+  }
+
+  static T& get_largest() {
     static T largest(0);
     return largest;
   }
@@ -40,27 +50,33 @@ struct UFNode : std::enable_shared_from_this<UFNode<T>> {
   void merge(std::shared_ptr<UFNode>& _rhs) {
     auto lhs = get_root(), rhs = _rhs->get_root();
     if (lhs != rhs) {
-      if (lhs < rhs) {
-        rhs->parent = lhs;
-        lhs->t += rhs->t;
-        if (lhs->t > get_largest()) {
-          get_largest() = lhs->t;
-          std::cout << "new largest uf: " << get_largest() << std::endl;
-        }
-      } else if (lhs > rhs) {
-        lhs->parent = rhs;
-        rhs->t += lhs->t;
-        if (rhs->t > get_largest()) {
-          get_largest() = rhs->t;
-          std::cout << "new largest uf: " << get_largest() << std::endl;
-        }
+      if (lhs > rhs) {
+        std::swap(lhs, rhs);
+      }
+      --get_uf_root_count();
+      rhs->parent = lhs;
+      lhs->t += rhs->t;
+      if (lhs->t > get_largest()) {
+        get_largest() = lhs->t;
+        std::cout << "new largest uf: " << get_largest() << ", total uf root count: " << get_uf_root_count() << ", total uf node count: " << get_uf_node_count() << std::endl;
       }
     }
   }
 
-  explicit UFNode(const T& t) : t(t) { }
-  explicit UFNode(T&& t) : t(std::move(t)) { }
-  ~UFNode() { }
+  explicit UFNode(const T& t) : t(t) {
+    ++get_uf_root_count();
+    ++get_uf_node_count();
+  }
+  explicit UFNode(T&& t) : t(std::move(t)) {
+    ++get_uf_root_count();
+    ++get_uf_node_count();
+  }
+  ~UFNode() {
+    if (!parent) {
+      --get_uf_root_count();
+    }
+    --get_uf_node_count();
+  }
 
   T value() const {
     return get_root()->t;
@@ -75,16 +91,29 @@ struct UFNode : std::enable_shared_from_this<UFNode<T>> {
 
 template<typename T>
 struct UF {
-  std::shared_ptr<UFNode<T>> ptr;
+  mutable std::shared_ptr<UFNode<T>> ptr;
+  std::shared_ptr<UFNode<T>> get_root() {
+    ptr = ptr->get_root();
+    return ptr;
+  }
+  std::shared_ptr<const UFNode<T>> get_root() const {
+    ptr = ptr->get_root();
+    return ptr;
+  }
   explicit UF(const T& t) : ptr(std::make_shared<UFNode<T>>(t)) { }
   explicit UF(T&& t) : ptr(std::make_shared<UFNode<T>>(std::move(t))) { }
-  void merge(UF& rhs) { ptr->merge(rhs.ptr); }
-  T value() const { return ptr->value(); }
+  void merge(UF& rhs) {
+    rhs.get_root();
+    get_root()->merge(rhs.ptr);
+  }
+  T value() const {
+    return get_root()->value();
+  }
   bool operator <(const UF& rhs) const {
-    return ptr->get_root() < rhs.ptr->get_root();
+    return get_root() < rhs.get_root();
   }
   bool operator ==(const UF& rhs) const {
-    return ptr->get_root() == rhs.ptr->get_root();
+    return get_root() == rhs.get_root();
   }
   template<typename F>
   void update(const F& f) {

@@ -221,7 +221,7 @@ public:
   SplayList<Tock, Context<cfg>> akasha;
   GDHeap<cfg, std::unique_ptr<Phantom>, NotifyIndexChanged, NotifyElementRemoved> book;
   std::vector<Record<cfg>> records = {std::make_shared<RootRecordNode<cfg>>(Tock(0))};
-  Replay<cfg> replay;
+  std::vector<Replay<cfg>> replays = {Replay<cfg>{}};
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
   std::function<void()> each_step = [](){};

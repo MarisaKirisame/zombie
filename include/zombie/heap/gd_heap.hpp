@@ -38,9 +38,10 @@ struct GDHeap {
       assert(!heap.empty());
       Node n = heap.pop();
       cost_t new_cost = cost_f(n.t);
-      if (n.cost / cfg.approx_factor.first <= new_cost / cfg.approx_factor.second &&
-          new_cost / cfg.approx_factor.first <= n.cost / cfg.approx_factor.second) {
-        L = n.cost + n.L_;
+      //if (n.cost / cfg.approx_factor.first <= new_cost / cfg.approx_factor.second &&
+      //    new_cost / cfg.approx_factor.first <= n.cost / cfg.approx_factor.second) {
+      if (n.cost == new_cost) {
+        L = std::max(L, n.cost + n.L_);
         return std::move(n.t);
       } else {
         n.cost = new_cost;
