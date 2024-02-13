@@ -226,6 +226,7 @@ public:
   ZombieMeter meter;
   Reaper reaper = Reaper(*this);
   std::function<void()> each_step = [](){};
+  Time recompute_time = Time(0);
 
 public:
   Trailokya() { }

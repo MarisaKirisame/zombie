@@ -259,15 +259,25 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
   } else {
     auto& t = Trailokya<cfg>::get_trailokya();
     std::shared_ptr<EZombieNode<cfg>> strong;
-    bracket([&]() { t.replays.push_back(Replay<cfg> { created_time, &strong }); },
-            [&]() { t.meter.block([&](){
-              auto* n = t.akasha.find_le_node(created_time);
-              if (!(n->v->end_t < created_time)) {
-                n = n->parent;
-              }
-              n->v->replay();
-            }); },
-            [&]() { t.replays.pop_back(); });
+    ns begin_time = t.meter.raw_time();
+    bracket([&]() {
+        t.replays.push_back(Replay<cfg> { created_time, &strong });
+      },
+      [&]() {
+        t.meter.block([&](){
+          auto* n = t.akasha.find_le_node(created_time);
+          if (!(n->v->end_t < created_time)) {
+            n = n->parent;
+          }
+          n->v->replay();
+        });
+      },
+      [&]() {
+        t.replays.pop_back();
+      });
+    if (t.replays.size() == 1) {
+      t.recompute_time += (t.meter.raw_time() - begin_time);
+    }
     ret = non_null(strong);
     ptr_cache = ret;
     return ret;

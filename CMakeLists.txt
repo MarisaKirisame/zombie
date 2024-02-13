@@ -59,6 +59,8 @@ include(GoogleTest)
 gtest_discover_tests(zombie_test)
 
 # ------- CODE COVERAGE -----------------
+option(COVERAGE "enable code coverage" OFF)
+if(COVERAGE)
 set (MAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CMakeModules)
 include (CodeCoverage.cmake)
 append_coverage_compiler_flags_to_target (zombie_test)
@@ -75,3 +77,4 @@ setup_target_for_coverage_lcov(
   NO_DEMANGLE                                    # Don't demangle C++ symbols
                                                  #  even if c++filt is found
 )
+endif()
