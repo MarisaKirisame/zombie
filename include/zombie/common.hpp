@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cassert>
 
+constexpr bool log_info = false;
+
 template<typename A, typename B, typename C>
 decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
   a();
@@ -91,11 +93,14 @@ struct Space {
   Space() = delete;
   // an ad hoc hack because we need test to run.
   // TODO: fix this by having plank constant configurable
-  explicit Space(size_t bytes) : bytes(bytes + plank_space_in_bytes) { }
+  explicit Space(size_t bytes) : bytes(bytes) { }
 
   size_t count() {
-    assert(bytes >= plank_space_in_bytes);
-    return bytes / plank_space_in_bytes;
+    if (bytes >= plank_space_in_bytes) {
+      return bytes / plank_space_in_bytes;
+    } else {
+      return 1;
+    }
   }
 
   Space& operator+=(const Space& rhs) {

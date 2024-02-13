@@ -117,7 +117,7 @@ template<const ZombieConfig& cfg>
 struct ContextNode : Object {
   Tock start_t, end_t; // open-close
   std::vector<std::shared_ptr<EZombieNode<cfg>>> ez;
-  size_t space_taken;
+  size_t ez_space_taken;
   Replayer<cfg> end_rep;
 
   // this live up here, but evicted_data_dependent live down there,
@@ -176,6 +176,7 @@ struct FullContextNode : ContextNode<cfg> {
   void evict() override;
   void evict_individual(const Tock& t) override;
   Time time_cost();
+  Space space_taken();
   cost_t cost();
   bool is_tailcall() override { return true; }
 };

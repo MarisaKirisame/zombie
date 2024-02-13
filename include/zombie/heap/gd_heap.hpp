@@ -11,7 +11,7 @@ struct GDHeap {
       return cost + L_ < r.cost + r.L_;
     }
   };
-  cost_t L;
+  cost_t L = 0;
 
   struct NHIC_INNER {
     NHIC nhic;
@@ -41,6 +41,9 @@ struct GDHeap {
       //if (n.cost / cfg.approx_factor.first <= new_cost / cfg.approx_factor.second &&
       //    new_cost / cfg.approx_factor.first <= n.cost / cfg.approx_factor.second) {
       if (n.cost == new_cost) {
+        if (log_info) {
+          std::cout << "popped " << n.cost << ", " << n.L_ << std::endl;
+        }
         L = std::max(L, n.cost + n.L_);
         return std::move(n.t);
       } else {
@@ -58,7 +61,15 @@ struct GDHeap {
     return heap.size();
   }
 
+  size_t insert_count = 0;
+
   void push(T&& t, const cost_t& cost) {
+    // in classical gd or gdsf, L is updated at pop.
+    // this create a very long warmup phase.
+    // doing it here avoid the warmup.
+    // weird. doesnt work.
+    // L += cost;
+    // std::cout << "L is: " << L << std::endl;
     heap.push(Node {std::move(t), cost, L});
   }
 

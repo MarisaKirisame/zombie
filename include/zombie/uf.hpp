@@ -53,12 +53,14 @@ struct UFNode : std::enable_shared_from_this<UFNode<T>> {
       if (lhs > rhs) {
         std::swap(lhs, rhs);
       }
-      --get_uf_root_count();
       rhs->parent = lhs;
       lhs->t += rhs->t;
-      if (lhs->t > get_largest()) {
-        get_largest() = lhs->t;
-        std::cout << "new largest uf: " << get_largest() << ", total uf root count: " << get_uf_root_count() << ", total uf node count: " << get_uf_node_count() << std::endl;
+      if (log_info) {
+        --get_uf_root_count();
+        if (lhs->t > get_largest()) {
+          get_largest() = lhs->t;
+          std::cout << "new largest uf: " << get_largest() << ", total uf root count: " << get_uf_root_count() << ", total uf node count: " << get_uf_node_count() << std::endl;
+        }
       }
     }
   }
@@ -92,6 +94,7 @@ struct UFNode : std::enable_shared_from_this<UFNode<T>> {
 template<typename T>
 struct UF {
   mutable std::shared_ptr<UFNode<T>> ptr;
+
   std::shared_ptr<UFNode<T>> get_root() {
     ptr = ptr->get_root();
     return ptr;
@@ -100,8 +103,11 @@ struct UF {
     ptr = ptr->get_root();
     return ptr;
   }
+
   explicit UF(const T& t) : ptr(std::make_shared<UFNode<T>>(t)) { }
   explicit UF(T&& t) : ptr(std::make_shared<UFNode<T>>(std::move(t))) { }
+  UF() = delete;
+
   void merge(UF& rhs) {
     rhs.get_root();
     get_root()->merge(rhs.ptr);
@@ -133,6 +139,7 @@ struct std::hash<UF<T>> {
 template<typename T>
 struct UFSet {
   mutable std::vector<UF<T>> data;
+  mutable UF<T> unique = UF<T>(0);
 
   void fixup(size_t idx) const {
     while (idx != 0 && idx < data.size()) {
@@ -149,8 +156,14 @@ struct UFSet {
     }
   }
 
+  size_t size() const {
+    return data.size();
+  }
 
   void insert(const UF<T>& uf) {
+    if (log_info) {
+      std::cout << "UFS size: " << data.size() << " unique: " << unique.value() << std::endl;
+    }
     data.push_back(uf);
 
     // alright, it is super unclear what's the right amount of fixing we should do.
@@ -185,14 +198,23 @@ struct UFSet {
         new_data.push_back(uf);
       }
     }
+
+    // assert() is unique
+    if (counted.insert(unique).second) {
+      result += unique.value();
+    }
+
     data = std::move(new_data);
     return result;
   }
 
+  // after merging the UF set is no longer usable as unique is no longer unique.
+  // it should be good to force this property.
   void merge(UF<T>& with) const {
     for (UF<T>& uf : data) {
       uf.merge(with);
     }
+    unique.merge(with);
     data.clear();
     data.push_back(with);
   }

@@ -49,7 +49,6 @@ void FullContextNode<cfg>::accessed() {
 
 template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::evict() {
-  Time pre_calculated = time_cost();
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
   size_t s = this->ez.size();
   this->ez.clear();
@@ -75,7 +74,10 @@ void FullContextNode<cfg>::evict() {
   auto parent_context = parent_node->v;
   parent_context->evicted_compute_dependents.merge(cost);
 
-  std::cout << "evicting " << this->start_t << ", cost: " << cost.value().count() << "-" << pre_calculated.count() << " gd heap size: " << t.book.size() << std::endl;
+  if (log_info) {
+    std::cout << "evicting " << this->start_t << ", cost: " << cost.value().count() << ", in book as: " << this->cost()
+              << " gd heap size: " << t.book.size() << " gd L: " << t.book.L << std::endl;
+  }
   // this line delete this;
   t.akasha.remove_precise(this->start_t);
 }
@@ -104,12 +106,17 @@ Time FullContextNode<cfg>::time_cost() {
 
 template<const ZombieConfig& cfg>
 cost_t FullContextNode<cfg>::cost() {
-  return cfg.metric(time_taken, time_cost(), Space(this->space_taken));
+  return cfg.metric(time_taken, time_cost(), Space(this->space_taken()));
 }
 
 template<const ZombieConfig& cfg>
 void FullContextNode<cfg>::evict_individual(const Tock& t) {
   this->ez[tock_to_index(t, this->start_t)].reset();
+}
+
+template<const ZombieConfig& cfg>
+Space FullContextNode<cfg>::space_taken() {
+  return Space(this->ez_space_taken + 8 * evicted_data_dependents.size());
 }
 
 template<const ZombieConfig& cfg>
@@ -120,7 +127,7 @@ ContextNode<cfg>::ContextNode(const Tock& start_t, const Tock& end_t,
   start_t(start_t),
   end_t(end_t),
   ez(std::move(ez)),
-  space_taken(sp),
+  ez_space_taken(sp),
   end_rep(rep) {
   if (start_t + this->ez.size() + 1 != end_t) {
     std::cout << start_t << " " << this->ez.size() << " " << end_t << std::endl;
@@ -128,6 +135,7 @@ ContextNode<cfg>::ContextNode(const Tock& start_t, const Tock& end_t,
   assert(start_t + this->ez.size() + 1 == end_t);
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+
   auto* n = t.akasha.find_le(start_t);
   if (n != nullptr && (*n)->end_t == start_t) {
     (*n)->evicted_compute_dependents = UF<Time>(0);
@@ -139,17 +147,26 @@ ContextNode<cfg>::ContextNode(const Tock& start_t, const Tock& end_t,
 
 template<const ZombieConfig& cfg>
 void ContextNode<cfg>::replay() {
-  Time cost = evicted_compute_dependents.value();
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+
+  auto* ptr = dynamic_cast<FullContextNode<cfg>*>(this);
+  if (ptr && ptr->pool_index != -1) {
+    assert(ptr->pool_index >= 0);
+    t.book.touch(ptr->pool_index);
+  }
+
+  Time cost = evicted_compute_dependents.value();
   Tock tock = t.current_tock;
   assert(this->end_t < t.replays.back().forward_at);
   Tock from = this->end_t;
-  std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
-            << " to " << t.replays.back().forward_at
-            << " diff(/32) " << (t.replays.back().forward_at - from).tock / 32 + 1
-            << " requested at " << t.current_tock
-            << ", cost " << cost.count()
-            << ", depth " << t.replays.size() << std::endl;
+  if (log_info) {
+    std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
+              << " to " << t.replays.back().forward_at
+              << " diff(/32) " << (t.replays.back().forward_at - from).tock / 32 + 1
+              << " requested at " << t.current_tock
+              << ", cost " << cost.count()
+              << ", depth " << t.replays.size() << std::endl;
+  }
   // this does not look absolutely right, but the problem seems super complex.
   // lets come back later.
   // also have to goes before actual playing as that steal.
@@ -173,7 +190,9 @@ void ContextNode<cfg>::replay() {
       t.records.pop_back();
       t.current_tock = tock;
     });
-  std::cout << "replaying done!" << std::endl;
+  if (log_info) {
+    std::cout << "replaying done!" << std::endl;
+  }
 }
 
 template<const ZombieConfig& cfg>
@@ -328,7 +347,31 @@ FullContextNode<cfg>::FullContextNode(const Tock& start_t,
   ContextNode<cfg>(start_t, end_t, std::move(ez), sp, rep),
   time_taken(time_taken),
   last_accessed(Trailokya<cfg>::get_trailokya().meter.raw_time()),
-  dependencies(std::move(deps)) { }
+  dependencies(std::move(deps)) {
+
+  Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
+
+  // we are replaying
+  if (false && t.replays.size() > 1) {
+    std::unordered_set<UF<Time>> updated;
+
+    for (const Tock& input: dependencies) {
+      auto* n = t.akasha.find_le_node(input);
+      if (n->v->end_t > input) {
+        // we found the node. it is a data dependency.
+        if (auto* ptr = dynamic_cast<FullContextNode<cfg>*>(n->v.get())) {
+          ptr->evicted_data_dependents.unique.update([&](const Time& t){ return t - time_taken; });
+        }
+      } else {
+        // the node is evicted.
+        // so there is a compute dependency between the node and the node that hold this value.
+        if (updated.insert(n->v->evicted_compute_dependents).second) {
+          n->v->evicted_compute_dependents.update([&](const Time& t){ return t - time_taken; });
+        }
+      }
+    }
+  }
+}
 
 template<const ZombieConfig& cfg>
 void RootRecordNode<cfg>::suspended(const Replayer<cfg>& rep) {
@@ -358,7 +401,9 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
                                                    rep,
                                                    std::move(deps));
   t.akasha.insert(this->t, fc);
-  std::cout << "inserting: " << this->t << ", cost: " << fc->time_cost() << std::endl;
+  if (log_info) {
+    std::cout << "inserting: " << this->t << ", cost: " << fc->time_cost() << std::endl;
+  }
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
 }
 
