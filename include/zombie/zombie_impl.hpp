@@ -10,6 +10,8 @@
 
 namespace ZombieInternal {
 
+constexpr size_t unroll_factor = 32;
+
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
   : created_time(created_time) { }
@@ -138,7 +140,7 @@ ContextNode<cfg>::ContextNode(const Tock& start_t, const Tock& end_t,
 
   auto* n = t.akasha.find_le(start_t);
   if (n != nullptr && (*n)->end_t == start_t) {
-    (*n)->evicted_compute_dependents = UF<Time>(0);
+    // (*n)->evicted_compute_dependents = UF<Time>(0);
   } else {
     // this happens when n is a nullptr, it is a rootrecordnode, or when it's parent was freshly-evicted.
     // std::cout << "weird but possible" << std::endl;
@@ -162,7 +164,7 @@ void ContextNode<cfg>::replay() {
   if (log_info) {
     std::cout << "replaying from [" << this->start_t << ", " << this->end_t << ")"
               << " to " << t.replays.back().forward_at
-              << " diff(/32) " << (t.replays.back().forward_at - from).tock / 32 + 1
+              << " diff(/" << unroll_factor << ") " << (t.replays.back().forward_at - from).tock / unroll_factor + 1
               << " requested at " << t.current_tock
               << ", cost " << cost.count()
               << ", depth " << t.replays.size() << std::endl;
@@ -528,7 +530,7 @@ auto TailCall(F&& f, const Zombie<cfg, Arg>& ...x) {
   static_assert(IsTCZombie<result_type>::value, "should be TCZombie");
 
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
-  if (t.records.back()->is_tailcall() && t.current_tock - t.records.back()->t < 32) {
+  if (t.records.back()->is_tailcall() && t.current_tock - t.records.back()->t < unroll_factor) {
     for (const Tock& tock: std::vector<Tock>{x.created_time...}) {
       t.records.back()->register_unrolled(tock);
     }

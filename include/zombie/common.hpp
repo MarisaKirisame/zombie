@@ -4,7 +4,7 @@
 #include <chrono>
 #include <cassert>
 
-constexpr bool log_info = false;
+constexpr bool log_info = true;
 
 template<typename A, typename B, typename C>
 decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
