@@ -139,7 +139,7 @@ struct std::hash<UF<T>> {
 template<typename T>
 struct UFSet {
   mutable std::vector<UF<T>> data;
-  mutable UF<T> unique = UF<T>(0);
+  //mutable UF<T> unique = UF<T>(0);
 
   void fixup(size_t idx) const {
     while (idx != 0 && idx < data.size()) {
@@ -162,7 +162,8 @@ struct UFSet {
 
   void insert(const UF<T>& uf) {
     if (log_info) {
-      std::cout << "UFS size: " << data.size() << " unique: " << unique.value() << std::endl;
+      //std::cout << "UFS size: " << data.size() << " unique: " << unique.value() << std::endl;
+      std::cout << "UFS size: " << data.size() << std::endl;
     }
     data.push_back(uf);
 
@@ -200,9 +201,9 @@ struct UFSet {
     }
 
     // assert() is unique
-    if (counted.insert(unique).second) {
-      result += unique.value();
-    }
+    //if (counted.insert(unique).second) {
+    //  result += unique.value();
+    //}
 
     data = std::move(new_data);
     return result;
@@ -214,7 +215,7 @@ struct UFSet {
     for (UF<T>& uf : data) {
       uf.merge(with);
     }
-    unique.merge(with);
+    //unique.merge(with);
     data.clear();
     data.push_back(with);
   }

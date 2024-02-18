@@ -169,9 +169,6 @@ void ContextNode<cfg>::replay() {
               << ", cost " << cost.count()
               << ", depth " << t.replays.size() << std::endl;
   }
-  // this does not look absolutely right, but the problem seems super complex.
-  // lets come back later.
-  // also have to goes before actual playing as that steal.
   bracket(
     [&]() {
       t.current_tock = from;
@@ -193,7 +190,7 @@ void ContextNode<cfg>::replay() {
       t.current_tock = tock;
     });
   if (log_info) {
-    std::cout << "replaying done!" << std::endl;
+    std::cout << "replaying done, depth" << t.replays.size() << std::endl;
   }
 }
 
@@ -372,7 +369,7 @@ FullContextNode<cfg>::FullContextNode(const Tock& start_t,
       if (n->v->end_t > input) {
         // we found the node. it is a data dependency.
         if (auto* ptr = dynamic_cast<FullContextNode<cfg>*>(n->v.get())) {
-          ptr->evicted_data_dependents.unique.update([&](const Time& t){ return t - time_taken; });
+          //ptr->evicted_data_dependents.unique.update([&](const Time& t){ return t - time_taken; });
         }
       } else {
         // the node is evicted.
@@ -414,7 +411,7 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
                                                    std::move(deps));
   t.akasha.insert(this->t, fc);
   if (log_info) {
-    std::cout << "inserting: " << this->t << ", cost: " << fc->time_cost() << std::endl;
+    std::cout << "inserting: " << this->t << ", cost: " << fc->time_cost() << ", time_taken: " << time_taken << std::endl;
   }
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
 }

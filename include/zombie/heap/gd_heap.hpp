@@ -3,6 +3,8 @@ template<const ZombieConfig& cfg,
          typename NHIC = NotifyHeapIndexChanged<T>,
          typename NHER = NotifyHeapElementRemoved<T>>
 struct GDHeap {
+  static constexpr bool staleness = false;
+
   struct Node {
     T t;
     cost_t cost;
@@ -10,6 +12,9 @@ struct GDHeap {
     bool operator<(const Node& r) const {
       return cost + L_ < r.cost + r.L_;
     }
+    Node(T&&t_, cost_t cost_, cost_t L__) : t(std::move(t_)), cost(cost_), L_(L__) { }
+    Node(Node&&) = default;
+    Node& operator=(Node&&) = default;
   };
   cost_t L = 0;
 
@@ -30,8 +35,23 @@ struct GDHeap {
   };
 
   MinHeap<Node, std::less<Node>, NHIC_INNER, NHER_INNER> heap;
+  std::vector<Node> waiting;
 
   GDHeap(const NHIC& nhic = NHIC(), const NHER& nher = NHER()) : heap(std::less<Node>(), NHIC_INNER(nhic), NHER_INNER(nher)) { }
+
+  void readjust() {
+    if (!staleness) {
+      if (waiting.size() * waiting.size() > heap.size()) {
+        if (log_info) {
+          std::cout << "readjust! " << std::endl; 
+        }
+        for (Node& n: waiting) {
+          heap.push(std::move(n));
+        }
+        waiting.clear();
+      }
+    }
+  }
 
   T adjust_pop(const std::function<cost_t(const T&)> cost_f) {
     while (true) {
@@ -44,7 +64,11 @@ struct GDHeap {
         if (log_info) {
           std::cout << "popped " << n.cost << ", " << n.L_ << std::endl;
         }
-        L = std::max(L, n.cost + n.L_);
+        if (staleness) {
+          L = std::max(L, n.cost + n.L_);
+        } else {
+          readjust();
+        }
         return std::move(n.t);
       } else {
         n.cost = new_cost;
@@ -58,19 +82,24 @@ struct GDHeap {
   }
 
   size_t size() const {
-    return heap.size();
+    return heap.size() + waiting.size();
   }
 
   size_t insert_count = 0;
 
   void push(T&& t, const cost_t& cost) {
-    // in classical gd or gdsf, L is updated at pop.
-    // this create a very long warmup phase.
-    // doing it here avoid the warmup.
-    // weird. doesnt work.
-    // L += cost;
-    // std::cout << "L is: " << L << std::endl;
-    heap.push(Node {std::move(t), cost, L});
+    if (staleness) {
+      // in classical gd or gdsf, L is updated at pop.
+      // this create a very long warmup phase.
+      // doing it here avoid the warmup.
+      // weird. doesnt work.
+      // L += cost;
+      // std::cout << "L is: " << L << std::endl;
+      heap.push(Node(std::move(t), cost, L));
+    } else {
+      waiting.push_back(Node(std::move(t), cost, L));
+      readjust();
+    }
   }
 
   void touch(size_t idx) {
