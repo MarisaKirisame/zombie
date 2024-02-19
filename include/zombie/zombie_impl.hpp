@@ -168,6 +168,13 @@ void ContextNode<cfg>::replay() {
               << " requested at " << t.current_tock
               << ", cost " << cost.count()
               << ", depth " << t.replays.size() << std::endl;
+    if (log_to.is_open()) {
+      nlohmann::json j;
+      j["name"] = "replay_begin";
+      j["timestamp"] = timestamp();
+      j["depth"] = t.replays.size();
+      log_to << j << std::endl;
+    }
   }
   bracket(
     [&]() {
@@ -191,6 +198,13 @@ void ContextNode<cfg>::replay() {
     });
   if (log_info) {
     std::cout << "replaying done, depth" << t.replays.size() << std::endl;
+    if (log_to.is_open()) {
+      nlohmann::json j;
+      j["name"] = "replay_end";
+      j["timestamp"] = timestamp();
+      j["depth"] = t.replays.size();
+      log_to << j << std::endl;
+    }
   }
 }
 
@@ -259,6 +273,13 @@ std::shared_ptr<EZombieNode<cfg>> EZombie<cfg>::shared_ptr() const {
     auto& t = Trailokya<cfg>::get_trailokya();
     std::shared_ptr<EZombieNode<cfg>> strong;
     ns begin_time = t.meter.raw_time();
+    if (log_to.is_open() && t.replays.size() == 1) {
+      nlohmann::json j;
+      j["name"] = "current_tock_change";
+      j["timestamp"] = timestamp();
+      j["value"] = t.current_tock.tock;
+      log_to << j << std::endl;
+    }
     bracket([&]() {
         t.replays.push_back(Replay<cfg> { created_time, &strong });
       },
@@ -389,6 +410,8 @@ void RootRecordNode<cfg>::suspended(const Replayer<cfg>& rep) {
                                                                   std::move(this->ez), this->space_taken, rep));
 }
 
+constexpr bool use_measured_time = false;
+
 template<const ZombieConfig& cfg>
 void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
   Trailokya<cfg>& t = Trailokya<cfg>::get_trailokya();
@@ -400,7 +423,7 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
   for (const auto& i: this->dependencies) {
     deps.push_back(i);
   }
-  auto time_taken = Time(Trailokya<cfg>::get_trailokya().meter.time()) - start_time;
+  auto time_taken = use_measured_time ? Time(Trailokya<cfg>::get_trailokya().meter.time()) - start_time : Time(ns(plank_time_in_nanoseconds));
   // std::cout << time_taken.count() << std::endl;
   auto fc = std::make_shared<FullContextNode<cfg>>(this->t,
                                                    t.current_tock,
@@ -412,6 +435,14 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
   t.akasha.insert(this->t, fc);
   if (log_info) {
     std::cout << "inserting: " << this->t << ", cost: " << fc->time_cost() << ", time_taken: " << time_taken << std::endl;
+    if (log_to.is_open()) {
+      nlohmann::json j;
+      j["name"] = "insert_context";
+      j["timestamp"] = timestamp();
+      j["time_taken"] = time_taken.count();
+      j["splaylist_size"] = t.akasha.size;
+      log_to << j << std::endl;
+    }
   }
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
 }

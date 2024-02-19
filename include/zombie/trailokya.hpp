@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <unordered_set>
+#include <fstream>
 
 #include "context.hpp"
 #include "base.hpp"

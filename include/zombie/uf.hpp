@@ -5,6 +5,8 @@
 #include <random>
 #include <unordered_set>
 
+#include <nlohmann/json.hpp>
+
 template<typename T>
 struct UFNode : std::enable_shared_from_this<UFNode<T>> {
   static int& get_uf_root_count() {
@@ -60,6 +62,15 @@ struct UFNode : std::enable_shared_from_this<UFNode<T>> {
         if (lhs->t > get_largest()) {
           get_largest() = lhs->t;
           std::cout << "new largest uf: " << get_largest() << ", total uf root count: " << get_uf_root_count() << ", total uf node count: " << get_uf_node_count() << std::endl;
+          if (log_to.is_open()) {
+            nlohmann::json j;
+            j["name"] = "largest_uf";
+            j["timestamp"] = timestamp();
+            j["value"] = get_largest().count();
+            j["total_uf_root_count"] = get_uf_root_count();
+            j["total_uf_node_count"] = get_uf_node_count();
+            log_to << j << std::endl;
+          }
         }
       }
     }

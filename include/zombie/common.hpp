@@ -3,8 +3,10 @@
 #include <memory>
 #include <chrono>
 #include <cassert>
+#include <fstream>
 
 constexpr bool log_info = true;
+static std::fstream log_to;
 
 template<typename A, typename B, typename C>
 decltype(std::declval<B>()()) bracket(const A& a, const B& b, const C& c) {
@@ -116,3 +118,7 @@ template<typename T>
 struct GetSize; // {
 //   size_t operator()(const T&);
 // };
+
+inline int64_t timestamp() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
