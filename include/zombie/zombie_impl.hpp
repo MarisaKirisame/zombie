@@ -140,7 +140,7 @@ ContextNode<cfg>::ContextNode(const Tock& start_t, const Tock& end_t,
 
   auto* n = t.akasha.find_le(start_t);
   if (n != nullptr && (*n)->end_t == start_t) {
-    (*n)->evicted_compute_dependents = UF<Time>(0);
+    // (*n)->evicted_compute_dependents = UF<Time>(0);
   } else {
     // this happens when n is a nullptr, it is a rootrecordnode, or when it's parent was freshly-evicted.
     // std::cout << "weird but possible" << std::endl;
