@@ -3,7 +3,7 @@ template<const ZombieConfig& cfg,
          typename NHIC = NotifyHeapIndexChanged<T>,
          typename NHER = NotifyHeapElementRemoved<T>>
 struct GDHeap {
-  static constexpr bool staleness = false;
+  static constexpr bool staleness = true;
 
   struct Node {
     T t;
