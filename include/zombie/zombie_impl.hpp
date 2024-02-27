@@ -469,9 +469,9 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
     }
   }
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
-  while (t.book.size() > 30) {
-    t.reaper.murder();
-  }
+  //while (t.book.size() > 30) {
+  //  t.reaper.murder();
+  //}
 }
 
 template<const ZombieConfig& cfg>
