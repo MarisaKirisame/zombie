@@ -10,7 +10,7 @@
 
 namespace ZombieInternal {
 
-constexpr size_t unroll_factor = 1;
+constexpr size_t unroll_factor = 32;
 
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
@@ -469,9 +469,6 @@ void HeadRecordNode<cfg>::completed(const Replayer<cfg>& rep) {
     }
   }
   t.book.push(std::make_unique<RecomputeLater<cfg>>(fc), fc->cost());
-  //while (t.book.size() > 30) {
-  //  t.reaper.murder();
-  //}
 }
 
 template<const ZombieConfig& cfg>
