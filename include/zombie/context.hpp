@@ -13,10 +13,7 @@ struct ContextNode : Object {
   size_t ez_space_taken;
   Replayer<cfg> end_rep;
 
-  // this live up here, but evicted_data_dependent live down there,
-  // because compute dependencies is about the next checkpoint,
-  // while data dependencies is about this checkpoint.
-  UF<Time> evicted_compute_dependents = UF<Time>(Time(0));
+  UF<Time> backward_uf = UF<Time>(Time(0));
 
   explicit ContextNode(const Tock& start_t, const Tock& end_t,
                        std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,
@@ -54,7 +51,9 @@ struct FullContextNode : ContextNode<cfg> {
 
   mutable ptrdiff_t pool_index = -1;
 
-  UFSet<Time> evicted_data_dependents;
+  UF<Time> forward_uf = UF<Time>(Time(0));
+  UFSet<Time> backedges;
+
   explicit FullContextNode(const Tock& start_t,
                            const Tock& end_t,
                            std::vector<std::shared_ptr<EZombieNode<cfg>>>&& ez,

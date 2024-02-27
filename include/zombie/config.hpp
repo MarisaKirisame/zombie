@@ -39,8 +39,12 @@ inline cost_t local_metric(Time cost, Time neighbor_cost, Space size) {
   return (static_cast<int128_t>(cost.count()) * (1UL << 10)) / size.count();
 }
 
+inline cost_t cost_metric(Time cost, Time neighbor_cost, Space size) {
+  return static_cast<int128_t>(neighbor_cost.count());
+}
+
 inline cost_t uf_metric(Time cost, Time neighbor_cost, Space size) {
   return (static_cast<int128_t>(neighbor_cost.count()) * (1UL << 10)) / size.count();
 }
 
-constexpr ZombieConfig default_config(/*metric=*/&uf_metric, /*approx_factor=*/{2, 1});
+constexpr ZombieConfig default_config(/*metric=*/&cost_metric, /*approx_factor=*/{2, 1});

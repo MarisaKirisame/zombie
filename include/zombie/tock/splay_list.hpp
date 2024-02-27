@@ -181,7 +181,7 @@ struct SplayList {
     return ret;
   }
 
-  // find the largest Node with start <= t.
+  // find the largest Node with start <= k.
   Node* find_le_node(const K& k) {
     Node* ptr = find_node(k);
     if (ptr == nullptr) {
@@ -209,14 +209,14 @@ struct SplayList {
     return ptr == nullptr ? nullptr : &(ptr->v);
   }
 
-  V* find_precise(const K& k) {
-    Node* ptr = find_precise_node(k);
-    return ptr == nullptr ? nullptr : &(ptr->v);
-  }
-
   bool has_le(const K& k) {
     Node* ptr = find_le_node(k);
     return ptr != nullptr;
+  }
+
+  V* find_precise(const K& k) {
+    Node* ptr = find_precise_node(k);
+    return ptr == nullptr ? nullptr : &(ptr->v);
   }
 
   bool has_precise(const K& k) {

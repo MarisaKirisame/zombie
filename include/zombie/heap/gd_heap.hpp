@@ -3,7 +3,7 @@ template<const ZombieConfig& cfg,
          typename NHIC = NotifyHeapIndexChanged<T>,
          typename NHER = NotifyHeapElementRemoved<T>>
 struct GDHeap {
-  static constexpr bool staleness = true;
+  static constexpr bool staleness = false;
 
   struct Node {
     T t;
@@ -43,7 +43,7 @@ struct GDHeap {
     if (!staleness) {
       if (waiting.size() * waiting.size() > heap.size()) {
         if (log_info) {
-          std::cout << "readjust! " << std::endl; 
+          std::cout << "readjust! " << std::endl;
         }
         for (Node& n: waiting) {
           heap.push(std::move(n));
@@ -53,7 +53,27 @@ struct GDHeap {
     }
   }
 
-  T adjust_pop(const std::function<cost_t(const T&)> cost_f) {
+  bool fix(const std::function<cost_t(const T&)>& cost_f) {
+    std::default_random_engine re;
+    std::uniform_int_distribution<int> uniform_dist(0, heap.size() - 1);
+    size_t i = uniform_dist(re);
+    Node& n = heap[i];
+    cost_t new_cost = cost_f(n.t);
+    if (n.cost != new_cost) {
+      n.cost = new_cost;
+      heap.rebalance(i, false);
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  T adjust_pop(const std::function<cost_t(const T&)>& cost_f) {
+    // turned off for now.
+    for (size_t i = 0; i < 0; ++i) {
+      fix(cost_f);
+    }
+
     while (true) {
       assert(!heap.empty());
       Node n = heap.pop();
