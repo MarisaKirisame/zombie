@@ -10,7 +10,7 @@
 
 namespace ZombieInternal {
 
-constexpr size_t unroll_factor = 1;
+constexpr size_t unroll_factor = 32;
 
 template<const ZombieConfig& cfg>
 EZombieNode<cfg>::EZombieNode(Tock created_time)
