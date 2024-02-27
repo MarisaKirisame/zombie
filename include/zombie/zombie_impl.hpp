@@ -71,7 +71,7 @@ void FullContextNode<cfg>::evict() {
   auto& parent_context = parent_node->v;
   parent_context->backward_uf.merge(cost);
 
-  if (log_info) {
+  if (false && log_info) {
     std::cout << "evicting " << this->start_t << ", cost: " << cost.value().count() << ", in book as: " << this->cost()
               << " gd heap size: " << t.book.size() << " gd L: " << t.book.L << std::endl;
     if (log_to.is_open()) {
